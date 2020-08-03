@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 use gio::prelude::*;
 
-use gtk::{Application, ScrolledWindow, TextView, ApplicationWindow, Button, Adjustment, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label};
+use gtk::{Application, ScrolledWindow, TextView, ApplicationWindow, Button, Adjustment, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, ArrowType, IconSize, ReliefStyle};
 use std::time::Duration;
 use std::rc::Rc;
 use std::error::Error;
@@ -57,15 +57,17 @@ fn main() {
         window.set_title("Log Viewer");
         window.set_default_size(800, 600);
 
-        let menu = gio::Menu::new();
-        menu.append_item(&gio::MenuItem::new(Some("Open"), Some("app.open")));
-        menu.append_item(&gio::MenuItem::new(Some("Quit"), Some("app.quit")));
+        let menu_model = gio::Menu::new();
+        menu_model.append_item(&gio::MenuItem::new(Some("Open"), Some("app.open")));
+        menu_model.append_item(&gio::MenuItem::new(Some("Quit"), Some("app.quit")));
 
         let menu_button = MenuButton::new();
-        menu_button.set_menu_model(Some(&menu));
+        menu_button.set_relief(ReliefStyle::None);
+        menu_button.set_popup(Some(&gtk::Menu::from_model(&menu_model)));
+        menu_button.set_image(Some(&gtk::Image::from_icon_name(Some("open-menu-symbolic"), IconSize::Menu)));
 
         let header_bar = HeaderBar::new();
-        header_bar.add(&menu_button);
+        header_bar.pack_end(&menu_button);
         header_bar.set_show_close_button(true);
         header_bar.set_title(Some("Log viewer"));
 
