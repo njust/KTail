@@ -30,10 +30,10 @@ fn main() {
                 .quit();
         });
 
-        let container = Notebook::new();
+        let container = Rc::new(Notebook::new());
         container.set_hexpand(true);
         container.set_vexpand(true);
-        window.add(&container);
+        window.add(&*container);
 
         let open_action = SimpleAction::new("open", None);
         open_action.connect_activate(move |a, b| {
@@ -46,8 +46,23 @@ fn main() {
                 if let Some(file_path) = dialog.get_filename() {
                     let file_name = file_path.file_name().unwrap().to_str().unwrap().to_string();
                     let file_view = FileView::new(file_path);
-                    container.append_page(file_view.get_view(), Some(&Label::new(Some(&file_name))));
+
+                    let close_btn = Button::from_icon_name(Some("window-close-symbolic"), IconSize::Menu);
+                    close_btn.set_relief(ReliefStyle::None);
+                    let tab_header = gtk::Box::new(Orientation::Horizontal, 0);
+                    tab_header.add(&Label::new(Some(&file_name)));
+                    tab_header.add(&close_btn);
+
+                    let idx = container.append_page(file_view.get_view(), Some(&tab_header));
+                    let c = container.clone();
+                    close_btn.connect_clicked(move |_| {
+                        if let Some(page) = c.get_nth_page(Some(idx)) {
+                            c.detach_tab(&page);
+                        }
+                    });
+
                     container.show_all();
+                    tab_header.show_all();
                 }
             }
         });

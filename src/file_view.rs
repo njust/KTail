@@ -86,3 +86,9 @@ fn get(path: &PathBuf, start: u64) -> Result<(u64, String), Box<dyn Error>> {
     let s = UTF_16LE.decode(buffer.as_slice(), DecoderTrap::Replace)?;
     Ok((read as u64, s))
 }
+
+impl Drop for FileView {
+    fn drop(&mut self) {
+        println!("Dropping file view");
+    }
+}
