@@ -7,31 +7,39 @@ use std::rc::Rc;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use gio::{SimpleAction};
+use std::sync::{Arc, Mutex, Condvar};
 
 use encoding::all::{UTF_8, WINDOWS_1252, UTF_16BE, UTF_16LE};
 use encoding::{Encoding, DecoderTrap};
 use std::path::PathBuf;
+use std::thread::JoinHandle;
 
 pub struct FileView {
-    path: PathBuf,
-    container: gtk::Box
+    container: gtk::Box,
+    stop_handle: Arc<(Mutex<bool>, Condvar)>
 }
 
 impl FileView {
     pub fn new(path: PathBuf) -> Self {
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
-
         let tx = tx.clone();
-        let p = path.clone();
+
+        let stop_handle = Arc::new((Mutex::new(false), Condvar::new()));
+        let thread_stop_handle = stop_handle.clone();
         std::thread::spawn(move || {
             let mut offset = 0;
-            loop {
-                if let Ok((read, s)) = get(&p, offset) {
+            let (lock, wait_handle) = thread_stop_handle.as_ref();
+            let mut stopped = lock.lock().unwrap();
+
+            while !*stopped {
+                if let Ok((read, s)) = get(&path, offset) {
                     offset += read;
                     tx.send(s);
                 }
-                std::thread::sleep(Duration::from_millis(900));
+
+                stopped = wait_handle.wait_timeout(stopped, Duration::from_millis(500)).unwrap().0;
             }
+            println!("File watcher stopped");
         });
 
         let text_view = TextView::new();
@@ -42,10 +50,10 @@ impl FileView {
             }
         });
 
-        let sw = ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
-        sw.set_vexpand(true);
-        sw.set_hexpand(true);
-        sw.add(&text_view);
+        let scroll_wnd = ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
+        scroll_wnd.set_vexpand(true);
+        scroll_wnd.set_hexpand(true);
+        scroll_wnd.add(&text_view);
 
         rx.attach(None, move |i| {
             if let Some(buffer) = text_view.get_buffer() {
@@ -61,11 +69,10 @@ impl FileView {
         container.set_vexpand(true);
         container.set_hexpand(true);
 
-
-        container.add(&sw);
+        container.add(&scroll_wnd);
         Self {
-            path,
-            container
+            container,
+            stop_handle
         }
     }
 
@@ -89,6 +96,9 @@ fn get(path: &PathBuf, start: u64) -> Result<(u64, String), Box<dyn Error>> {
 
 impl Drop for FileView {
     fn drop(&mut self) {
-        println!("Dropping file view");
+        let &(ref lock, ref cvar) = self.stop_handle.as_ref();
+        let mut stop = lock.lock().unwrap();
+        *stop = true;
+        cvar.notify_one();
     }
 }

@@ -14,13 +14,16 @@ use std::path::PathBuf;
 
 mod file_view;
 use file_view::FileView;
+use glib::bitflags::_core::cell::RefCell;
 
 fn main() {
     let application = Application::new(
         Some("com.github.gtk-rs.examples.basic"),
         Default::default(),
     ).expect("failed to initialize GTK application");
+    let mut fv = Rc::new(RefCell::new(vec![]));
 
+    let mut file_views = fv.clone();
     application.connect_activate(move |app| {
         let window = ApplicationWindow::new(app);
         let exit_action = SimpleAction::new("quit", None);
@@ -36,6 +39,7 @@ fn main() {
         window.add(&*container);
 
         let open_action = SimpleAction::new("open", None);
+        let mut file_views = file_views.clone();
         open_action.connect_activate(move |a, b| {
             let dialog = FileChooserDialog::new::<ApplicationWindow>(Some("Open File"), None, FileChooserAction::Open);
             dialog.add_button("_Cancel", ResponseType::Cancel);
@@ -53,16 +57,21 @@ fn main() {
                     tab_header.add(&Label::new(Some(&file_name)));
                     tab_header.add(&close_btn);
 
-                    let idx = container.append_page(file_view.get_view(), Some(&tab_header));
-                    let c = container.clone();
-                    close_btn.connect_clicked(move |_| {
-                        if let Some(page) = c.get_nth_page(Some(idx)) {
-                            c.detach_tab(&page);
-                        }
-                    });
+                    let idx= container.append_page(file_view.get_view(), Some(&tab_header));
+                    let notebook = container.clone();
+                    {
+                        let file_views = file_views.clone();
+                        close_btn.connect_clicked(move |_| {
+                            if let Some(page) = notebook.get_nth_page(Some(idx)) {
+                                notebook.detach_tab(&page);
+                                file_views.borrow_mut().remove(idx as usize);
+                            }
+                        });
+                    }
 
                     container.show_all();
                     tab_header.show_all();
+                    file_views.borrow_mut().push(file_view);
                 }
             }
         });
