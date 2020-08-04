@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 use gio::prelude::*;
 
-use gtk::{Application, ScrolledWindow, TextView, ApplicationWindow, Button, Adjustment, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, ArrowType, IconSize, ReliefStyle};
+use gtk::{Application, ToggleButton, Toolbar, ScrolledWindow, TextView, ApplicationWindow, Button, Adjustment, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, ArrowType, IconSize, ReliefStyle, ToolButton};
 use std::time::Duration;
 use std::rc::Rc;
 use std::error::Error;
@@ -21,7 +21,7 @@ fn main() {
         Some("com.github.gtk-rs.examples.basic"),
         Default::default(),
     ).expect("failed to initialize GTK application");
-    let mut fv = Rc::new(RefCell::new(vec![]));
+    let mut fv = Rc::new(RefCell::new(Vec::<FileView>::new()));
 
     let mut file_views = fv.clone();
     application.connect_activate(move |app| {
@@ -34,9 +34,31 @@ fn main() {
         });
 
         let container = Rc::new(Notebook::new());
+        let t = Toolbar::new();
+        let b = ToolButton::new(Some(&gtk::Image::from_icon_name(Some("go-bottom-symbolic"), IconSize::Menu)), Some("Auto scroll"));
+        {
+            let container = container.clone();
+            let file_views= file_views.clone();
+            b.connect_clicked(move |_| {
+                let a = container.get_property_page();
+                if let Some(view)  = file_views.borrow_mut().get_mut(a as usize) {
+                    if view.is_auto_scroll_enabled() {
+                        view.disable_auto_scroll();
+                    }else {
+                        view.enable_auto_scroll();
+                    }
+                }
+            });
+        }
+        t.add(&b);
+        let wrapper = gtk::Box::new(Orientation::Vertical, 0);
+
+        wrapper.add(&t);
+        wrapper.add(&*container);
+
         container.set_hexpand(true);
         container.set_vexpand(true);
-        window.add(&*container);
+        window.add(&wrapper);
 
         let open_action = SimpleAction::new("open", None);
         let mut file_views = file_views.clone();

@@ -13,10 +13,13 @@ use encoding::all::{UTF_8, WINDOWS_1252, UTF_16BE, UTF_16LE};
 use encoding::{Encoding, DecoderTrap};
 use std::path::PathBuf;
 use std::thread::JoinHandle;
+use glib::SignalHandlerId;
 
 pub struct FileView {
     container: gtk::Box,
-    stop_handle: Arc<(Mutex<bool>, Condvar)>
+    stop_handle: Arc<(Mutex<bool>, Condvar)>,
+    text_view: Rc<TextView>,
+    autoscroll_handler: Option<SignalHandlerId>,
 }
 
 impl FileView {
@@ -42,28 +45,26 @@ impl FileView {
             println!("File watcher stopped");
         });
 
-        let text_view = TextView::new();
-        text_view.connect_size_allocate(|tv,b| {
-            if let Some(buffer) = tv.get_buffer() {
-                let mut end = buffer.get_end_iter();
-                tv.scroll_to_iter(&mut end,  0.0, true, 0.5, 0.5);
-            }
-        });
+        let text_view = Rc::new(TextView::new());
+        let autoscroll_handler = enable_auto_scroll(&*text_view);
 
         let scroll_wnd = ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
         scroll_wnd.set_vexpand(true);
         scroll_wnd.set_hexpand(true);
-        scroll_wnd.add(&text_view);
+        scroll_wnd.add(&*text_view);
 
-        rx.attach(None, move |i| {
-            if let Some(buffer) = text_view.get_buffer() {
-                if i.len() > 0 {
-                    let (_start, mut end) = buffer.get_bounds();
-                    buffer.insert(&mut end, &i);
+        {
+            let text_view = text_view.clone();
+            rx.attach(None, move |i| {
+                if let Some(buffer) = &text_view.get_buffer() {
+                    if i.len() > 0 {
+                        let (_start, mut end) = buffer.get_bounds();
+                        buffer.insert(&mut end, &i);
+                    }
                 }
-            }
-            glib::Continue(true)
-        });
+                glib::Continue(true)
+            });
+        }
 
         let container = gtk::Box::new(Orientation::Vertical, 0);
         container.set_vexpand(true);
@@ -72,13 +73,40 @@ impl FileView {
         container.add(&scroll_wnd);
         Self {
             container,
-            stop_handle
+            stop_handle,
+            text_view,
+            autoscroll_handler: Some(autoscroll_handler)
+        }
+    }
+
+    pub fn enable_auto_scroll(&mut self) {
+        let handler = enable_auto_scroll(&*self.text_view);
+        self.autoscroll_handler = Some(handler);
+    }
+
+    pub fn is_auto_scroll_enabled(&self) -> bool {
+        self.autoscroll_handler.is_some()
+    }
+
+    pub fn disable_auto_scroll(&mut self) {
+        if let Some(handler) = self.autoscroll_handler.take() {
+            let text_view = &*self.text_view;
+            text_view.disconnect(handler);
         }
     }
 
     pub fn get_view(&self) -> &gtk::Box {
         &self.container
     }
+}
+
+pub fn enable_auto_scroll(text_view : &TextView) -> SignalHandlerId {
+    text_view.connect_size_allocate(|tv,b| {
+        if let Some(buffer) = tv.get_buffer() {
+            let mut end = buffer.get_end_iter();
+            tv.scroll_to_iter(&mut end,  0.0, true, 0.5, 0.5);
+        }
+    })
 }
 
 fn get(path: &PathBuf, start: u64) -> Result<(u64, String), Box<dyn Error>> {
