@@ -1,71 +1,40 @@
 use gtk::prelude::*;
 use gio::prelude::*;
 
-use gtk::{Application, ToggleButton, ScrolledWindow, TextView, ApplicationWindow, Button, Adjustment, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, ArrowType, IconSize, ReliefStyle, ToolButton};
-use std::time::Duration;
+use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle};
 use std::rc::Rc;
-use std::error::Error;
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use gio::{SimpleAction};
 
-use encoding::all::{UTF_8, WINDOWS_1252, UTF_16BE, UTF_16LE};
-use encoding::{Encoding, DecoderTrap};
-use std::path::PathBuf;
-
 mod file_view;
-use file_view::FileView;
 use glib::bitflags::_core::cell::RefCell;
+use crate::file_view::workbench::FileViewWorkbench;
 
 fn main() {
     let application = Application::new(
-        Some("com.github.gtk-rs.examples.basic"),
+        Some("de.njust.ktail"),
         Default::default(),
     ).expect("failed to initialize GTK application");
-    let mut fv = Rc::new(RefCell::new(Vec::<FileView>::new()));
+    let fv = Rc::new(RefCell::new(Vec::<FileViewWorkbench>::new()));
 
-    let mut file_views = fv.clone();
+    let file_views = fv.clone();
     application.connect_activate(move |app| {
         let window = ApplicationWindow::new(app);
         let exit_action = SimpleAction::new("quit", None);
-        exit_action.connect_activate(|a, b| {
+        exit_action.connect_activate(|_a, _b| {
             gio::Application::get_default()
                 .expect("no default Application!")
                 .quit();
         });
 
         let container = Rc::new(Notebook::new());
-        let t = gtk::Box::new(Orientation::Horizontal, 4);
-        t.set_property_margin(4);
-        let b = ToggleButton::new();
-        b.set_image(Some(&gtk::Image::from_icon_name(Some("go-bottom-symbolic"), IconSize::Menu)));
-        b.set_active(true);
-        {
-            let container = container.clone();
-            let file_views= file_views.clone();
-            b.connect_clicked(move |_| {
-                let a = container.get_property_page();
-                if let Some(view)  = file_views.borrow_mut().get_mut(a as usize) {
-                    if view.is_auto_scroll_enabled() {
-                        view.disable_auto_scroll();
-                    }else {
-                        view.enable_auto_scroll();
-                    }
-                }
-            });
-        }
-        t.add(&b);
-        let wrapper = gtk::Box::new(Orientation::Vertical, 0);
-
-        wrapper.add(&t);
-        wrapper.add(&*container);
 
         container.set_hexpand(true);
         container.set_vexpand(true);
-        window.add(&wrapper);
+        window.add(&*container);
 
         let open_action = SimpleAction::new("open", None);
-        let mut file_views = file_views.clone();
-        open_action.connect_activate(move |a, b| {
+        let file_views = file_views.clone();
+        open_action.connect_activate(move |_a, _b| {
             let dialog = FileChooserDialog::new::<ApplicationWindow>(Some("Open File"), None, FileChooserAction::Open);
             dialog.add_button("_Cancel", ResponseType::Cancel);
             dialog.add_button("_Open", ResponseType::Accept);
@@ -74,7 +43,7 @@ fn main() {
             if res == ResponseType::Accept {
                 if let Some(file_path) = dialog.get_filename() {
                     let file_name = file_path.file_name().unwrap().to_str().unwrap().to_string();
-                    let file_view = FileView::new(file_path);
+                    let file_view = FileViewWorkbench::new(file_path);
 
                     let close_btn = Button::from_icon_name(Some("window-close-symbolic"), IconSize::Menu);
                     close_btn.set_relief(ReliefStyle::None);
@@ -82,7 +51,7 @@ fn main() {
                     tab_header.add(&Label::new(Some(&file_name)));
                     tab_header.add(&close_btn);
 
-                    let idx= container.append_page(file_view.get_view(), Some(&tab_header));
+                    let idx= container.append_page(file_view.view(), Some(&tab_header));
                     let notebook = container.clone();
                     {
                         let file_views = file_views.clone();
