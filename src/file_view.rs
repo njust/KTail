@@ -22,6 +22,11 @@ pub struct FileView {
     autoscroll_handler: Option<SignalHandlerId>,
 }
 
+enum Msg {
+    Data(u64, String),
+    Clear
+}
+
 impl FileView {
     pub fn new(path: PathBuf) -> Self {
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
@@ -35,9 +40,17 @@ impl FileView {
             let mut stopped = lock.lock().unwrap();
 
             while !*stopped {
+                if let Ok(metadata) = std::fs::metadata(&path) {
+                    let len = metadata.len();
+                    if len < offset {
+                        offset = 0;
+                        tx.send(Msg::Clear);
+                    }
+                }
+
                 if let Ok((read, s)) = get(&path, offset) {
                     offset += read;
-                    tx.send(s);
+                    tx.send(Msg::Data(read, s));
                 }
 
                 stopped = wait_handle.wait_timeout(stopped, Duration::from_millis(500)).unwrap().0;
@@ -55,11 +68,20 @@ impl FileView {
 
         {
             let text_view = text_view.clone();
-            rx.attach(None, move |i| {
-                if let Some(buffer) = &text_view.get_buffer() {
-                    if i.len() > 0 {
-                        let (_start, mut end) = buffer.get_bounds();
-                        buffer.insert(&mut end, &i);
+            rx.attach(None, move |msg| {
+                match msg {
+                    Msg::Data(read, data) => {
+                        if let Some(buffer) = &text_view.get_buffer() {
+                            if read > 0 {
+                                let (_start, mut end) = buffer.get_bounds();
+                                buffer.insert(&mut end, &data);
+                            }
+                        }
+                    }
+                    Msg::Clear => {
+                        if let Some(buffer) = &text_view.get_buffer() {
+                            buffer.set_text("");
+                        }
                     }
                 }
                 glib::Continue(true)

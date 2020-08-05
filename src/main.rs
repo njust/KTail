@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 use gio::prelude::*;
 
-use gtk::{Application, ToggleButton, Toolbar, ScrolledWindow, TextView, ApplicationWindow, Button, Adjustment, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, ArrowType, IconSize, ReliefStyle, ToolButton};
+use gtk::{Application, ToggleButton, ScrolledWindow, TextView, ApplicationWindow, Button, Adjustment, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, ArrowType, IconSize, ReliefStyle, ToolButton};
 use std::time::Duration;
 use std::rc::Rc;
 use std::error::Error;
@@ -34,8 +34,11 @@ fn main() {
         });
 
         let container = Rc::new(Notebook::new());
-        let t = Toolbar::new();
-        let b = ToolButton::new(Some(&gtk::Image::from_icon_name(Some("go-bottom-symbolic"), IconSize::Menu)), Some("Auto scroll"));
+        let t = gtk::Box::new(Orientation::Horizontal, 4);
+        t.set_property_margin(4);
+        let b = ToggleButton::new();
+        b.set_image(Some(&gtk::Image::from_icon_name(Some("go-bottom-symbolic"), IconSize::Menu)));
+        b.set_active(true);
         {
             let container = container.clone();
             let file_views= file_views.clone();
