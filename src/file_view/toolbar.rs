@@ -1,5 +1,5 @@
 use gtk::prelude::*;
-use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize};
+use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry};
 
 pub struct FileViewToolbar {
     container: gtk::Box,
@@ -13,6 +13,10 @@ impl FileViewToolbar {
         let toggle_auto_scroll_btn = ToggleButton::new();
         toggle_auto_scroll_btn.set_image(Some(&gtk::Image::from_icon_name(Some("go-bottom-symbolic"), IconSize::Menu)));
         toggle_auto_scroll_btn.set_active(true);
+
+        let ent = SearchEntry::new();
+
+        toolbar.add(&ent);
 
         toolbar.add(&toggle_auto_scroll_btn);
         Self{

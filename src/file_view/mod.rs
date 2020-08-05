@@ -1,17 +1,19 @@
 use gtk::prelude::*;
 
-use gtk::{ScrolledWindow, TextView, Orientation};
+use gtk::{ScrolledWindow, TextView, Orientation, TextBuffer, TextTag, TextTagTable};
 use std::time::Duration;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use encoding::{Encoding, DecoderTrap};
 use std::path::PathBuf;
 use glib::{SignalHandlerId, Receiver, Sender};
-use crate::file_view::util::{enable_auto_scroll, read_file};
+use crate::file_view::util::{enable_auto_scroll, read_file, search};
 
 pub mod workbench;
 pub mod toolbar;
 pub mod util;
+
+const ERROR_FATAL: &'static str = "ERROR_FATAL";
 
 pub struct FileView {
     container: gtk::Box,
@@ -21,7 +23,7 @@ pub struct FileView {
 }
 
 enum Msg {
-    Data(u64, String),
+    Data(u64, String, Vec<(usize, usize)>),
     Clear
 }
 
@@ -31,7 +33,14 @@ impl FileView {
         let stop_handle = Arc::new((Mutex::new(false), Condvar::new()));
         register_file_watcher(path, tx, stop_handle.clone());
 
-        let text_view = Rc::new(TextView::new());
+        let error_fatal = TextTag::new(Some(ERROR_FATAL));
+        error_fatal.set_property_foreground(Some("orange"));
+
+        let tag_table = TextTagTable::new();
+        tag_table.add(&error_fatal);
+
+        let text_buffer = TextBuffer::new(Some(&tag_table));
+        let text_view = Rc::new(TextView::with_buffer(&text_buffer));
         let autoscroll_handler= enable_auto_scroll(&*text_view);
 
         let scroll_wnd = ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
@@ -87,11 +96,18 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<Msg>) {
     let text_view = text_view.clone();
     rx.attach(None, move |msg| {
         match msg {
-            Msg::Data(read, data) => {
+            Msg::Data(read, data, matches) => {
                 if let Some(buffer) = &text_view.get_buffer() {
+                    let (_start, mut end) = buffer.get_bounds();
+                    let char_offset = end.get_offset();
                     if read > 0 {
-                        let (_start, mut end) = buffer.get_bounds();
                         buffer.insert(&mut end, &data);
+                    }
+
+                    for (start, end) in matches {
+                        let iter_start = buffer.get_iter_at_offset(char_offset + start as i32);
+                        let iter_end = buffer.get_iter_at_offset(char_offset + end as i32);
+                        buffer.apply_tag_by_name(ERROR_FATAL, &iter_start, &iter_end);
                     }
                 }
             }
@@ -121,8 +137,10 @@ fn register_file_watcher(path: PathBuf, tx: Sender<Msg>, thread_stop_handle: Arc
             }
 
             if let Ok((read, s)) = read_file(&path, offset) {
+                // Todo: Use option of vec
+                let matches = search(&s, String::from(r".*\s((?i)error|fatal(?-i))\s.*")).unwrap_or(vec![]);
                 offset += read;
-                tx.send(Msg::Data(read, s));
+                tx.send(Msg::Data(read, s, matches));
             }
 
             stopped = wait_handle.wait_timeout(stopped, Duration::from_millis(500)).unwrap().0;
