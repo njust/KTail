@@ -4,7 +4,6 @@ use gtk::{ScrolledWindow, TextView, Orientation, TextBuffer, TextTag, TextTagTab
 use std::time::Duration;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
-use encoding::{Encoding, DecoderTrap};
 use std::path::PathBuf;
 use glib::{SignalHandlerId, Receiver, Sender};
 use crate::file_view::util::{enable_auto_scroll, read_file, search};
@@ -12,6 +11,7 @@ use crate::file_view::util::{enable_auto_scroll, read_file, search};
 pub mod workbench;
 pub mod toolbar;
 pub mod util;
+
 
 const ERROR_FATAL: &'static str = "ERROR_FATAL";
 
@@ -22,7 +22,7 @@ pub struct FileView {
     autoscroll_handler: Option<SignalHandlerId>,
 }
 
-enum Msg {
+enum FileMsg {
     Data(u64, String, Vec<(usize, usize)>),
     Clear
 }
@@ -63,21 +63,21 @@ impl FileView {
         }
     }
 
-    fn toggle_autoscroll(&mut self) {
-        if self.is_auto_scroll_enabled() {
-            self.disable_auto_scroll();
-        }else {
+    fn search(&mut self, text: String) {
+        println!("Search: {}", text);
+    }
+
+    fn toggle_autoscroll(&mut self, enable: bool) {
+        if enable {
             self.enable_auto_scroll();
+        }else {
+            self.disable_auto_scroll();
         }
     }
 
     pub fn enable_auto_scroll(&mut self) {
         let handler = enable_auto_scroll(&*self.text_view);
         self.autoscroll_handler = Some(handler);
-    }
-
-    pub fn is_auto_scroll_enabled(&self) -> bool {
-        self.autoscroll_handler.is_some()
     }
 
     pub fn disable_auto_scroll(&mut self) {
@@ -92,11 +92,11 @@ impl FileView {
     }
 }
 
-fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<Msg>) {
+fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileMsg>) {
     let text_view = text_view.clone();
     rx.attach(None, move |msg| {
         match msg {
-            Msg::Data(read, data, matches) => {
+            FileMsg::Data(read, data, matches) => {
                 if let Some(buffer) = &text_view.get_buffer() {
                     let (_start, mut end) = buffer.get_bounds();
                     let char_offset = end.get_offset();
@@ -111,7 +111,7 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<Msg>) {
                     }
                 }
             }
-            Msg::Clear => {
+            FileMsg::Clear => {
                 if let Some(buffer) = &text_view.get_buffer() {
                     buffer.set_text("");
                 }
@@ -121,7 +121,7 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<Msg>) {
     });
 }
 
-fn register_file_watcher(path: PathBuf, tx: Sender<Msg>, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>) {
+fn register_file_watcher(path: PathBuf, tx: Sender<FileMsg>, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>) {
     std::thread::spawn(move || {
         let mut offset = 0;
         let (lock, wait_handle) = thread_stop_handle.as_ref();
@@ -132,7 +132,7 @@ fn register_file_watcher(path: PathBuf, tx: Sender<Msg>, thread_stop_handle: Arc
                 let len = metadata.len();
                 if len < offset {
                     offset = 0;
-                    tx.send(Msg::Clear);
+                    tx.send(FileMsg::Clear);
                 }
             }
 
@@ -140,7 +140,7 @@ fn register_file_watcher(path: PathBuf, tx: Sender<Msg>, thread_stop_handle: Arc
                 // Todo: Use option of vec
                 let matches = search(&s, String::from(r".*\s((?i)error|fatal(?-i))\s.*")).unwrap_or(vec![]);
                 offset += read;
-                tx.send(Msg::Data(read, s, matches));
+                tx.send(FileMsg::Data(read, s, matches));
             }
 
             stopped = wait_handle.wait_timeout(stopped, Duration::from_millis(500)).unwrap().0;

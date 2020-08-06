@@ -6,30 +6,48 @@ use glib::bitflags::_core::cell::RefCell;
 use std::path::PathBuf;
 use gtk::Orientation;
 
+pub enum Msg {
+    TextChange(String),
+    SearchPressed,
+    ToggleAutoScroll(bool)
+}
+
+#[derive(Default)]
+pub struct WorkbenchState {
+    search_text: String,
+}
 
 pub struct FileViewWorkbench {
-    toolbar: FileViewToolbar,
-    file_view: Rc<RefCell<FileView>>,
     container: gtk::Box,
 }
 
 impl FileViewWorkbench {
     pub fn new(path: PathBuf) -> Self  {
-        let toolbar = FileViewToolbar::new();
-        let file_view = Rc::new(RefCell::new(FileView::new(path)));
+        let state = Rc::new(RefCell::new(WorkbenchState::default()));
+        let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
+        let toolbar = FileViewToolbar::new(tx.clone());
 
-        let file = file_view.clone();
-        toolbar.on_toggle_autoscroll(move || {
-            file.borrow_mut().toggle_autoscroll();
-        });
-
+        let mut file_view = FileView::new(path);
         let container = gtk::Box::new(Orientation::Vertical, 0);
         container.add(toolbar.view());
-        container.add(file_view.borrow().view());
+        container.add(file_view.view());
+
+        rx.attach(None, move |msg| {
+            match msg {
+                Msg::SearchPressed => {
+                    file_view.search(state.borrow().search_text.clone());
+                },
+                Msg::TextChange(text) => {
+                    state.borrow_mut().search_text = text;
+                },
+                Msg::ToggleAutoScroll(enable) => {
+                    file_view.toggle_autoscroll(enable)
+                }
+            }
+            glib::Continue(true)
+        });
 
         Self {
-            toolbar,
-            file_view,
             container
         }
     }
