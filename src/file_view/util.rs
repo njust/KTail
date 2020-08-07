@@ -31,37 +31,14 @@ pub fn read_file(path: &PathBuf, start: u64) -> Result<(u64, String), Box<dyn Er
     Ok((read as u64, s))
 }
 
-pub fn search(text: &String, search: String) -> Result<Vec<(usize, usize)>, Box<dyn Error>> {
+pub fn search(text: &String, search: String) -> Result<Vec<(usize, usize, usize)>, Box<dyn Error>> {
+    let lines = text.split("\n");
     let re = Regex::new(&search)?;
-    let mut temp_matches = vec![];
-    let mut map = std::collections::HashMap::new();
-    for mat in re.find_iter(&text) {
-        map.insert(mat.start(), 0);
-        map.insert(mat.end(), 0);
-        temp_matches.push((mat.start(), mat.end()));
-    }
-
-    let mut current = 0;
-    for (index, current_char) in text.chars().into_iter().enumerate() {
-        current += current_char.len_utf8();
-        if let Some(_) = map.get(&current) {
-            map.insert(current, index + 1);
-        }
-    }
-
     let mut matches = vec![];
-    for (start, end) in temp_matches {
-        if let (Some(mapped_start), Some(mapped_end)) = (map.get(&start), map.get(&end)) {
-            matches.push((*mapped_start, *mapped_end));
+    for (n, line) in lines.enumerate() {
+        for mat in re.find_iter(&line) {
+            matches.push((n, mat.start(), mat.end()));
         }
     }
-
-    matches.sort_by(|a, b| {
-        if a.0 > b.0 {
-            return Ordering::Greater;
-        }else {
-            return Ordering::Less;
-        }
-    });
     Ok(matches)
 }

@@ -13,6 +13,7 @@ impl FileViewToolbar {
         toolbar.set_property_margin(4);
 
         let search_txt = SearchEntry::new(); {
+            search_txt.set_width_chars(40);
             let tx = tx.clone();
             search_txt.connect_changed(move |e| {
                 let text = e.get_text().to_string();
@@ -29,9 +30,16 @@ impl FileViewToolbar {
             toolbar.add(&search_btn);
         }
 
+        let clear_search_btn = Button::with_label("Clear"); {
+            let tx = tx.clone();
+            clear_search_btn.connect_clicked(move |_| {
+                tx.send(Msg::ClearSearchPressed);
+            });
+            toolbar.add(&clear_search_btn);
+        }
+
         let toggle_auto_scroll_btn = ToggleButton::new(); {
             let tx = tx.clone();
-            toggle_auto_scroll_btn.set_active(true);
             toggle_auto_scroll_btn.connect_clicked(move |b| {
                 tx.send(Msg::ToggleAutoScroll(b.get_active()));
             });

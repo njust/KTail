@@ -9,6 +9,7 @@ use gtk::Orientation;
 pub enum Msg {
     TextChange(String),
     SearchPressed,
+    ClearSearchPressed,
     ToggleAutoScroll(bool)
 }
 
@@ -36,10 +37,13 @@ impl FileViewWorkbench {
             match msg {
                 Msg::SearchPressed => {
                     file_view.search(state.borrow().search_text.clone());
-                },
+                }
+                Msg::ClearSearchPressed => {
+                    file_view.clear_search();
+                }
                 Msg::TextChange(text) => {
                     state.borrow_mut().search_text = text;
-                },
+                }
                 Msg::ToggleAutoScroll(enable) => {
                     file_view.toggle_autoscroll(enable)
                 }
