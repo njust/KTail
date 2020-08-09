@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId, Receiver, Sender};
 use crate::file_view::util::{enable_auto_scroll, read_file, search};
+use glib::bitflags::_core::cell::RefCell;
 
 pub mod workbench;
 pub mod toolbar;
@@ -20,21 +21,35 @@ pub struct FileView {
     container: gtk::Box,
     stop_handle: Arc<(Mutex<bool>, Condvar)>,
     text_view: Rc<TextView>,
-    sender: Sender<FileMsg>,
+    ui_action_sender: Sender<FileUiMsg>,
+    thread_action_sender: std::sync::mpsc::Sender<FileThreadMsg>,
     autoscroll_handler: Option<SignalHandlerId>,
 }
 
-enum FileMsg {
-    Data(u64, String, Vec<(usize, usize, usize)>),
+struct SearchMatches {
+    with_offset: bool,
+    matches: Vec<(usize, usize, usize)>
+}
+
+enum FileUiMsg {
+    Data(u64, String, Vec<SearchMatches>),
     Clear,
-    Search(Vec<(usize, usize, usize)>),
+}
+
+enum FileThreadMsg {
+    AddSearch(String),
 }
 
 impl FileView {
     pub fn new(path: PathBuf) -> Self {
-        let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
+        let (ui_action_sender, ui_action_receiver) =
+            glib::MainContext::channel::<FileUiMsg>(glib::PRIORITY_DEFAULT);
+
+        let (thread_action_sender, thread_action_receiver) =
+            std::sync::mpsc::channel::<FileThreadMsg>();
+
         let stop_handle = Arc::new((Mutex::new(false), Condvar::new()));
-        register_file_watcher(path, tx.clone(), stop_handle.clone());
+        register_file_watcher_thread(path, ui_action_sender.clone(), stop_handle.clone(), thread_action_receiver);
 
         let error_fatal = TextTag::new(Some(ERROR_FATAL));
         error_fatal.set_property_foreground(Some("orange"));
@@ -59,28 +74,23 @@ impl FileView {
         container.set_hexpand(true);
         container.add(&scroll_wnd);
 
-        attach_text_view_update(text_view.clone(), rx);
+        attach_text_view_update(text_view.clone(), ui_action_receiver);
 
         Self {
             container,
             stop_handle,
             text_view,
-            sender: tx.clone(),
+            ui_action_sender: ui_action_sender.clone(),
+            thread_action_sender,
             autoscroll_handler: None
         }
     }
 
     fn search(&mut self, search_text: String) {
-        let tx = self.sender.clone();
-        let text_view = &*self.text_view;
-        let buffer = text_view.get_buffer().unwrap();
-        let (start, end) = buffer.get_bounds();
-        if let Some(text)  = buffer.get_text(&start, &end, false).map(|s| s.to_string()) {
-            std::thread::spawn(move || {
-                let matches = search(&text, search_text).unwrap();
-                tx.send(FileMsg::Search(matches));
-            });
-        }
+
+        self.thread_action_sender.send(FileThreadMsg::AddSearch(search_text));
+
+
     }
 
     fn clear_search(&mut self) {
@@ -93,6 +103,10 @@ impl FileView {
         }else {
             self.disable_auto_scroll();
         }
+    }
+
+    fn add_regex(&mut self, regex: String) {
+        self.thread_action_sender.send(FileThreadMsg::AddSearch(regex));
     }
 
     pub fn enable_auto_scroll(&mut self) {
@@ -119,39 +133,35 @@ fn clear_search(text_view: &TextView) {
     }
 }
 
-fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileMsg>) {
+fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileUiMsg>) {
     let text_view = text_view.clone();
     rx.attach(None, move |msg| {
         match msg {
-            FileMsg::Data(read, data, matches) => {
+            FileUiMsg::Data(read, data, matches) => {
                 if let Some(buffer) = &text_view.get_buffer() {
                     let (_start, mut end) = buffer.get_bounds();
                     let line_offset = end.get_line();
                     if read > 0 {
                         buffer.insert(&mut end, &data);
                     }
-
-                    for (line, start, end) in matches {
-                        let iter_start = buffer.get_iter_at_line_index(line_offset + line as i32, start as i32);
-                        let iter_end = buffer.get_iter_at_line_index(line_offset + line as i32, end as i32);
-                        buffer.apply_tag_by_name(ERROR_FATAL, &iter_start, &iter_end);
+                    for m in matches {
+                        for s in m.matches {
+                            let (line, start, end) = s;
+                            let line = if m.with_offset {
+                                line_offset + line as i32
+                            }else {
+                              line as i32
+                            };
+                            let iter_start = buffer.get_iter_at_line_index(line, start as i32);
+                            let iter_end = buffer.get_iter_at_line_index(line, end as i32);
+                            buffer.apply_tag_by_name(ERROR_FATAL, &iter_start, &iter_end);
+                        }
                     }
                 }
             }
-            FileMsg::Clear => {
+            FileUiMsg::Clear => {
                 if let Some(buffer) = &text_view.get_buffer() {
                     buffer.set_text("");
-                }
-            }
-            FileMsg::Search(matches) => {
-                if let Some(buffer) = &text_view.get_buffer() {
-                    clear_search(&text_view);
-
-                    for (line, start, end) in matches {
-                        let iter_start = buffer.get_iter_at_line_index(line as i32, start as i32);
-                        let iter_end = buffer.get_iter_at_line_index(line as i32, end as i32);
-                        buffer.apply_tag_by_name(SEARCH, &iter_start, &iter_end);
-                    }
                 }
             }
         }
@@ -159,26 +169,84 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileMsg>) {
     });
 }
 
-fn register_file_watcher(path: PathBuf, tx: Sender<FileMsg>, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>) {
+struct SearchData {
+    is_new: bool,
+    regex: String,
+}
+
+fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>) {
     std::thread::spawn(move || {
-        let mut offset = 0;
+        let mut file_byte_offset = 0;
+        let mut utf8_byte_offset = 0;
         let (lock, wait_handle) = thread_stop_handle.as_ref();
         let mut stopped = lock.lock().unwrap();
 
+        let mut regex_list: Vec<SearchData> = vec![];
         while !*stopped {
             if let Ok(metadata) = std::fs::metadata(&path) {
                 let len = metadata.len();
-                if len < offset {
-                    offset = 0;
-                    tx.send(FileMsg::Clear);
+                if len < file_byte_offset {
+                    file_byte_offset = 0;
+                    utf8_byte_offset = 0;
+                    tx.send(FileUiMsg::Clear);
                 }
             }
 
-            if let Ok((read, s)) = read_file(&path, offset) {
-                // Todo: Use option of vec
-                let matches = search(&s, String::from(r".*\s((?i)error|fatal(?-i))\s.*")).unwrap_or(vec![]);
-                offset += read;
-                tx.send(FileMsg::Data(read, s, matches));
+            let mut search_added = false;
+            if let Some(msg) = rx.try_iter().peekable().peek() {
+                match msg {
+                    FileThreadMsg::AddSearch(regex) => {
+                        search_added = true;
+                        regex_list.push(SearchData {
+                            regex: regex.clone(),
+                            is_new: true
+                        });
+                    }
+                }
+            }
+
+            let tmp_file_offset = if search_added {0} else { file_byte_offset };
+            if let Ok((read_bytes, content)) = read_file(&path, tmp_file_offset) {
+                let read_utf8 = content.as_bytes().len();
+                let mut re_list_matches = vec![];
+                for regex in regex_list.iter_mut() {
+                    let search_content = if regex.is_new {
+                      &content[0..]
+                    }else {
+                        if read_utf8 > utf8_byte_offset {
+                            &content[utf8_byte_offset..]
+                        }else {
+                            &content[0..]
+                        }
+                    };
+
+                    let matches = search(search_content, &regex.regex).unwrap_or(vec![]);
+                    if matches.len() > 0 {
+                        re_list_matches.push(SearchMatches {
+                            matches,
+                            with_offset: !regex.is_new
+                        });
+                    }
+                    regex.is_new = false;
+                }
+
+                let delta_content = if search_added {
+                    let res = if read_bytes >= file_byte_offset {
+                        &content[utf8_byte_offset as usize..]
+                    }else {
+                        &content[0..]
+                    };
+
+                    utf8_byte_offset = read_utf8;
+                    file_byte_offset = read_bytes;
+                    res
+                }else {
+                    utf8_byte_offset += read_utf8;
+                    file_byte_offset += read_bytes;
+                    &content[0..]
+                };
+
+                tx.send(FileUiMsg::Data(read_bytes, String::from(delta_content), re_list_matches));
             }
 
             stopped = wait_handle.wait_timeout(stopped, Duration::from_millis(500)).unwrap().0;

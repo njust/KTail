@@ -31,9 +31,9 @@ pub fn read_file(path: &PathBuf, start: u64) -> Result<(u64, String), Box<dyn Er
     Ok((read as u64, s))
 }
 
-pub fn search(text: &String, search: String) -> Result<Vec<(usize, usize, usize)>, Box<dyn Error>> {
+pub fn search(text: &str, search: &str) -> Result<Vec<(usize, usize, usize)>, Box<dyn Error>> {
     let lines = text.split("\n");
-    let re = Regex::new(&search)?;
+    let re = Regex::new(search)?;
     let mut matches = vec![];
     for (n, line) in lines.enumerate() {
         for mat in re.find_iter(&line) {

@@ -39,7 +39,8 @@ impl FileViewWorkbench {
                     file_view.search(state.borrow().search_text.clone());
                 }
                 Msg::ClearSearchPressed => {
-                    file_view.clear_search();
+                    // file_view.clear_search();
+                    file_view.add_regex(String::from(r".*\s((?i)error|fatal(?-i))\s.*"));
                 }
                 Msg::TextChange(text) => {
                     state.borrow_mut().search_text = text;
