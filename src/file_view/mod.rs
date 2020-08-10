@@ -12,6 +12,7 @@ use glib::bitflags::_core::cell::RefCell;
 pub mod workbench;
 pub mod toolbar;
 pub mod util;
+pub mod rules;
 
 
 const ERROR_FATAL: &'static str = "ERROR_FATAL";

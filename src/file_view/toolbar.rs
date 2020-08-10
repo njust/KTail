@@ -1,11 +1,14 @@
 use gtk::prelude::*;
-use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button};
+use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, ComboBox, Label, HeaderBar, WindowPosition, ApplicationWindow};
 use glib::{Sender};
-use crate::file_view::workbench::Msg;
+use crate::file_view::workbench::{Msg, RuleMsg};
+use crate::file_view::rules::{RulesDialog, RuleList, RuleListView};
 
 pub struct FileViewToolbar {
     container: gtk::Box,
 }
+
+
 
 impl FileViewToolbar {
     pub fn new(tx: Sender<Msg>) -> Self {
@@ -37,6 +40,14 @@ impl FileViewToolbar {
                 tx.send(Msg::ClearSearchPressed);
             });
             toolbar.add(&clear_search_btn);
+        }
+
+        let show_rules_btn = Button::with_label("Rules"); {
+            let tx = tx.clone();
+            show_rules_btn.connect_clicked(move |_| {
+                tx.send(Msg::RuleMsg(RuleMsg::ShowRules));
+            });
+            toolbar.add(&show_rules_btn);
         }
 
         let toggle_auto_scroll_btn = ToggleButton::new(); {

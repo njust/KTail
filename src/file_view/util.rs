@@ -1,5 +1,5 @@
 use gtk::prelude::*;
-use gtk::TextView;
+use gtk::{TextView, TreeViewColumn, CellRendererText, TreePath};
 use glib::SignalHandlerId;
 use std::path::PathBuf;
 use std::io::{BufReader, SeekFrom, Read, Seek};
@@ -41,4 +41,20 @@ pub fn search(text: &str, search: &str) -> Result<Vec<(usize, usize, usize)>, Bo
         }
     }
     Ok(matches)
+}
+
+pub fn create_col<T: Fn(&CellRendererText, TreePath, &str) + 'static>(title: &str, idx: i32, t: T) -> TreeViewColumn {
+    let col = TreeViewColumn::new();
+    let cell = CellRendererText::new();
+    cell.connect_edited(move |e,f,g| {
+       t(e,f,g);
+    });
+    cell.set_property_editable(true);
+    col.pack_start(&cell, true);
+    col.add_attribute(&cell, "text", idx);
+    col.set_title(title);
+    col.set_resizable(true);
+    col.set_sort_column_id(idx);
+    col.set_expand(true);
+    col
 }
