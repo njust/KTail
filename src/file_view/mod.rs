@@ -38,6 +38,7 @@ enum FileUiMsg {
 
 enum FileThreadMsg {
     AddSearch(String),
+    DeleteSearch(String),
 }
 
 impl FileView {
@@ -93,7 +94,8 @@ impl FileView {
 
     }
 
-    fn clear_search(&mut self) {
+    fn clear_search(&mut self, search: &str) {
+        self.thread_action_sender.send(FileThreadMsg::DeleteSearch(search.to_string()));
         clear_search(&self.text_view);
     }
 
@@ -154,7 +156,7 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileUiMsg>) {
                             };
                             let iter_start = buffer.get_iter_at_line_index(line, start as i32);
                             let iter_end = buffer.get_iter_at_line_index(line, end as i32);
-                            buffer.apply_tag_by_name(ERROR_FATAL, &iter_start, &iter_end);
+                            buffer.apply_tag_by_name(SEARCH, &iter_start, &iter_end);
                         }
                     }
                 }
@@ -201,6 +203,11 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                             regex: regex.clone(),
                             is_new: true
                         });
+                    }
+                    FileThreadMsg::DeleteSearch(regex) => {
+                        if let Some((idx, _search)) = regex_list.iter().enumerate().find(|(idx, item)| &item.regex == regex) {
+                            regex_list.remove(idx);
+                        }
                     }
                 }
             }

@@ -19,6 +19,7 @@ impl FileViewToolbar {
                 let text = e.get_text().to_string();
                 tx.send(Msg::TextChange(text));
             });
+            search_txt.set_text(r".*\s((?i)error|fatal(?-i))\s.*");
             toolbar.add(&search_txt);
         }
 
