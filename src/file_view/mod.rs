@@ -6,7 +6,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId, Receiver, Sender};
-use crate::file_view::util::{enable_auto_scroll, read_file, search};
+use crate::file_view::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
 use glib::bitflags::_core::cell::RefCell;
 use crate::file_view::rules::{CustomRule, Rule};
 
@@ -16,8 +16,7 @@ pub mod util;
 pub mod rules;
 
 
-const ERROR_FATAL: &'static str = "ERROR_FATAL";
-const SEARCH: &'static str = "SEARCH";
+pub const SEARCH_TAG: &'static str = "SEARCH";
 
 pub struct FileView {
     container: gtk::Box,
@@ -26,10 +25,12 @@ pub struct FileView {
     ui_action_sender: Sender<FileUiMsg>,
     thread_action_sender: std::sync::mpsc::Sender<FileThreadMsg>,
     autoscroll_handler: Option<SignalHandlerId>,
+    rules: Vec<CustomRule>,
 }
 
 struct SearchMatches {
     with_offset: bool,
+    tag: String,
     matches: Vec<(usize, usize, usize)>
 }
 
@@ -41,6 +42,7 @@ enum FileUiMsg {
 enum FileThreadMsg {
     AddRule(Rule),
     DeleteRule(Rule),
+    ApplyRules(Vec<CustomRule>),
 }
 
 impl FileView {
@@ -54,15 +56,11 @@ impl FileView {
         let stop_handle = Arc::new((Mutex::new(false), Condvar::new()));
         register_file_watcher_thread(path, ui_action_sender.clone(), stop_handle.clone(), thread_action_receiver);
 
-        let error_fatal = TextTag::new(Some(ERROR_FATAL));
-        error_fatal.set_property_foreground(Some("orange"));
-
-        let search = TextTag::new(Some(SEARCH));
+        let search = TextTag::new(Some(SEARCH_TAG));
         search.set_property_background(Some("#FFF135"));
 
         let tag_table = TextTagTable::new();
         tag_table.add(&search);
-        tag_table.add(&error_fatal);
 
         let text_buffer = TextBuffer::new(Some(&tag_table));
         let text_view = Rc::new(TextView::with_buffer(&text_buffer));
@@ -85,7 +83,8 @@ impl FileView {
             text_view,
             ui_action_sender: ui_action_sender.clone(),
             thread_action_sender,
-            autoscroll_handler: None
+            autoscroll_handler: None,
+            rules: vec![]
         }
     }
 
@@ -96,6 +95,39 @@ impl FileView {
     fn clear_search(&mut self, search: &str) {
         self.thread_action_sender.send(FileThreadMsg::DeleteRule(Rule::UserSearch(search.to_string())));
         clear_search(&self.text_view);
+    }
+
+    fn apply_rules(&mut self, mut rules: Vec<CustomRule>) {
+        let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
+        for compare_result in compare_results {
+            match compare_result {
+                CompareResult::MissesLeft(new) => {
+                    let mut text_view = self.text_view.clone();
+                    if let Some(buffer) = text_view.get_buffer() {
+                        if let Some(tags) = buffer.get_tag_table() {
+                            let tag = TextTag::new(Some(&new.id.to_string()));
+                            if let Some(color) = &new.color {
+                                tag.set_property_background(Some(color))
+                            }
+                            tags.add(&tag);
+                        }
+                    }
+
+                }
+                CompareResult::MissesRight(delete) => {
+                    let mut text_view = self.text_view.clone();
+                    if let Some(buffer) = text_view.get_buffer() {
+                        if let Some(tags) = buffer.get_tag_table() {
+                        }
+                    }
+                }
+                CompareResult::Equal(left, right) => {
+
+                }
+            }
+        }
+        self.rules = rules.clone();
+        self.thread_action_sender.send(FileThreadMsg::ApplyRules(rules));
     }
 
     fn toggle_autoscroll(&mut self, enable: bool) {
@@ -130,7 +162,7 @@ impl FileView {
 fn clear_search(text_view: &TextView) {
     if let Some(buffer) = text_view.get_buffer() {
         let (start, mut end) = buffer.get_bounds();
-        buffer.remove_tag_by_name(SEARCH, &start, &end);
+        buffer.remove_tag_by_name(SEARCH_TAG, &start, &end);
     }
 }
 
@@ -155,7 +187,7 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileUiMsg>) {
                             };
                             let iter_start = buffer.get_iter_at_line_index(line, start as i32);
                             let iter_end = buffer.get_iter_at_line_index(line, end as i32);
-                            buffer.apply_tag_by_name(SEARCH, &iter_start, &iter_end);
+                            buffer.apply_tag_by_name(&m.tag, &iter_start, &iter_end);
                         }
                     }
                 }
@@ -170,7 +202,7 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileUiMsg>) {
     });
 }
 
-struct SearchData {
+struct ActiveRule {
     is_new: bool,
     rule: Rule,
 }
@@ -182,7 +214,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
         let (lock, wait_handle) = thread_stop_handle.as_ref();
         let mut stopped = lock.lock().unwrap();
 
-        let mut regex_list: Vec<SearchData> = vec![];
+        let mut active_rules: Vec<ActiveRule> = vec![];
         while !*stopped {
             if let Ok(metadata) = std::fs::metadata(&path) {
                 let len = metadata.len();
@@ -193,29 +225,64 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                 }
             }
 
-            let mut search_added = false;
+            let mut read_full_file = false;
             if let Some(msg) = rx.try_iter().peekable().peek() {
                 match msg {
                     FileThreadMsg::AddRule(rule) => {
-                        search_added = true;
-                        regex_list.push(SearchData {
+                        read_full_file = true;
+                        active_rules.push(ActiveRule {
                             rule: rule.clone(),
                             is_new: true
                         });
                     }
                     FileThreadMsg::DeleteRule(rule) => {
-                        if let Some((idx, _search)) = regex_list.iter().enumerate().find(|(idx, item)| &item.rule == rule) {
-                            regex_list.remove(idx);
+                        if let Some((idx, _search)) = active_rules.iter().enumerate().find(|(idx, item)| &item.rule == rule) {
+                            active_rules.remove(idx);
+                        }
+                    }
+                    FileThreadMsg::ApplyRules(rules) => {
+                        let mut to_add: Vec<CustomRule> = vec![];
+                        let mut to_delete = vec![];
+                        {
+                            let mut active_custom_rules = vec![];
+                            for active_rule in active_rules.iter() {
+                                if let Rule::CustomRule(r) = &active_rule.rule {
+                                    active_custom_rules.push(r);
+                                }
+                            }
+                            let mut rules_to_compare: Vec<&CustomRule> = rules.iter().collect();
+                            let compare_results = SortedListCompare::new(&mut active_custom_rules, &mut rules_to_compare);
+
+                            for compare_result in compare_results {
+                                match compare_result {
+                                    CompareResult::MissesLeft(new) => {
+                                        read_full_file = true;
+                                        to_add.push((*new).clone());
+                                    }
+                                    CompareResult::MissesRight(delete) => {
+                                        to_delete.push(delete.id);
+                                    }
+                                    CompareResult::Equal(left, right) => {
+                                    }
+                                }
+                            }
+                        }
+
+                        for new in to_add {
+                            active_rules.push(ActiveRule {
+                                rule: Rule::CustomRule(new),
+                                is_new: true
+                            });
                         }
                     }
                 }
             }
 
-            let tmp_file_offset = if search_added {0} else { file_byte_offset };
+            let tmp_file_offset = if read_full_file {0} else { file_byte_offset };
             if let Ok((read_bytes, content)) = read_file(&path, tmp_file_offset) {
                 let read_utf8 = content.as_bytes().len();
                 let mut re_list_matches = vec![];
-                for search_data in regex_list.iter_mut() {
+                for search_data in active_rules.iter_mut() {
                     let search_content = if search_data.is_new {
                       &content[0..]
                     }else {
@@ -231,6 +298,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                         if matches.len() > 0 {
                             re_list_matches.push(SearchMatches {
                                 matches,
+                                tag: search_data.rule.get_tag(),
                                 with_offset: !search_data.is_new
                             });
                         }
@@ -238,7 +306,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                     }
                 }
 
-                let delta_content = if search_added {
+                let delta_content = if read_full_file {
                     let res = if read_bytes >= file_byte_offset {
                         &content[utf8_byte_offset as usize..]
                     }else {

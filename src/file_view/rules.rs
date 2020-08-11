@@ -4,6 +4,8 @@ use gtk::prelude::GtkListStoreExtManual;
 use glib::Sender;
 use crate::file_view::workbench::{Msg, RuleMsg};
 use std::error::Error;
+use glib::bitflags::_core::cmp::Ordering;
+use crate::file_view::SEARCH_TAG;
 
 
 #[derive(Debug, Clone)]
@@ -17,6 +19,13 @@ impl Rule {
         match self {
             Rule::UserSearch(s) => Some(s),
             Rule::CustomRule(rule) => rule.regex.as_ref()
+        }
+    }
+
+    pub fn get_tag(&self) -> String {
+        match self {
+            Rule::UserSearch(s) => String::from(SEARCH_TAG),
+            Rule::CustomRule(rule) => rule.id.to_string()
         }
     }
 }
@@ -42,6 +51,7 @@ impl PartialEq for Rule {
 
 #[derive(Debug, Default, Clone)]
 pub struct CustomRule {
+    pub id: uuid::Uuid,
     pub name: Option<String>,
     pub color: Option<String>,
     pub regex: Option<String>,
@@ -50,10 +60,23 @@ pub struct CustomRule {
 impl CustomRule {
     pub fn new(name: &str) -> Self {
         Self {
+            id: uuid::Uuid::new_v4(),
             name: Some(String::from(name)),
             color: None,
             regex: None,
         }
+    }
+}
+
+impl PartialEq for CustomRule {
+    fn eq(&self, other: &Self) -> bool {
+        self.id.eq(&other.id)
+    }
+}
+
+impl PartialOrd for CustomRule {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.id.partial_cmp(&other.id)
     }
 }
 
@@ -63,7 +86,7 @@ pub struct RuleList {
 
 impl RuleList {
     pub fn new() -> Self {
-        let list_model = gtk::ListStore::new(&[glib::Type::String, glib::Type::String, glib::Type::String]);
+        let list_model = gtk::ListStore::new(&[glib::Type::String, glib::Type::String, glib::Type::String, glib::Type::String]);
         list_model.connect_row_changed(|r,path,iter| {
            println!("Row changed!");
         });
@@ -79,7 +102,7 @@ impl RuleList {
     }
 
     pub fn add_rule(&self, rule: &CustomRule) {
-        self.list_model.insert_with_values(None, &[0,1,2], &[&rule.name, &rule.regex, &rule.color]);
+        self.list_model.insert_with_values(None, &[0,1,2,3], &[&rule.id.to_string(), &rule.name, &rule.regex, &rule.color]);
     }
 
     pub fn get_rules(&self) -> Result<Vec<CustomRule>, Box<dyn Error>> {
@@ -96,12 +119,14 @@ impl RuleList {
     }
 
     pub fn get_rule_for_iter(&self, iter: &TreeIter) -> Result<CustomRule, Box<dyn Error>> {
-        let name = self.list_model.get_value(&iter, 0).get::<String>()?;
-        let regex = self.list_model.get_value(&iter, 1).get::<String>()?;
-        let color = self.list_model.get_value(&iter, 2).get::<String>()?;
+        let id = self.list_model.get_value(&iter, 0).get::<String>()?.ok_or("Rule without id!")?;
+        let name = self.list_model.get_value(&iter, 1).get::<String>()?;
+        let regex = self.list_model.get_value(&iter, 2).get::<String>()?;
+        let color = self.list_model.get_value(&iter, 3).get::<String>()?;
 
+        let id = uuid::Uuid::parse_str(&id)?;
         Ok(CustomRule {
-            name, regex, color
+            id, name, regex, color
         })
     }
 
@@ -137,11 +162,9 @@ impl<'a> RuleListView<'a> {
 
         let list_view = gtk::TreeView::with_model(&rules.list_model);
 
-        list_view.append_column(&create_col("Name", 0, tx.clone()));
-
-        list_view.append_column(&create_col("Regex", 1, tx.clone()));
-
-        list_view.append_column(&create_col("Color", 2, tx.clone()));
+        list_view.append_column(&create_col("Name", 1, tx.clone()));
+        list_view.append_column(&create_col("Regex", 2, tx.clone()));
+        list_view.append_column(&create_col("Color", 3, tx.clone()));
 
         container.add(&toolbar);
         container.add(&list_view);
@@ -159,7 +182,6 @@ impl<'a> RuleListView<'a> {
         &self.container
     }
 }
-
 
 pub struct RulesDialog<'a> {
     dlg: gtk::Dialog,

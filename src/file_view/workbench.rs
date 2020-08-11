@@ -85,6 +85,7 @@ impl FileViewWorkbench {
                             let state = state.borrow();
                             if let Ok(rules) = state.rules.get_rules() {
                                 println!("Rules: {:?}", rules);
+                                file_view.apply_rules(rules);
                             }
                         }
                     }

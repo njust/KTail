@@ -59,3 +59,75 @@ pub fn create_col(title: &str, idx: i32, tx: Sender<Msg>) -> TreeViewColumn {
     col.set_expand(true);
     col
 }
+
+
+pub struct SortedListCompare<'a, 'b, T: PartialOrd> {
+    lh: &'a Vec<T>,
+    rh: &'b Vec<T>,
+    lhi: usize,
+    rhi: usize,
+}
+
+#[derive(Debug)]
+pub enum CompareResult<'a, 'b, T:PartialOrd> {
+    Equal(&'a T, &'b T),
+    MissesLeft(&'b T),
+    MissesRight(&'a T)
+}
+
+impl<'a, 'b, T: PartialOrd> Iterator for SortedListCompare<'a, 'b, T> {
+    type Item = CompareResult<'a, 'b, T>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let lh = self.lh.get(self.lhi);
+        let rh = self.rh.get(self.rhi);
+        if lh.is_none() && rh.is_none() {
+            return None;
+        }
+
+        if lh.is_none() {
+            self.rhi +=1;
+            return Some(CompareResult::MissesLeft(rh.unwrap()));
+        }
+
+        if rh.is_none() {
+            self.lhi +=1;
+            return Some(CompareResult::MissesRight(lh.unwrap()));
+        }
+
+        let lh = lh.unwrap();
+        let rh = rh.unwrap();
+        match lh.partial_cmp(rh) {
+            Some(c) => {
+                match c {
+                    Ordering::Less => {
+                        self.lhi += 1;
+                        Some(CompareResult::MissesRight(lh))
+                    }
+                    Ordering::Greater => {
+                        self.rhi += 1;
+                        Some(CompareResult::MissesLeft(rh))
+                    }
+                    Ordering::Equal => {
+                        self.rhi += 1;
+                        self.lhi += 1;
+                        Some(CompareResult::Equal(lh, rh))
+                    }
+                }
+            }
+            None => {
+                Some(CompareResult::MissesRight(lh))
+            }
+        }
+    }
+}
+
+impl<'a, 'b, T:PartialOrd> SortedListCompare<'a, 'b, T> {
+    pub fn new(lh: &'a mut Vec<T>, rh: &'b mut Vec<T>) -> Self {
+        SortedListCompare {
+            lh,
+            rh,
+            lhi: 0,
+            rhi: 0
+        }
+    }
+}
