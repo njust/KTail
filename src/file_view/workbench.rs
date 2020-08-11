@@ -4,12 +4,14 @@ use crate::file_view::toolbar::FileViewToolbar;
 use std::rc::Rc;
 use glib::bitflags::_core::cell::RefCell;
 use std::path::PathBuf;
-use gtk::Orientation;
-use crate::file_view::rules::{RuleList, Rule, RulesDialog};
+use gtk::{Orientation, TreePath};
+use crate::file_view::rules::{RuleList, CustomRule, RulesDialog};
 
 pub enum RuleMsg {
     ShowRules,
     AddRule,
+    Ok,
+    RuleChanged(TreePath, u32, String)
 }
 
 pub enum Msg {
@@ -73,7 +75,17 @@ impl FileViewWorkbench {
                         }
                         RuleMsg::AddRule => {
                             let state = state.borrow_mut();
-                            state.rules.add_rule(&Rule::new("New rule"));
+                            state.rules.add_rule(&CustomRule::new("New rule"));
+                        }
+                        RuleMsg::RuleChanged(path, column, value) => {
+                            let state = state.borrow_mut();
+                            state.rules.update(path, column, value);
+                        }
+                        RuleMsg::Ok => {
+                            let state = state.borrow();
+                            if let Ok(rules) = state.rules.get_rules() {
+                                println!("Rules: {:?}", rules);
+                            }
                         }
                     }
                 }

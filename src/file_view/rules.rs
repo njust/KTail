@@ -1,21 +1,58 @@
-use gtk::{Orientation, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, Label, TreeViewExt, ButtonExt, TreeModelExt};
+use gtk::{Orientation, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, Label, TreeViewExt, ButtonExt, TreeModelExt, CellRendererText, TreePath, TreeIter};
 use crate::file_view::util::create_col;
 use gtk::prelude::GtkListStoreExtManual;
 use glib::Sender;
 use crate::file_view::workbench::{Msg, RuleMsg};
+use std::error::Error;
 
-pub struct Rule {
-    name: String,
-    color: String,
-    regex: String,
+
+#[derive(Debug, Clone)]
+pub enum Rule {
+    UserSearch(String),
+    CustomRule(CustomRule),
 }
 
 impl Rule {
+    pub fn get_regex(&self) -> Option<&String> {
+        match self {
+            Rule::UserSearch(s) => Some(s),
+            Rule::CustomRule(rule) => rule.regex.as_ref()
+        }
+    }
+}
+
+impl PartialEq for Rule {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Rule::UserSearch(s) => {
+                if let Rule::UserSearch(s2) = other {
+                    return s == s2;
+                }
+            }
+            Rule::CustomRule(rule) => {
+                if let Rule::CustomRule(rule2) = other {
+                    return rule.regex == rule2.regex && rule.name == rule2.name;
+                }
+            }
+        }
+
+        false
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CustomRule {
+    pub name: Option<String>,
+    pub color: Option<String>,
+    pub regex: Option<String>,
+}
+
+impl CustomRule {
     pub fn new(name: &str) -> Self {
         Self {
-            name: String::from(name),
-            color: String::new(),
-            regex: String::new(),
+            name: Some(String::from(name)),
+            color: None,
+            regex: None,
         }
     }
 }
@@ -35,8 +72,37 @@ impl RuleList {
         }
     }
 
-    pub fn add_rule(&self, rule: &Rule) {
+    pub fn update(&self, path: TreePath, column: u32, data: String) {
+        if let Some(item) = self.list_model.get_iter(&path) {
+            self.list_model.set(&item, &[column], &[&data]);
+        }
+    }
+
+    pub fn add_rule(&self, rule: &CustomRule) {
         self.list_model.insert_with_values(None, &[0,1,2], &[&rule.name, &rule.regex, &rule.color]);
+    }
+
+    pub fn get_rules(&self) -> Result<Vec<CustomRule>, Box<dyn Error>> {
+        let mut rules = vec![];
+        if let Some(iter) = self.list_model.get_iter_first() {
+            let rule = self.get_rule_for_iter(&iter)?;
+            rules.push(rule);
+            while self.list_model.iter_next(&iter) {
+                let rule = self.get_rule_for_iter(&iter)?;
+                rules.push(rule);
+            }
+        }
+        Ok(rules)
+    }
+
+    pub fn get_rule_for_iter(&self, iter: &TreeIter) -> Result<CustomRule, Box<dyn Error>> {
+        let name = self.list_model.get_value(&iter, 0).get::<String>()?;
+        let regex = self.list_model.get_value(&iter, 1).get::<String>()?;
+        let color = self.list_model.get_value(&iter, 2).get::<String>()?;
+
+        Ok(CustomRule {
+            name, regex, color
+        })
     }
 
     pub fn model(&self) -> &gtk::ListStore {
@@ -54,25 +120,28 @@ impl<'a> RuleListView<'a> {
         let container = gtk::Box::new(Orientation::Vertical, 0);
         let toolbar = gtk::Box::new(Orientation::Horizontal, 0);
         let add_btn = gtk::Button::with_label("Add"); {
+            let tx = tx.clone();
             add_btn.connect_clicked(move |_| {
                 tx.send(Msg::RuleMsg(RuleMsg::AddRule));
             });
             toolbar.add(&add_btn);
         }
 
+        let ok_btn = gtk::Button::with_label("Ok"); {
+            let tx = tx.clone();
+            ok_btn.connect_clicked(move |_| {
+                tx.send(Msg::RuleMsg(RuleMsg::Ok));
+            });
+            toolbar.add(&ok_btn);
+        }
+
         let list_view = gtk::TreeView::with_model(&rules.list_model);
 
-        list_view.append_column(&create_col("Name", 0, |a,b,c| {
-            println!("Cell changed")
-        }));
+        list_view.append_column(&create_col("Name", 0, tx.clone()));
 
-        list_view.append_column(&create_col("Regex", 1, |a,b,c| {
-            println!("Cell changed")
-        }));
+        list_view.append_column(&create_col("Regex", 1, tx.clone()));
 
-        list_view.append_column(&create_col("Color", 2, |a,b,c| {
-            println!("Cell changed")
-        }));
+        list_view.append_column(&create_col("Color", 2, tx.clone()));
 
         container.add(&toolbar);
         container.add(&list_view);
@@ -82,7 +151,7 @@ impl<'a> RuleListView<'a> {
         }
     }
 
-    fn add_rule(&self, rule: &Rule) {
+    fn add_rule(&self, rule: &CustomRule) {
         self.list.add_rule(rule)
     }
 
@@ -122,7 +191,7 @@ impl<'a> RulesDialog<'a> {
         }
     }
 
-    fn add_rule(&mut self, rule: &Rule) {
+    fn add_rule(&mut self, rule: &CustomRule) {
         self.list.add_rule(rule);
     }
 

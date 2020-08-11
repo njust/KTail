@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use glib::{SignalHandlerId, Receiver, Sender};
 use crate::file_view::util::{enable_auto_scroll, read_file, search};
 use glib::bitflags::_core::cell::RefCell;
+use crate::file_view::rules::{CustomRule, Rule};
 
 pub mod workbench;
 pub mod toolbar;
@@ -38,8 +39,8 @@ enum FileUiMsg {
 }
 
 enum FileThreadMsg {
-    AddSearch(String),
-    DeleteSearch(String),
+    AddRule(Rule),
+    DeleteRule(Rule),
 }
 
 impl FileView {
@@ -57,7 +58,7 @@ impl FileView {
         error_fatal.set_property_foreground(Some("orange"));
 
         let search = TextTag::new(Some(SEARCH));
-        search.set_property_background(Some("yellow"));
+        search.set_property_background(Some("#FFF135"));
 
         let tag_table = TextTagTable::new();
         tag_table.add(&search);
@@ -89,14 +90,11 @@ impl FileView {
     }
 
     fn search(&mut self, search_text: String) {
-
-        self.thread_action_sender.send(FileThreadMsg::AddSearch(search_text));
-
-
+        self.thread_action_sender.send(FileThreadMsg::AddRule(Rule::UserSearch(search_text)));
     }
 
     fn clear_search(&mut self, search: &str) {
-        self.thread_action_sender.send(FileThreadMsg::DeleteSearch(search.to_string()));
+        self.thread_action_sender.send(FileThreadMsg::DeleteRule(Rule::UserSearch(search.to_string())));
         clear_search(&self.text_view);
     }
 
@@ -108,8 +106,8 @@ impl FileView {
         }
     }
 
-    fn add_regex(&mut self, regex: String) {
-        self.thread_action_sender.send(FileThreadMsg::AddSearch(regex));
+    fn add_rule(&mut self, rule: CustomRule) {
+        self.thread_action_sender.send(FileThreadMsg::AddRule(Rule::CustomRule(rule)));
     }
 
     pub fn enable_auto_scroll(&mut self) {
@@ -174,7 +172,7 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileUiMsg>) {
 
 struct SearchData {
     is_new: bool,
-    regex: String,
+    rule: Rule,
 }
 
 fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>) {
@@ -198,15 +196,15 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
             let mut search_added = false;
             if let Some(msg) = rx.try_iter().peekable().peek() {
                 match msg {
-                    FileThreadMsg::AddSearch(regex) => {
+                    FileThreadMsg::AddRule(rule) => {
                         search_added = true;
                         regex_list.push(SearchData {
-                            regex: regex.clone(),
+                            rule: rule.clone(),
                             is_new: true
                         });
                     }
-                    FileThreadMsg::DeleteSearch(regex) => {
-                        if let Some((idx, _search)) = regex_list.iter().enumerate().find(|(idx, item)| &item.regex == regex) {
+                    FileThreadMsg::DeleteRule(rule) => {
+                        if let Some((idx, _search)) = regex_list.iter().enumerate().find(|(idx, item)| &item.rule == rule) {
                             regex_list.remove(idx);
                         }
                     }
@@ -217,8 +215,8 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
             if let Ok((read_bytes, content)) = read_file(&path, tmp_file_offset) {
                 let read_utf8 = content.as_bytes().len();
                 let mut re_list_matches = vec![];
-                for regex in regex_list.iter_mut() {
-                    let search_content = if regex.is_new {
+                for search_data in regex_list.iter_mut() {
+                    let search_content = if search_data.is_new {
                       &content[0..]
                     }else {
                         if read_utf8 > utf8_byte_offset {
@@ -228,14 +226,16 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                         }
                     };
 
-                    let matches = search(search_content, &regex.regex).unwrap_or(vec![]);
-                    if matches.len() > 0 {
-                        re_list_matches.push(SearchMatches {
-                            matches,
-                            with_offset: !regex.is_new
-                        });
+                    if let Some(regex) = search_data.rule.get_regex() {
+                        let matches = search(search_content, regex).unwrap_or(vec![]);
+                        if matches.len() > 0 {
+                            re_list_matches.push(SearchMatches {
+                                matches,
+                                with_offset: !search_data.is_new
+                            });
+                        }
+                        search_data.is_new = false;
                     }
-                    regex.is_new = false;
                 }
 
                 let delta_content = if search_added {

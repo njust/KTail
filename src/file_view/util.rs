@@ -1,6 +1,6 @@
 use gtk::prelude::*;
 use gtk::{TextView, TreeViewColumn, CellRendererText, TreePath};
-use glib::SignalHandlerId;
+use glib::{SignalHandlerId, Sender};
 use std::path::PathBuf;
 use std::io::{BufReader, SeekFrom, Read, Seek};
 use std::error::Error;
@@ -8,6 +8,7 @@ use encoding::all::UTF_16LE;
 use encoding::{Encoding, DecoderTrap};
 use glib::bitflags::_core::cmp::Ordering;
 use regex::Regex;
+use crate::file_view::workbench::{Msg, RuleMsg};
 
 pub fn enable_auto_scroll(text_view : &TextView) -> SignalHandlerId {
     text_view.connect_size_allocate(|tv, _b| {
@@ -43,11 +44,11 @@ pub fn search(text: &str, search: &str) -> Result<Vec<(usize, usize, usize)>, Bo
     Ok(matches)
 }
 
-pub fn create_col<T: Fn(&CellRendererText, TreePath, &str) + 'static>(title: &str, idx: i32, t: T) -> TreeViewColumn {
+pub fn create_col(title: &str, idx: i32, tx: Sender<Msg>) -> TreeViewColumn {
     let col = TreeViewColumn::new();
     let cell = CellRendererText::new();
     cell.connect_edited(move |e,f,g| {
-       t(e,f,g);
+       tx.send(Msg::RuleMsg(RuleMsg::RuleChanged(f, idx as u32, String::from(g))));
     });
     cell.set_property_editable(true);
     col.pack_start(&cell, true);

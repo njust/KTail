@@ -8,8 +8,6 @@ pub struct FileViewToolbar {
     container: gtk::Box,
 }
 
-
-
 impl FileViewToolbar {
     pub fn new(tx: Sender<Msg>) -> Self {
         let toolbar = gtk::Box::new(Orientation::Horizontal, 4);
