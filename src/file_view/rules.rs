@@ -151,17 +151,6 @@ impl<'a> RuleListView<'a> {
         let container = gtk::Box::new(Orientation::Vertical, 0);
         let toolbar = gtk::Box::new(Orientation::Horizontal, 0);
         let list_view = Rc::new(gtk::TreeView::with_model(&rules.list_model));
-        let delete_btn = gtk::Button::with_label("Delete"); {
-            let tx = tx.clone();
-            let list_view = list_view.clone();
-            delete_btn.connect_clicked(move |_| {
-                if let Some((_, iter)) = list_view.get_selection().get_selected() {
-                    tx.send(Msg::RuleMsg(RuleMsg::DeleteRule(iter)));
-                }
-
-            });
-            toolbar.add(&delete_btn);
-        }
 
         let add_btn = gtk::Button::with_label("Add"); {
             let tx = tx.clone();
@@ -169,6 +158,17 @@ impl<'a> RuleListView<'a> {
                 tx.send(Msg::RuleMsg(RuleMsg::AddRule));
             });
             toolbar.add(&add_btn);
+        }
+
+        let delete_btn = gtk::Button::with_label("Delete"); {
+            let tx = tx.clone();
+            let list_view = list_view.clone();
+            delete_btn.connect_clicked(move |_| {
+                if let Some((_, iter)) = list_view.get_selection().get_selected() {
+                    tx.send(Msg::RuleMsg(RuleMsg::DeleteRule(iter)));
+                }
+            });
+            toolbar.add(&delete_btn);
         }
 
         let ok_btn = gtk::Button::with_label("Ok"); {
