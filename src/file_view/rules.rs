@@ -1,4 +1,4 @@
-use gtk::{Orientation, GtkListStoreExt, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, Label, TreeViewExt, ButtonExt, TreeModelExt, CellRendererText, TreePath, TreeIter, TreeSelectionExt, TreeModel};
+use gtk::{Orientation, GtkListStoreExt, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, Label, TreeViewExt, ButtonExt, TreeModelExt, CellRendererText, TreePath, TreeIter, TreeSelectionExt, TreeModel, ColorChooserDialog, ApplicationWindow, ColorChooserExt, TreeView};
 use crate::file_view::util::create_col;
 use gtk::prelude::GtkListStoreExtManual;
 use glib::Sender;
@@ -110,6 +110,10 @@ impl RuleList {
         }
     }
 
+    pub fn color_changed(&self, iter: TreeIter, color: String) {
+        self.list_model.set(&iter, &[3], &[&color]);
+    }
+
     pub fn add_rule(&self, rule: &CustomRule) {
         self.list_model.insert_with_values(None, &[0,1,2,3], &[&rule.id.to_string(), &rule.name, &rule.regex, &rule.color]);
     }
@@ -167,7 +171,22 @@ impl<'a> RuleListView<'a> {
             toolbar.add(&add_btn);
         }
 
-        let delete_btn = gtk::Button::with_label("Delete"); {
+        let select_color_btn = gtk::Button::with_label("Color"); {
+            let tx = tx.clone();
+            let list_view = list_view.clone();
+            select_color_btn.connect_clicked(move |_| {
+                    let cc_dlg = ColorChooserDialog::new::<ApplicationWindow>(Some("Color"), None);
+                    cc_dlg.set_modal(true);
+                    cc_dlg.run();
+                    cc_dlg.close();
+                    if let Some((_, iter)) = list_view.get_selection().get_selected() {
+                        tx.send(Msg::RuleMsg(RuleMsg::ColorChanged(iter, cc_dlg.get_rgba().to_string())));
+                    }
+            });
+            toolbar.add(&select_color_btn);
+        }
+
+       let delete_btn = gtk::Button::with_label("Delete"); {
             let tx = tx.clone();
             let list_view = list_view.clone();
             delete_btn.connect_clicked(move |_| {
@@ -178,17 +197,9 @@ impl<'a> RuleListView<'a> {
             toolbar.add(&delete_btn);
         }
 
-        let ok_btn = gtk::Button::with_label("Ok"); {
-            let tx = tx.clone();
-            ok_btn.connect_clicked(move |_| {
-                tx.send(Msg::RuleMsg(RuleMsg::Ok));
-            });
-            toolbar.add(&ok_btn);
-        }
-
-        list_view.append_column(&create_col("Name", 1, tx.clone()));
-        list_view.append_column(&create_col("Regex", 2, tx.clone()));
-        list_view.append_column(&create_col("Color", 3, tx.clone()));
+        list_view.append_column(&create_col("Name", 1, tx.clone(), false));
+        list_view.append_column(&create_col("Regex", 2, tx.clone(), false));
+        list_view.append_column(&create_col("Color", 3, tx.clone(), true));
 
         container.add(&toolbar);
         container.add(&*list_view);
@@ -216,18 +227,19 @@ impl<'a> RulesDialog<'a> {
     pub fn new(rules: &'a RuleList, tx: Sender<Msg>) -> Self {
         let dlg = gtk::Dialog::new();
         dlg.set_position(WindowPosition::Mouse);
-        dlg.set_default_size(300, 200);
+        dlg.set_default_size(400, 200);
         let header_bar = HeaderBar::new();
         header_bar.set_show_close_button(true);
         header_bar.set_title(Some("Rules"));
         dlg.set_titlebar(Some(&header_bar));
         dlg.set_modal(true);
 
-        let rules = RuleListView::new(rules, tx);
+        let rules = RuleListView::new(rules, tx.clone());
         let content = dlg.get_content_area();
         content.add(rules.view());
 
-        dlg.connect_delete_event(|dlg, _| {
+        dlg.connect_delete_event(move |dlg, _| {
+            tx.send(Msg::RuleMsg(RuleMsg::Ok));
             dlg.hide();
             gtk::Inhibit(true)
         });
@@ -235,10 +247,6 @@ impl<'a> RulesDialog<'a> {
             dlg,
             list: rules
         }
-    }
-
-    fn add_rule(&mut self, rule: &CustomRule) {
-        self.list.add_rule(rule);
     }
 
     pub fn show(&self) {

@@ -1,5 +1,5 @@
 use gtk::prelude::*;
-use gtk::{TextView, TreeViewColumn, CellRendererText, TreePath};
+use gtk::{TextView, TreeViewColumn, CellRendererText, TreePath, CellRenderer, ColorChooserDialog, ApplicationWindow, ResponseType};
 use glib::{SignalHandlerId, Sender};
 use std::path::PathBuf;
 use std::io::{BufReader, SeekFrom, Read, Seek};
@@ -44,20 +44,27 @@ pub fn search(text: &str, search: &str) -> Result<Vec<(usize, usize, usize)>, Bo
     Ok(matches)
 }
 
-pub fn create_col(title: &str, idx: i32, tx: Sender<Msg>) -> TreeViewColumn {
-    let col = TreeViewColumn::new();
-    let cell = CellRendererText::new();
-    cell.connect_edited(move |e,f,g| {
-       tx.send(Msg::RuleMsg(RuleMsg::RuleChanged(f, idx as u32, String::from(g))));
+pub fn create_col(title: &str, idx: i32, tx: Sender<Msg>, color: bool) -> TreeViewColumn {
+    let column = TreeViewColumn::new();
+    let renderer = CellRendererText::new();
+    column.pack_start(&renderer, true);
+    renderer.connect_edited(move |e, f, g| {
+        tx.send(Msg::RuleMsg(RuleMsg::RuleChanged(f, idx as u32, String::from(g))));
     });
-    cell.set_property_editable(true);
-    col.pack_start(&cell, true);
-    col.add_attribute(&cell, "text", idx);
-    col.set_title(title);
-    col.set_resizable(true);
-    col.set_sort_column_id(idx);
-    col.set_expand(true);
-    col
+
+    if color {
+        column.add_attribute(&renderer, "cell-background", idx);
+        column.add_attribute(&renderer, "text", idx);
+    }else {
+        column.add_attribute(&renderer, "text", idx);
+        renderer.set_property_editable(true);
+    }
+
+    column.set_title(title);
+    column.set_resizable(true);
+    column.set_sort_column_id(idx);
+    column.set_expand(true);
+    column
 }
 
 

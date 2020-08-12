@@ -11,6 +11,7 @@ pub enum RuleMsg {
     ShowRules,
     AddRule,
     DeleteRule(TreeIter),
+    ColorChanged(TreeIter, String),
     Ok,
     RuleChanged(TreePath, u32, String)
 }
@@ -81,6 +82,10 @@ impl FileViewWorkbench {
                         RuleMsg::RuleChanged(path, column, value) => {
                             let state = state.borrow_mut();
                             state.rules.update(path, column, value);
+                        }
+                        RuleMsg::ColorChanged(iter, color) => {
+                            let state = state.borrow_mut();
+                            state.rules.color_changed(iter, color);
                         }
                         RuleMsg::Ok => {
                             let state = state.borrow();
