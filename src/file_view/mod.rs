@@ -31,7 +31,7 @@ pub struct FileView {
 struct SearchMatches {
     with_offset: bool,
     tag: String,
-    matches: Vec<(usize, usize, usize)>
+    matches: Vec<(usize, usize, usize)>,
 }
 
 enum FileUiMsg {
@@ -84,7 +84,7 @@ impl FileView {
             ui_action_sender: ui_action_sender.clone(),
             thread_action_sender,
             autoscroll_handler: None,
-            rules: vec![]
+            rules: vec![],
         }
     }
 
@@ -100,29 +100,29 @@ impl FileView {
     fn apply_rules(&mut self, mut rules: Vec<CustomRule>) {
         let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
         for compare_result in compare_results {
+            let mut text_view = self.text_view.clone();
             match compare_result {
                 CompareResult::MissesLeft(new) => {
-                    let mut text_view = self.text_view.clone();
-                    if let Some(buffer) = text_view.get_buffer() {
-                        if let Some(tags) = buffer.get_tag_table() {
-                            let tag = TextTag::new(Some(&new.id.to_string()));
-                            if let Some(color) = &new.color {
-                                tag.set_property_background(Some(color))
-                            }
-                            tags.add(&tag);
-                        }
+                    if let Some(tags) = text_view.get_buffer()
+                        .and_then(|buffer| buffer.get_tag_table()) {
+                        let tag = TextTag::new(Some(&new.id.to_string()));
+                        tag.set_property_background(new.color.as_ref().map(|c|c.as_str()));
+                        tags.add(&tag);
                     }
-
                 }
                 CompareResult::MissesRight(delete) => {
-                    let mut text_view = self.text_view.clone();
-                    if let Some(buffer) = text_view.get_buffer() {
-                        if let Some(tags) = buffer.get_tag_table() {
+                    if let Some(tags) = text_view.get_buffer().and_then(|buffer| buffer.get_tag_table()) {
+                        if let Some(tag) = tags.lookup(&delete.id.to_string()) {
+                            tags.remove(&tag);
                         }
                     }
                 }
                 CompareResult::Equal(left, right) => {
-
+                    if let Some(tag) = text_view.get_buffer()
+                        .and_then(|buffer| buffer.get_tag_table())
+                        .and_then(|tag_table| tag_table.lookup(&left.id.to_string())) {
+                        tag.set_property_background(right.color.as_ref().map(|s|s.as_str()));
+                    }
                 }
             }
         }
@@ -133,7 +133,7 @@ impl FileView {
     fn toggle_autoscroll(&mut self, enable: bool) {
         if enable {
             self.enable_auto_scroll();
-        }else {
+        } else {
             self.disable_auto_scroll();
         }
     }
@@ -182,8 +182,8 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileUiMsg>) {
                             let (line, start, end) = s;
                             let line = if m.with_offset {
                                 line_offset + line as i32
-                            }else {
-                              line as i32
+                            } else {
+                                line as i32
                             };
                             let iter_start = buffer.get_iter_at_line_index(line, start as i32);
                             let iter_end = buffer.get_iter_at_line_index(line, end as i32);
@@ -232,7 +232,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                         read_full_file = true;
                         active_rules.push(ActiveRule {
                             rule: rule.clone(),
-                            is_new: true
+                            is_new: true,
                         });
                     }
                     FileThreadMsg::DeleteRule(rule) => {
@@ -262,8 +262,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                                     CompareResult::MissesRight(delete) => {
                                         to_delete.push(delete.id);
                                     }
-                                    CompareResult::Equal(left, right) => {
-                                    }
+                                    CompareResult::Equal(left, right) => {}
                                 }
                             }
                         }
@@ -271,24 +270,24 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                         for new in to_add {
                             active_rules.push(ActiveRule {
                                 rule: Rule::CustomRule(new),
-                                is_new: true
+                                is_new: true,
                             });
                         }
                     }
                 }
             }
 
-            let tmp_file_offset = if read_full_file {0} else { file_byte_offset };
+            let tmp_file_offset = if read_full_file { 0 } else { file_byte_offset };
             if let Ok((read_bytes, content)) = read_file(&path, tmp_file_offset) {
                 let read_utf8 = content.as_bytes().len();
                 let mut re_list_matches = vec![];
                 for search_data in active_rules.iter_mut() {
                     let search_content = if search_data.is_new {
-                      &content[0..]
-                    }else {
+                        &content[0..]
+                    } else {
                         if read_utf8 > utf8_byte_offset {
                             &content[utf8_byte_offset..]
-                        }else {
+                        } else {
                             &content[0..]
                         }
                     };
@@ -299,7 +298,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                             re_list_matches.push(SearchMatches {
                                 matches,
                                 tag: search_data.rule.get_tag(),
-                                with_offset: !search_data.is_new
+                                with_offset: !search_data.is_new,
                             });
                         }
                         search_data.is_new = false;
@@ -309,14 +308,14 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                 let delta_content = if read_full_file {
                     let res = if read_bytes >= file_byte_offset {
                         &content[utf8_byte_offset as usize..]
-                    }else {
+                    } else {
                         &content[0..]
                     };
 
                     utf8_byte_offset = read_utf8;
                     file_byte_offset = read_bytes;
                     res
-                }else {
+                } else {
                     utf8_byte_offset += read_utf8;
                     file_byte_offset += read_bytes;
                     &content[0..]

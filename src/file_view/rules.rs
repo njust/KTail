@@ -1,4 +1,4 @@
-use gtk::{Orientation, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, Label, TreeViewExt, ButtonExt, TreeModelExt, CellRendererText, TreePath, TreeIter};
+use gtk::{Orientation, GtkListStoreExt, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, Label, TreeViewExt, ButtonExt, TreeModelExt, CellRendererText, TreePath, TreeIter, TreeSelectionExt, TreeModel};
 use crate::file_view::util::create_col;
 use gtk::prelude::GtkListStoreExtManual;
 use glib::Sender;
@@ -6,6 +6,8 @@ use crate::file_view::workbench::{Msg, RuleMsg};
 use std::error::Error;
 use glib::bitflags::_core::cmp::Ordering;
 use crate::file_view::SEARCH_TAG;
+use std::rc::Rc;
+use gio::ListStore;
 
 
 #[derive(Debug, Clone)]
@@ -130,6 +132,10 @@ impl RuleList {
         })
     }
 
+    pub fn delete(&mut self, iter: &TreeIter) {
+        self.list_model.remove(iter);
+    }
+
     pub fn model(&self) -> &gtk::ListStore {
         &self.list_model
     }
@@ -144,6 +150,19 @@ impl<'a> RuleListView<'a> {
     pub fn new(rules: &'a RuleList, tx: Sender<Msg>) -> Self {
         let container = gtk::Box::new(Orientation::Vertical, 0);
         let toolbar = gtk::Box::new(Orientation::Horizontal, 0);
+        let list_view = Rc::new(gtk::TreeView::with_model(&rules.list_model));
+        let delete_btn = gtk::Button::with_label("Delete"); {
+            let tx = tx.clone();
+            let list_view = list_view.clone();
+            delete_btn.connect_clicked(move |_| {
+                if let Some((_, iter)) = list_view.get_selection().get_selected() {
+                    tx.send(Msg::RuleMsg(RuleMsg::DeleteRule(iter)));
+                }
+
+            });
+            toolbar.add(&delete_btn);
+        }
+
         let add_btn = gtk::Button::with_label("Add"); {
             let tx = tx.clone();
             add_btn.connect_clicked(move |_| {
@@ -160,14 +179,12 @@ impl<'a> RuleListView<'a> {
             toolbar.add(&ok_btn);
         }
 
-        let list_view = gtk::TreeView::with_model(&rules.list_model);
-
         list_view.append_column(&create_col("Name", 1, tx.clone()));
         list_view.append_column(&create_col("Regex", 2, tx.clone()));
         list_view.append_column(&create_col("Color", 3, tx.clone()));
 
         container.add(&toolbar);
-        container.add(&list_view);
+        container.add(&*list_view);
         Self {
             container,
             list: rules
