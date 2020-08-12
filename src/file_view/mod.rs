@@ -9,6 +9,7 @@ use glib::{SignalHandlerId, Receiver, Sender};
 use crate::file_view::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
 use glib::bitflags::_core::cell::RefCell;
 use crate::file_view::rules::{CustomRule, Rule};
+use uuid::Uuid;
 
 pub mod workbench;
 pub mod toolbar;
@@ -39,10 +40,15 @@ enum FileUiMsg {
     Clear,
 }
 
+struct RuleChanges {
+    add: Vec<CustomRule>,
+    remove: Vec<String>,
+}
+
 enum FileThreadMsg {
     AddRule(Rule),
     DeleteRule(Rule),
-    ApplyRules(Vec<CustomRule>),
+    ApplyRules(RuleChanges),
 }
 
 impl FileView {
@@ -98,11 +104,14 @@ impl FileView {
     }
 
     fn apply_rules(&mut self, mut rules: Vec<CustomRule>) {
+        let mut add = vec![];
+        let mut remove = vec![];
         let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
         for compare_result in compare_results {
             let mut text_view = self.text_view.clone();
             match compare_result {
                 CompareResult::MissesLeft(new) => {
+                    add.push(new.clone());
                     if let Some(tags) = text_view.get_buffer()
                         .and_then(|buffer| buffer.get_tag_table()) {
                         let tag = TextTag::new(Some(&new.id.to_string()));
@@ -111,6 +120,7 @@ impl FileView {
                     }
                 }
                 CompareResult::MissesRight(delete) => {
+                    remove.push(delete.id.to_string());
                     if let Some(tags) = text_view.get_buffer().and_then(|buffer| buffer.get_tag_table()) {
                         if let Some(tag) = tags.lookup(&delete.id.to_string()) {
                             tags.remove(&tag);
@@ -127,7 +137,10 @@ impl FileView {
             }
         }
         self.rules = rules.clone();
-        self.thread_action_sender.send(FileThreadMsg::ApplyRules(rules));
+        self.thread_action_sender.send(FileThreadMsg::ApplyRules(RuleChanges {
+            add,
+            remove
+        }));
     }
 
     fn toggle_autoscroll(&mut self, enable: bool) {
@@ -240,38 +253,18 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                             active_rules.remove(idx);
                         }
                     }
-                    FileThreadMsg::ApplyRules(rules) => {
-                        let mut to_add: Vec<CustomRule> = vec![];
-                        let mut to_delete = vec![];
-                        {
-                            let mut active_custom_rules = vec![];
-                            for active_rule in active_rules.iter() {
-                                if let Rule::CustomRule(r) = &active_rule.rule {
-                                    active_custom_rules.push(r);
-                                }
-                            }
-                            let mut rules_to_compare: Vec<&CustomRule> = rules.iter().collect();
-                            let compare_results = SortedListCompare::new(&mut active_custom_rules, &mut rules_to_compare);
-
-                            for compare_result in compare_results {
-                                match compare_result {
-                                    CompareResult::MissesLeft(new) => {
-                                        read_full_file = true;
-                                        to_add.push((*new).clone());
-                                    }
-                                    CompareResult::MissesRight(delete) => {
-                                        to_delete.push(delete.id);
-                                    }
-                                    CompareResult::Equal(left, right) => {}
-                                }
-                            }
-                        }
-
-                        for new in to_add {
+                    FileThreadMsg::ApplyRules(changes) => {
+                        for new in &changes.add {
+                            read_full_file = true;
                             active_rules.push(ActiveRule {
-                                rule: Rule::CustomRule(new),
+                                rule: Rule::CustomRule(new.clone()),
                                 is_new: true,
                             });
+                        }
+                        for remove in &changes.remove {
+                            if let Some((idx, _item)) = active_rules.iter().enumerate().find(|(idx, e)| &e.rule.get_id() == remove) {
+                                active_rules.remove(idx);
+                            }
                         }
                     }
                 }

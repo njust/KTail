@@ -24,6 +24,13 @@ impl Rule {
         }
     }
 
+    pub fn get_id(&self) -> String {
+        match self {
+            Rule::UserSearch(s) => s.clone(),
+            Rule::CustomRule(rule) => rule.id.to_string()
+        }
+    }
+
     pub fn get_tag(&self) -> String {
         match self {
             Rule::UserSearch(s) => String::from(SEARCH_TAG),
