@@ -1,8 +1,7 @@
 use gtk::prelude::*;
-use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, ComboBox, Label, HeaderBar, WindowPosition, ApplicationWindow};
+use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button};
 use glib::{Sender};
-use crate::file_view::workbench::{Msg, RuleMsg};
-use crate::file_view::rules::{RulesDialog, RuleList, RuleListView};
+use crate::file_view::workbench::{Msg};
 
 pub struct FileViewToolbar {
     container: gtk::Box,
@@ -18,7 +17,7 @@ impl FileViewToolbar {
             let tx = tx.clone();
             search_txt.connect_changed(move |e| {
                 let text = e.get_text().to_string();
-                tx.send(Msg::TextChange(text));
+                tx.send(Msg::TextChange(text)).expect("Could not send search text change");
             });
             search_txt.set_text(r".*\s((?i)error|fatal(?-i))\s.*");
             toolbar.add(&search_txt);
@@ -27,7 +26,7 @@ impl FileViewToolbar {
         let search_btn = Button::with_label("Search"); {
             let tx = tx.clone();
             search_btn.connect_clicked(move |_| {
-                tx.send(Msg::SearchPressed);
+                tx.send(Msg::SearchPressed).expect("Could not send search pressed");
             });
             toolbar.add(&search_btn);
         }
@@ -35,7 +34,7 @@ impl FileViewToolbar {
         let clear_search_btn = Button::with_label("Clear"); {
             let tx = tx.clone();
             clear_search_btn.connect_clicked(move |_| {
-                tx.send(Msg::ClearSearchPressed);
+                tx.send(Msg::ClearSearchPressed).expect("Could not send clear search");
             });
             toolbar.add(&clear_search_btn);
         }
@@ -43,7 +42,7 @@ impl FileViewToolbar {
         let show_rules_btn = Button::with_label("Rules"); {
             let tx = tx.clone();
             show_rules_btn.connect_clicked(move |_| {
-                tx.send(Msg::ShowRules);
+                tx.send(Msg::ShowRules).expect("Could not send show rules");
             });
             toolbar.add(&show_rules_btn);
         }
@@ -51,7 +50,7 @@ impl FileViewToolbar {
         let toggle_auto_scroll_btn = ToggleButton::new(); {
             let tx = tx.clone();
             toggle_auto_scroll_btn.connect_clicked(move |b| {
-                tx.send(Msg::ToggleAutoScroll(b.get_active()));
+                tx.send(Msg::ToggleAutoScroll(b.get_active())).expect("Could not send toggle autoscroll");
             });
 
             toggle_auto_scroll_btn.set_image(Some(&gtk::Image::from_icon_name(Some("go-bottom-symbolic"), IconSize::Menu)));

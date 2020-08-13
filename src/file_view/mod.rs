@@ -7,9 +7,7 @@ use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId, Receiver, Sender};
 use crate::file_view::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
-use glib::bitflags::_core::cell::RefCell;
 use crate::file_view::rules::{CustomRule, Rule};
-use uuid::Uuid;
 
 pub mod workbench;
 pub mod toolbar;
@@ -22,7 +20,6 @@ pub struct FileView {
     container: gtk::Box,
     stop_handle: Arc<(Mutex<bool>, Condvar)>,
     text_view: Rc<TextView>,
-    ui_action_sender: Sender<FileUiMsg>,
     thread_action_sender: std::sync::mpsc::Sender<FileThreadMsg>,
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<CustomRule>,
@@ -86,7 +83,6 @@ impl FileView {
             container,
             stop_handle,
             text_view,
-            ui_action_sender: ui_action_sender.clone(),
             thread_action_sender,
             autoscroll_handler: None,
             rules: vec![],
@@ -94,11 +90,11 @@ impl FileView {
     }
 
     fn search(&mut self, search_text: String) {
-        self.thread_action_sender.send(FileThreadMsg::AddRule(Rule::UserSearch(search_text)));
+        self.thread_action_sender.send(FileThreadMsg::AddRule(Rule::UserSearch(search_text))).expect("Could not send add rule");
     }
 
     fn clear_search(&mut self, search: &str) {
-        self.thread_action_sender.send(FileThreadMsg::DeleteRule(Rule::UserSearch(search.to_string())));
+        self.thread_action_sender.send(FileThreadMsg::DeleteRule(Rule::UserSearch(search.to_string()))).expect("Could not send delete rule");
         clear_search(&self.text_view);
     }
 
@@ -107,7 +103,7 @@ impl FileView {
         let mut remove = vec![];
         let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
         for compare_result in compare_results {
-            let mut text_view = self.text_view.clone();
+            let text_view = self.text_view.clone();
             match compare_result {
                 CompareResult::MissesLeft(new) => {
                     add.push(new.clone());
@@ -139,7 +135,7 @@ impl FileView {
         self.thread_action_sender.send(FileThreadMsg::ApplyRules(RuleChanges {
             add,
             remove
-        }));
+        })).expect("Could not send apply rules");
     }
 
     fn toggle_autoscroll(&mut self, enable: bool) {
@@ -148,10 +144,6 @@ impl FileView {
         } else {
             self.disable_auto_scroll();
         }
-    }
-
-    fn add_rule(&mut self, rule: CustomRule) {
-        self.thread_action_sender.send(FileThreadMsg::AddRule(Rule::CustomRule(rule)));
     }
 
     pub fn enable_auto_scroll(&mut self) {
@@ -173,7 +165,7 @@ impl FileView {
 
 fn clear_search(text_view: &TextView) {
     if let Some(buffer) = text_view.get_buffer() {
-        let (start, mut end) = buffer.get_bounds();
+        let (start, end) = buffer.get_bounds();
         buffer.remove_tag_by_name(SEARCH_TAG, &start, &end);
     }
 }
@@ -233,7 +225,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                 if len < file_byte_offset {
                     file_byte_offset = 0;
                     utf8_byte_offset = 0;
-                    tx.send(FileUiMsg::Clear);
+                    tx.send(FileUiMsg::Clear).expect("Could not send clear file");
                 }
             }
 
@@ -248,7 +240,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                         });
                     }
                     FileThreadMsg::DeleteRule(rule) => {
-                        if let Some((idx, _search)) = active_rules.iter().enumerate().find(|(idx, item)| &item.rule == rule) {
+                        if let Some((idx, _search)) = active_rules.iter().enumerate().find(|(_, item)| &item.rule == rule) {
                             active_rules.remove(idx);
                         }
                     }
@@ -261,7 +253,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                             });
                         }
                         for remove in &changes.remove {
-                            if let Some((idx, _item)) = active_rules.iter().enumerate().find(|(idx, e)| &e.rule.get_id() == remove) {
+                            if let Some((idx, _item)) = active_rules.iter().enumerate().find(|(_, e)| &e.rule.get_id() == remove) {
                                 active_rules.remove(idx);
                             }
                         }
@@ -313,7 +305,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                     &content[0..]
                 };
 
-                tx.send(FileUiMsg::Data(read_bytes, String::from(delta_content), re_list_matches));
+                tx.send(FileUiMsg::Data(read_bytes, String::from(delta_content), re_list_matches)).expect("Could not send file data");
             }
 
             stopped = wait_handle.wait_timeout(stopped, Duration::from_millis(500)).unwrap().0;

@@ -1,15 +1,11 @@
-use gio::prelude::*;
 use gtk::prelude::*;
 
-use gtk::{Orientation, GtkListStoreExt, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, Label, TreeViewExt, ButtonExt, TreeModelExt, CellRendererText, TreePath, TreeIter, TreeSelectionExt, TreeModel, ColorChooserDialog, ApplicationWindow, ColorChooserExt, TreeView, ListBoxExt, TreeStore};
-use gtk::prelude::GtkListStoreExtManual;
-use glib::{Sender, Type};
+use gtk::{Orientation, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, ButtonExt};
+use glib::{Sender};
 use crate::file_view::workbench::{Msg, RuleMsg};
-use std::error::Error;
 use glib::bitflags::_core::cmp::Ordering;
 use crate::file_view::SEARCH_TAG;
 use std::rc::Rc;
-use gio::ListStore;
 use uuid::Uuid;
 use std::collections::HashMap;
 use glib::bitflags::_core::cell::RefCell;
@@ -38,7 +34,7 @@ impl Rule {
 
     pub fn get_tag(&self) -> String {
         match self {
-            Rule::UserSearch(s) => String::from(SEARCH_TAG),
+            Rule::UserSearch(_) => String::from(SEARCH_TAG),
             Rule::CustomRule(rule) => rule.id.to_string()
         }
     }
@@ -93,14 +89,12 @@ impl CustomRuleView {
         let name = rule.name.as_ref().unwrap_or(&default);
 
         let container = gtk::Box::new(Orientation::Horizontal, 20);
-        unsafe {
-            container.set_data("id", id);
-        }
+
         let name_txt = gtk::Entry::new(); {
             let tx = tx.clone();
             name_txt.connect_changed(move |e| {
                 let s = e.get_text().to_string();
-                tx.send(Msg::RuleMsg(RuleMsg::NameChanged(id, s)));
+                tx.send(Msg::RuleMsg(RuleMsg::NameChanged(id, s))).expect("Could not send name change");
             });
             name_txt.set_text(name);
             container.add(&name_txt);
@@ -110,7 +104,7 @@ impl CustomRuleView {
             let tx = tx.clone();
             regex.connect_changed(move |e| {
                 let s = e.get_text().to_string();
-                tx.send(Msg::RuleMsg(RuleMsg::RegexChanged(id, s)));
+                tx.send(Msg::RuleMsg(RuleMsg::RegexChanged(id, s))).expect("Could not send regex changed");
             });
             container.add(&regex);
         }
@@ -119,7 +113,7 @@ impl CustomRuleView {
             let tx = tx.clone();
             color_btn.connect_color_set(move |a|{
                 let color = a.get_rgba();
-                tx.send(Msg::RuleMsg(RuleMsg::ColorChanged(id, color.to_string())));
+                tx.send(Msg::RuleMsg(RuleMsg::ColorChanged(id, color.to_string()))).expect("Could not send color change");
             });
 
             container.add(&color_btn);
@@ -127,8 +121,8 @@ impl CustomRuleView {
 
         let btn = gtk::Button::with_label("Delete"); {
             let tx = tx.clone();
-            btn.connect_clicked(move |b| {
-                tx.send(Msg::RuleMsg(RuleMsg::DeleteRule(id)));
+            btn.connect_clicked(move |_| {
+                tx.send(Msg::RuleMsg(RuleMsg::DeleteRule(id))).expect("Could not send delete rule");
             });
             container.add(&btn);
         }
@@ -225,7 +219,7 @@ impl RuleListView {
                 rule_list.add(&wrapper);
                 rule_id_view_map.borrow_mut().insert(rule_data.id, wrapper);
                 rule_list.show_all();
-                tx.send(Msg::RuleMsg(RuleMsg::AddRule(rule_data)));
+                tx.send(Msg::RuleMsg(RuleMsg::AddRule(rule_data))).expect("Could not send add rule");
             });
             toolbar.add(&add_btn);
         }
@@ -298,7 +292,7 @@ impl RulesDialog {
         content.add(rule_list_view.view());
 
         dlg.connect_delete_event(move |dlg, _| {
-            tx.send(Msg::ApplyRules);
+            tx.send(Msg::ApplyRules).expect("Could not send apply rules");
             dlg.hide();
             gtk::Inhibit(true)
         });

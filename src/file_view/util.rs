@@ -1,14 +1,13 @@
 use gtk::prelude::*;
-use gtk::{TextView, TreeViewColumn, CellRendererText, TreePath, CellRenderer, ColorChooserDialog, ApplicationWindow, ResponseType};
-use glib::{SignalHandlerId, Sender};
+use gtk::{TextView};
+use glib::{SignalHandlerId};
 use std::path::PathBuf;
 use std::io::{BufReader, SeekFrom, Read, Seek};
 use std::error::Error;
-use encoding::all::{UTF_16LE, UTF_8};
+use encoding::all::{UTF_8};
 use encoding::{Encoding, DecoderTrap};
 use glib::bitflags::_core::cmp::Ordering;
 use regex::Regex;
-use crate::file_view::workbench::{Msg, RuleMsg};
 
 pub fn enable_auto_scroll(text_view : &TextView) -> SignalHandlerId {
     text_view.connect_size_allocate(|tv, _b| {
@@ -24,7 +23,7 @@ pub fn read_file(path: &PathBuf, start: u64) -> Result<(u64, String), Box<dyn Er
     let mut reader = BufReader::new(file);
     let mut buffer = vec![];
     if start > 0 {
-        reader.seek(SeekFrom::Start(start));
+        reader.seek(SeekFrom::Start(start))?;
     }
 
     let read = reader.read_to_end(&mut buffer)?;

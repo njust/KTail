@@ -4,8 +4,8 @@ use crate::file_view::toolbar::FileViewToolbar;
 use std::rc::Rc;
 use glib::bitflags::_core::cell::RefCell;
 use std::path::PathBuf;
-use gtk::{Orientation, TreePath, TreeIter};
-use crate::file_view::rules::{RuleList, CustomRule, RulesDialog, RuleListView};
+use gtk::{Orientation};
+use crate::file_view::rules::{CustomRule, RulesDialog, RuleListView};
 use uuid::Uuid;
 
 pub enum RuleMsg {
@@ -53,8 +53,9 @@ impl FileViewWorkbench {
         container.add(toolbar.view());
         container.add(file_view.view());
 
-        let mut rules = RuleListView::new(tx.clone());
-        let dlg = RulesDialog::new(&rules, tx.clone());
+        let mut rule_view = RuleListView::new(tx.clone());
+        let rule_dlg = RulesDialog::new(&rule_view, tx.clone());
+
         rx.attach(None, move |msg| {
             match msg {
                 Msg::SearchPressed => {
@@ -71,14 +72,14 @@ impl FileViewWorkbench {
                     file_view.toggle_autoscroll(enable)
                 }
                 Msg::ShowRules => {
-                    dlg.show();
+                    rule_dlg.show();
                 }
                 Msg::ApplyRules => {
-                    let rules = rules.get_rules();
+                    let rules = rule_view.get_rules();
                     file_view.apply_rules(rules);
                 }
                 Msg::RuleMsg(msg) => {
-                    rules.update(msg);
+                    rule_view.update(msg);
                 }
             }
             glib::Continue(true)
