@@ -43,7 +43,7 @@ impl FileViewToolbar {
         let show_rules_btn = Button::with_label("Rules"); {
             let tx = tx.clone();
             show_rules_btn.connect_clicked(move |_| {
-                tx.send(Msg::RuleMsg(RuleMsg::ShowRules));
+                tx.send(Msg::ShowRules);
             });
             toolbar.add(&show_rules_btn);
         }

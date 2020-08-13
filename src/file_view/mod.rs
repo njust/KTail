@@ -16,7 +16,6 @@ pub mod toolbar;
 pub mod util;
 pub mod rules;
 
-
 pub const SEARCH_TAG: &'static str = "SEARCH";
 
 pub struct FileView {

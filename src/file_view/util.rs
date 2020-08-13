@@ -4,7 +4,7 @@ use glib::{SignalHandlerId, Sender};
 use std::path::PathBuf;
 use std::io::{BufReader, SeekFrom, Read, Seek};
 use std::error::Error;
-use encoding::all::UTF_16LE;
+use encoding::all::{UTF_16LE, UTF_8};
 use encoding::{Encoding, DecoderTrap};
 use glib::bitflags::_core::cmp::Ordering;
 use regex::Regex;
@@ -28,7 +28,7 @@ pub fn read_file(path: &PathBuf, start: u64) -> Result<(u64, String), Box<dyn Er
     }
 
     let read = reader.read_to_end(&mut buffer)?;
-    let s = UTF_16LE.decode(buffer.as_slice(), DecoderTrap::Replace)?;
+    let s = UTF_8.decode(buffer.as_slice(), DecoderTrap::Replace)?;
     Ok((read as u64, s))
 }
 
@@ -43,30 +43,6 @@ pub fn search(text: &str, search: &str) -> Result<Vec<(usize, usize, usize)>, Bo
     }
     Ok(matches)
 }
-
-pub fn create_col(title: &str, idx: i32, tx: Sender<Msg>, color: bool) -> TreeViewColumn {
-    let column = TreeViewColumn::new();
-    let renderer = CellRendererText::new();
-    column.pack_start(&renderer, true);
-    renderer.connect_edited(move |e, f, g| {
-        tx.send(Msg::RuleMsg(RuleMsg::RuleChanged(f, idx as u32, String::from(g))));
-    });
-
-    if color {
-        column.add_attribute(&renderer, "cell-background", idx);
-        column.add_attribute(&renderer, "text", idx);
-    }else {
-        column.add_attribute(&renderer, "text", idx);
-        renderer.set_property_editable(true);
-    }
-
-    column.set_title(title);
-    column.set_resizable(true);
-    column.set_sort_column_id(idx);
-    column.set_expand(true);
-    column
-}
-
 
 pub struct SortedListCompare<'a, 'b, T: PartialOrd> {
     lh: &'a Vec<T>,

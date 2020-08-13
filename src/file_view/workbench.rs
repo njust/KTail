@@ -5,15 +5,15 @@ use std::rc::Rc;
 use glib::bitflags::_core::cell::RefCell;
 use std::path::PathBuf;
 use gtk::{Orientation, TreePath, TreeIter};
-use crate::file_view::rules::{RuleList, CustomRule, RulesDialog};
+use crate::file_view::rules::{RuleList, CustomRule, RulesDialog, RuleListView};
+use uuid::Uuid;
 
 pub enum RuleMsg {
-    ShowRules,
-    AddRule,
-    DeleteRule(TreeIter),
-    ColorChanged(TreeIter, String),
-    Ok,
-    RuleChanged(TreePath, u32, String)
+    AddRule(CustomRule),
+    DeleteRule(Uuid),
+    NameChanged(Uuid, String),
+    RegexChanged (Uuid, String),
+    ColorChanged(Uuid, String),
 }
 
 pub enum Msg {
@@ -21,19 +21,19 @@ pub enum Msg {
     SearchPressed,
     ClearSearchPressed,
     RuleMsg(RuleMsg),
-    ToggleAutoScroll(bool)
+    ApplyRules,
+    ToggleAutoScroll(bool),
+    ShowRules
 }
 
 pub struct WorkbenchState {
     search_text: String,
-    rules: RuleList,
 }
 
 impl Default for WorkbenchState {
     fn default() -> Self {
         Self {
             search_text: String::new(),
-            rules: RuleList::new()
         }
     }
 }
@@ -53,6 +53,8 @@ impl FileViewWorkbench {
         container.add(toolbar.view());
         container.add(file_view.view());
 
+        let mut rules = RuleListView::new(tx.clone());
+        let dlg = RulesDialog::new(&rules, tx.clone());
         rx.attach(None, move |msg| {
             match msg {
                 Msg::SearchPressed => {
@@ -68,37 +70,15 @@ impl FileViewWorkbench {
                 Msg::ToggleAutoScroll(enable) => {
                     file_view.toggle_autoscroll(enable)
                 }
+                Msg::ShowRules => {
+                    dlg.show();
+                }
+                Msg::ApplyRules => {
+                    let rules = rules.get_rules();
+                    file_view.apply_rules(rules);
+                }
                 Msg::RuleMsg(msg) => {
-                    match msg {
-                        RuleMsg::ShowRules => {
-                            let state = state.borrow_mut();
-                            let dlg = RulesDialog::new(&state.rules, tx.clone());
-                            dlg.show();
-                        }
-                        RuleMsg::AddRule => {
-                            let state = state.borrow_mut();
-                            state.rules.add_rule(&CustomRule::new("New rule"));
-                        }
-                        RuleMsg::RuleChanged(path, column, value) => {
-                            let state = state.borrow_mut();
-                            state.rules.update(path, column, value);
-                        }
-                        RuleMsg::ColorChanged(iter, color) => {
-                            let state = state.borrow_mut();
-                            state.rules.color_changed(iter, color);
-                        }
-                        RuleMsg::Ok => {
-                            let state = state.borrow();
-                            if let Ok(rules) = state.rules.get_rules() {
-                                println!("Apply rules: {:?}", rules);
-                                file_view.apply_rules(rules);
-                            }
-                        }
-                        RuleMsg::DeleteRule(iter) => {
-                            let mut state = state.borrow_mut();
-                            state.rules.delete(&iter);
-                        }
-                    }
+                    rules.update(msg);
                 }
             }
             glib::Continue(true)

@@ -1,13 +1,18 @@
-use gtk::{Orientation, GtkListStoreExt, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, Label, TreeViewExt, ButtonExt, TreeModelExt, CellRendererText, TreePath, TreeIter, TreeSelectionExt, TreeModel, ColorChooserDialog, ApplicationWindow, ColorChooserExt, TreeView};
-use crate::file_view::util::create_col;
+use gio::prelude::*;
+use gtk::prelude::*;
+
+use gtk::{Orientation, GtkListStoreExt, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, Label, TreeViewExt, ButtonExt, TreeModelExt, CellRendererText, TreePath, TreeIter, TreeSelectionExt, TreeModel, ColorChooserDialog, ApplicationWindow, ColorChooserExt, TreeView, ListBoxExt, TreeStore};
 use gtk::prelude::GtkListStoreExtManual;
-use glib::Sender;
+use glib::{Sender, Type};
 use crate::file_view::workbench::{Msg, RuleMsg};
 use std::error::Error;
 use glib::bitflags::_core::cmp::Ordering;
 use crate::file_view::SEARCH_TAG;
 use std::rc::Rc;
 use gio::ListStore;
+use uuid::Uuid;
+use std::collections::HashMap;
+use glib::bitflags::_core::cell::RefCell;
 
 
 #[derive(Debug, Clone)]
@@ -67,13 +72,74 @@ pub struct CustomRule {
 }
 
 impl CustomRule {
-    pub fn new(name: &str) -> Self {
+    pub fn new() -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
-            name: Some(String::from(name)),
+            name: None,
             color: None,
             regex: None,
         }
+    }
+}
+
+struct CustomRuleView {
+    container: gtk::Box,
+}
+
+impl CustomRuleView {
+    fn new(rule: &CustomRule, tx: Sender<Msg>) -> Self {
+        let id = rule.id;
+        let default = String::from("New Rule");
+        let name = rule.name.as_ref().unwrap_or(&default);
+
+        let container = gtk::Box::new(Orientation::Horizontal, 20);
+        unsafe {
+            container.set_data("id", id);
+        }
+        let name_txt = gtk::Entry::new(); {
+            let tx = tx.clone();
+            name_txt.connect_changed(move |e| {
+                let s = e.get_text().to_string();
+                tx.send(Msg::RuleMsg(RuleMsg::NameChanged(id, s)));
+            });
+            name_txt.set_text(name);
+            container.add(&name_txt);
+        }
+
+        let regex = gtk::Entry::new(); {
+            let tx = tx.clone();
+            regex.connect_changed(move |e| {
+                let s = e.get_text().to_string();
+                tx.send(Msg::RuleMsg(RuleMsg::RegexChanged(id, s)));
+            });
+            container.add(&regex);
+        }
+
+        let color_btn = gtk::ColorButton::new(); {
+            let tx = tx.clone();
+            color_btn.connect_color_set(move |a|{
+                let color = a.get_rgba();
+                tx.send(Msg::RuleMsg(RuleMsg::ColorChanged(id, color.to_string())));
+            });
+
+            container.add(&color_btn);
+        }
+
+        let btn = gtk::Button::with_label("Delete"); {
+            let tx = tx.clone();
+            btn.connect_clicked(move |b| {
+                tx.send(Msg::RuleMsg(RuleMsg::DeleteRule(id)));
+            });
+            container.add(&btn);
+        }
+
+        Self {
+            container
+        }
+    }
+
+    fn view(&self) -> &gtk::Box {
+        &self.container
     }
 }
 
@@ -89,128 +155,123 @@ impl PartialOrd for CustomRule {
     }
 }
 
+#[derive(Clone)]
 pub struct RuleList {
-    list_model: gtk::ListStore,
+    rules: HashMap<Uuid, CustomRule>
 }
 
 impl RuleList {
     pub fn new() -> Self {
-        let list_model = gtk::ListStore::new(&[glib::Type::String, glib::Type::String, glib::Type::String, glib::Type::String]);
-        list_model.connect_row_changed(|r,path,iter| {
-           println!("Row changed!");
-        });
         Self {
-            list_model
+            rules: HashMap::new()
+        }
+    }
+    pub fn color_changed(&mut self, id: Uuid, color: String) {
+        if let Some(rule) = self.rules.get_mut(&id) {
+            rule.color = Some(color)
         }
     }
 
-    pub fn update(&self, path: TreePath, column: u32, data: String) {
-        if let Some(item) = self.list_model.get_iter(&path) {
-            self.list_model.set(&item, &[column], &[&data]);
+    pub fn name_changed(&mut self, id: Uuid, name: String) {
+        if let Some(rule) = self.rules.get_mut(&id) {
+            rule.name = Some(name)
         }
     }
 
-    pub fn color_changed(&self, iter: TreeIter, color: String) {
-        self.list_model.set(&iter, &[3], &[&color]);
-    }
-
-    pub fn add_rule(&self, rule: &CustomRule) {
-        self.list_model.insert_with_values(None, &[0,1,2,3], &[&rule.id.to_string(), &rule.name, &rule.regex, &rule.color]);
-    }
-
-    pub fn get_rules(&self) -> Result<Vec<CustomRule>, Box<dyn Error>> {
-        let mut rules = vec![];
-        if let Some(iter) = self.list_model.get_iter_first() {
-            let rule = self.get_rule_for_iter(&iter)?;
-            rules.push(rule);
-            while self.list_model.iter_next(&iter) {
-                let rule = self.get_rule_for_iter(&iter)?;
-                rules.push(rule);
-            }
+    pub fn regex_changed(&mut self, id: Uuid, regex: String) {
+        if let Some(rule) = self.rules.get_mut(&id) {
+            rule.regex = Some(regex)
         }
-        Ok(rules)
     }
 
-    pub fn get_rule_for_iter(&self, iter: &TreeIter) -> Result<CustomRule, Box<dyn Error>> {
-        let id = self.list_model.get_value(&iter, 0).get::<String>()?.ok_or("Rule without id!")?;
-        let name = self.list_model.get_value(&iter, 1).get::<String>()?;
-        let regex = self.list_model.get_value(&iter, 2).get::<String>()?;
-        let color = self.list_model.get_value(&iter, 3).get::<String>()?;
-
-        let id = uuid::Uuid::parse_str(&id)?;
-        Ok(CustomRule {
-            id, name, regex, color
-        })
+    pub fn add_rule(&mut self, rule: CustomRule) {
+        self.rules.insert(rule.id, rule);
     }
 
-    pub fn delete(&mut self, iter: &TreeIter) {
-        self.list_model.remove(iter);
+    pub fn get_rules(&self) -> Vec<CustomRule> {
+        self.rules.values().map(|e|e.clone()).collect()
     }
 
-    pub fn model(&self) -> &gtk::ListStore {
-        &self.list_model
+    pub fn delete(&mut self, id: Uuid) {
+        self.rules.remove(&id);
     }
+
 }
 
-pub struct RuleListView<'a> {
+pub struct RuleListView {
     container: gtk::Box,
-    list: &'a RuleList,
+    rules: RuleList,
+    rule_list: Rc<gtk::Box>,
+    rule_view_id_map: Rc<RefCell<HashMap<Uuid, gtk::Box>>>
 }
 
-impl<'a> RuleListView<'a> {
-    pub fn new(rules: &'a RuleList, tx: Sender<Msg>) -> Self {
-        let container = gtk::Box::new(Orientation::Vertical, 0);
+impl RuleListView {
+    pub fn new(tx: Sender<Msg>) -> Self {
+        let rule_list = Rc::new(gtk::Box::new(Orientation::Vertical, 0));
         let toolbar = gtk::Box::new(Orientation::Horizontal, 0);
-        let list_view = Rc::new(gtk::TreeView::with_model(&rules.list_model));
+        let rule_view_id_map = Rc::new(RefCell::new(HashMap::new()));
 
         let add_btn = gtk::Button::with_label("Add"); {
             let tx = tx.clone();
+            let rule_list = rule_list.clone();
+            let rule_id_view_map = rule_view_id_map.clone();
             add_btn.connect_clicked(move |_| {
-                tx.send(Msg::RuleMsg(RuleMsg::AddRule));
+                let rule_data = CustomRule::new();
+                let rule_view = CustomRuleView::new(&rule_data, tx.clone());
+
+                let wrapper = gtk::Box::new(Orientation::Horizontal, 0);
+                wrapper.add(rule_view.view());
+
+                rule_list.add(&wrapper);
+                rule_id_view_map.borrow_mut().insert(rule_data.id, wrapper);
+                rule_list.show_all();
+                tx.send(Msg::RuleMsg(RuleMsg::AddRule(rule_data)));
             });
             toolbar.add(&add_btn);
         }
 
-        let select_color_btn = gtk::Button::with_label("Color"); {
-            let tx = tx.clone();
-            let list_view = list_view.clone();
-            select_color_btn.connect_clicked(move |_| {
-                    let cc_dlg = ColorChooserDialog::new::<ApplicationWindow>(Some("Color"), None);
-                    cc_dlg.set_modal(true);
-                    cc_dlg.run();
-                    cc_dlg.close();
-                    if let Some((_, iter)) = list_view.get_selection().get_selected() {
-                        tx.send(Msg::RuleMsg(RuleMsg::ColorChanged(iter, cc_dlg.get_rgba().to_string())));
-                    }
-            });
-            toolbar.add(&select_color_btn);
-        }
-
-       let delete_btn = gtk::Button::with_label("Delete"); {
-            let tx = tx.clone();
-            let list_view = list_view.clone();
-            delete_btn.connect_clicked(move |_| {
-                if let Some((_, iter)) = list_view.get_selection().get_selected() {
-                    tx.send(Msg::RuleMsg(RuleMsg::DeleteRule(iter)));
-                }
-            });
-            toolbar.add(&delete_btn);
-        }
-
-        list_view.append_column(&create_col("Name", 1, tx.clone(), false));
-        list_view.append_column(&create_col("Regex", 2, tx.clone(), false));
-        list_view.append_column(&create_col("Color", 3, tx.clone(), true));
-
+        let container = gtk::Box::new(Orientation::Vertical, 0);
         container.add(&toolbar);
-        container.add(&*list_view);
+        container.add(&*rule_list);
+
         Self {
             container,
-            list: rules
+            rule_list,
+            rule_view_id_map,
+            rules: RuleList::new()
         }
     }
 
-    fn add_rule(&self, rule: &CustomRule) {
-        self.list.add_rule(rule)
+    pub fn get_rules(&self) -> Vec<CustomRule> {
+        self.rules.get_rules()
+    }
+
+    pub fn update(&mut self, msg: RuleMsg) {
+        match msg {
+            RuleMsg::AddRule(rule) => {
+                self.rules.add_rule(rule);
+            }
+            RuleMsg::NameChanged(id, name) => {
+                self.rules.name_changed(id, name);
+            }
+            RuleMsg::RegexChanged(id, regex) => {
+                self.rules.regex_changed(id, regex);
+            }
+            RuleMsg::ColorChanged(id, color) => {
+                self.rules.color_changed(id, color);
+            }
+            RuleMsg::DeleteRule(id) => {
+                self.rules.delete(id);
+                self.delete(id);
+            }
+        }
+    }
+
+    pub fn delete(&mut self, id: Uuid) {
+        let map = self.rule_view_id_map.borrow_mut();
+        if let Some(existing) = map.get(&id) {
+            self.rule_list.remove(existing);
+        }
     }
 
     fn view(&self) -> &gtk::Box {
@@ -218,13 +279,12 @@ impl<'a> RuleListView<'a> {
     }
 }
 
-pub struct RulesDialog<'a> {
+pub struct RulesDialog {
     dlg: gtk::Dialog,
-    list: RuleListView<'a>,
 }
 
-impl<'a> RulesDialog<'a> {
-    pub fn new(rules: &'a RuleList, tx: Sender<Msg>) -> Self {
+impl RulesDialog {
+    pub fn new(rule_list_view: &RuleListView, tx: Sender<Msg>) -> Self {
         let dlg = gtk::Dialog::new();
         dlg.set_position(WindowPosition::Mouse);
         dlg.set_default_size(400, 200);
@@ -234,18 +294,16 @@ impl<'a> RulesDialog<'a> {
         dlg.set_titlebar(Some(&header_bar));
         dlg.set_modal(true);
 
-        let rules = RuleListView::new(rules, tx.clone());
         let content = dlg.get_content_area();
-        content.add(rules.view());
+        content.add(rule_list_view.view());
 
         dlg.connect_delete_event(move |dlg, _| {
-            tx.send(Msg::RuleMsg(RuleMsg::Ok));
+            tx.send(Msg::ApplyRules);
             dlg.hide();
             gtk::Inhibit(true)
         });
         Self {
             dlg,
-            list: rules
         }
     }
 
