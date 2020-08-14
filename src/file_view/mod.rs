@@ -25,14 +25,20 @@ pub struct FileView {
     rules: Vec<CustomRule>,
 }
 
-struct SearchMatches {
-    with_offset: bool,
+pub struct SearchResultMatch {
+    pub line: usize,
+    pub start: usize,
+    pub end: usize,
+}
+
+struct SearchResult {
     tag: String,
-    matches: Vec<(usize, usize, usize)>,
+    with_offset: bool,
+    matches: Vec<SearchResultMatch>,
 }
 
 enum FileUiMsg {
-    Data(u64, String, Vec<SearchMatches>),
+    Data(u64, String, Vec<SearchResult>),
     Clear,
 }
 
@@ -185,24 +191,23 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileUiMsg>) {
     let text_view = text_view.clone();
     rx.attach(None, move |msg| {
         match msg {
-            FileUiMsg::Data(read, data, matches) => {
+            FileUiMsg::Data(read, data, search_result_list) => {
                 if let Some(buffer) = &text_view.get_buffer() {
                     let (_start, mut end) = buffer.get_bounds();
                     let line_offset = end.get_line();
                     if read > 0 {
                         buffer.insert(&mut end, &data);
                     }
-                    for m in matches {
-                        for s in m.matches {
-                            let (line, start, end) = s;
-                            let line = if m.with_offset {
-                                line_offset + line as i32
+                    for search_result in search_result_list {
+                        for search_match in search_result.matches {
+                            let line = if search_result.with_offset {
+                                line_offset + search_match.line as i32
                             } else {
-                                line as i32
+                                search_match.line as i32
                             };
-                            let iter_start = buffer.get_iter_at_line_index(line, start as i32);
-                            let iter_end = buffer.get_iter_at_line_index(line, end as i32);
-                            buffer.apply_tag_by_name(&m.tag, &iter_start, &iter_end);
+                            let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
+                            let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
+                            buffer.apply_tag_by_name(&search_result.tag, &iter_start, &iter_end);
                         }
                     }
                 }
@@ -306,7 +311,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                     if let Some(regex) = search_data.rule.get_regex() {
                         let matches = search(search_content, regex).unwrap_or(vec![]);
                         if matches.len() > 0 {
-                            re_list_matches.push(SearchMatches {
+                            re_list_matches.push(SearchResult {
                                 matches,
                                 tag: search_data.rule.get_tag(),
                                 with_offset: !search_data.is_new,

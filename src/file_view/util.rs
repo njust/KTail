@@ -8,6 +8,7 @@ use encoding::all::{UTF_8};
 use encoding::{Encoding, DecoderTrap};
 use glib::bitflags::_core::cmp::Ordering;
 use regex::Regex;
+use crate::file_view::SearchResultMatch;
 
 pub fn enable_auto_scroll(text_view : &TextView) -> SignalHandlerId {
     text_view.connect_size_allocate(|tv, _b| {
@@ -31,13 +32,17 @@ pub fn read_file(path: &PathBuf, start: u64) -> Result<(u64, String), Box<dyn Er
     Ok((read as u64, s))
 }
 
-pub fn search(text: &str, search: &str) -> Result<Vec<(usize, usize, usize)>, Box<dyn Error>> {
+pub fn search(text: &str, search: &str) -> Result<Vec<SearchResultMatch>, Box<dyn Error>> {
     let lines = text.split("\n");
     let re = Regex::new(search)?;
     let mut matches = vec![];
     for (n, line) in lines.enumerate() {
         for mat in re.find_iter(&line) {
-            matches.push((n, mat.start(), mat.end()));
+            matches.push(SearchResultMatch {
+                line: n,
+                start: mat.start(),
+                end: mat.end()
+            });
         }
     }
     Ok(matches)
