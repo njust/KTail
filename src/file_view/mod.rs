@@ -39,6 +39,7 @@ enum FileUiMsg {
 struct RuleChanges {
     add: Vec<CustomRule>,
     remove: Vec<String>,
+    update: Vec<CustomRule>,
 }
 
 enum FileThreadMsg {
@@ -101,6 +102,8 @@ impl FileView {
     fn apply_rules(&mut self, mut rules: Vec<CustomRule>) {
         let mut add = vec![];
         let mut remove = vec![];
+        let mut update = vec![];
+
         let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
         for compare_result in compare_results {
             let text_view = self.text_view.clone();
@@ -128,13 +131,21 @@ impl FileView {
                         .and_then(|tag_table| tag_table.lookup(&left.id.to_string())) {
                         tag.set_property_background(right.color.as_ref().map(|s|s.as_str()));
                     }
+                    if left.regex != right.regex {
+                        update.push(right.clone());
+                        if let Some(tb) = text_view.get_buffer() {
+                            let (start, end) = tb.get_bounds();
+                            tb.remove_tag_by_name(&left.id.to_string(), &start, &end);
+                        }
+                    }
                 }
             }
         }
-        self.rules = rules.clone();
+        self.rules = rules;
         self.thread_action_sender.send(FileThreadMsg::ApplyRules(RuleChanges {
             add,
-            remove
+            remove,
+            update
         })).expect("Could not send apply rules");
     }
 
@@ -246,7 +257,9 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                     }
                     FileThreadMsg::ApplyRules(changes) => {
                         for new in &changes.add {
-                            read_full_file = true;
+                            if new.regex.is_some() {
+                                read_full_file = true;
+                            }
                             active_rules.push(ActiveRule {
                                 rule: Rule::CustomRule(new.clone()),
                                 is_new: true,
@@ -255,6 +268,20 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                         for remove in &changes.remove {
                             if let Some((idx, _item)) = active_rules.iter().enumerate().find(|(_, e)| &e.rule.get_id() == remove) {
                                 active_rules.remove(idx);
+                            }
+                        }
+
+                        for update in &changes.update {
+                            if let Some((idx, _search)) = active_rules.iter().enumerate().find(|(_, item)| item.rule.get_id() == update.id.to_string()) {
+                                if update.regex.is_some() {
+                                    read_full_file = true;
+                                }
+
+                                active_rules.remove(idx);
+                                active_rules.push(ActiveRule {
+                                    rule: Rule::CustomRule(update.clone()),
+                                    is_new: true,
+                                });
                             }
                         }
                     }
