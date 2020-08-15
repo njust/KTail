@@ -5,9 +5,43 @@ use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButto
 use std::rc::Rc;
 use gio::{SimpleAction};
 
-mod file_view;
+mod file;
+pub mod rules;
+pub mod util;
+
 use glib::bitflags::_core::cell::RefCell;
-use crate::file_view::workbench::FileViewWorkbench;
+use crate::file::workbench::FileViewWorkbench;
+use uuid::Uuid;
+use crate::rules::CustomRule;
+
+pub const SEARCH_TAG: &'static str = "SEARCH";
+
+pub enum Msg {
+    WorkbenchMsg(usize, WorkbenchMsg)
+}
+
+pub enum WorkbenchMsg {
+    RuleMsg(RuleMsg),
+    ApplyRules,
+    ToolbarMsg(WorkbenchToolbarMsg),
+}
+
+pub enum WorkbenchToolbarMsg {
+    TextChange(String),
+    SearchPressed,
+    ClearSearchPressed,
+    ShowRules,
+    ToggleAutoScroll(bool),
+}
+
+pub enum RuleMsg {
+    AddRule(CustomRule),
+    DeleteRule(Uuid),
+    NameChanged(Uuid, String),
+    RegexChanged (Uuid, String),
+    ColorChanged(Uuid, String),
+}
+
 
 fn main() {
     let application = Application::new(
@@ -18,6 +52,7 @@ fn main() {
 
     let file_views = fv.clone();
     application.connect_activate(move |app| {
+        let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
         let window = ApplicationWindow::new(app);
         let exit_action = SimpleAction::new("quit", None);
         exit_action.connect_activate(|_a, _b| {
@@ -28,12 +63,28 @@ fn main() {
 
         let container = Rc::new(Notebook::new());
 
+        let file_views = file_views.clone(); {
+            let file_views = file_views.clone();
+            rx.attach(None, move |msg| {
+                match msg {
+                    Msg::WorkbenchMsg(idx, msg) => {
+                        if let Some(tab) = file_views.borrow_mut().get_mut(idx) {
+                            tab.update(msg);
+                        }
+                    }
+                }
+                glib::Continue(true)
+            });
+        }
+
+
         container.set_hexpand(true);
         container.set_vexpand(true);
         window.add(&*container);
 
         let open_action = SimpleAction::new("open", None);
         let file_views = file_views.clone();
+
         open_action.connect_activate(move |_a, _b| {
             let dialog = FileChooserDialog::new::<ApplicationWindow>(Some("Open File"), None, FileChooserAction::Open);
             dialog.add_button("_Cancel", ResponseType::Cancel);
@@ -43,13 +94,18 @@ fn main() {
             if res == ResponseType::Accept {
                 if let Some(file_path) = dialog.get_filename() {
                     let file_name = file_path.file_name().unwrap().to_str().unwrap().to_string();
-                    let file_view = FileViewWorkbench::new(file_path);
+                    let tx = tx.clone();
+                    let idx = file_views.borrow().len();
+                    let file_view = FileViewWorkbench::new(file_path, move |msg| {
+                        tx.send(Msg::WorkbenchMsg(idx, msg)).expect("Could not send msg");
+                    });
 
                     let close_btn = Button::from_icon_name(Some("window-close-symbolic"), IconSize::Menu);
                     close_btn.set_relief(ReliefStyle::None);
                     let tab_header = gtk::Box::new(Orientation::Horizontal, 0);
                     tab_header.add(&Label::new(Some(&file_name)));
                     tab_header.add(&close_btn);
+
 
                     let idx= container.append_page(file_view.view(), Some(&tab_header));
                     let notebook = container.clone();

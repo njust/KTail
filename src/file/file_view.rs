@@ -6,15 +6,10 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId, Receiver, Sender};
-use crate::file_view::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
-use crate::file_view::rules::{CustomRule, Rule};
-
-pub mod workbench;
-pub mod toolbar;
-pub mod util;
-pub mod rules;
-
-pub const SEARCH_TAG: &'static str = "SEARCH";
+use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
+use crate::rules::{Rule};
+use crate::{SEARCH_TAG};
+use crate::file::{FileThreadMsg, CustomRule, FileUiMsg, RuleChanges, ActiveRule, SearchResult};
 
 pub struct FileView {
     container: gtk::Box,
@@ -23,35 +18,6 @@ pub struct FileView {
     thread_action_sender: std::sync::mpsc::Sender<FileThreadMsg>,
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<CustomRule>,
-}
-
-pub struct SearchResultMatch {
-    pub line: usize,
-    pub start: usize,
-    pub end: usize,
-}
-
-struct SearchResult {
-    tag: String,
-    with_offset: bool,
-    matches: Vec<SearchResultMatch>,
-}
-
-enum FileUiMsg {
-    Data(u64, String, Vec<SearchResult>),
-    Clear,
-}
-
-struct RuleChanges {
-    add: Vec<CustomRule>,
-    remove: Vec<String>,
-    update: Vec<CustomRule>,
-}
-
-enum FileThreadMsg {
-    AddRule(Rule),
-    DeleteRule(Rule),
-    ApplyRules(RuleChanges),
 }
 
 impl FileView {
@@ -96,16 +62,16 @@ impl FileView {
         }
     }
 
-    fn search(&mut self, search_text: String) {
+    pub fn search(&mut self, search_text: String) {
         self.thread_action_sender.send(FileThreadMsg::AddRule(Rule::UserSearch(search_text))).expect("Could not send add rule");
     }
 
-    fn clear_search(&mut self, search: &str) {
+    pub fn clear_search(&mut self, search: &str) {
         self.thread_action_sender.send(FileThreadMsg::DeleteRule(Rule::UserSearch(search.to_string()))).expect("Could not send delete rule");
         clear_search(&self.text_view);
     }
 
-    fn apply_rules(&mut self, mut rules: Vec<CustomRule>) {
+    pub fn apply_rules(&mut self, mut rules: Vec<CustomRule>) {
         let mut add = vec![];
         let mut remove = vec![];
         let mut update = vec![];
@@ -155,7 +121,7 @@ impl FileView {
         })).expect("Could not send apply rules");
     }
 
-    fn toggle_autoscroll(&mut self, enable: bool) {
+    pub fn toggle_autoscroll(&mut self, enable: bool) {
         if enable {
             self.enable_auto_scroll();
         } else {
@@ -222,10 +188,7 @@ fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileUiMsg>) {
     });
 }
 
-struct ActiveRule {
-    is_new: bool,
-    rule: Rule,
-}
+
 
 fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>) {
     std::thread::spawn(move || {

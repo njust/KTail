@@ -1,10 +1,9 @@
 use gtk::prelude::*;
 
-use gtk::{Orientation, GtkWindowExt, WindowPosition, HeaderBar, WidgetExt, HeaderBarExt, DialogExt, ContainerExt, ButtonExt};
-use glib::{Sender};
-use crate::file_view::workbench::{Msg, RuleMsg};
+use gtk::{Orientation, WidgetExt, ContainerExt, ButtonExt};
+use crate::{RuleMsg};
 use glib::bitflags::_core::cmp::Ordering;
-use crate::file_view::SEARCH_TAG;
+use crate::SEARCH_TAG;
 use std::rc::Rc;
 use uuid::Uuid;
 use std::collections::HashMap;
@@ -83,7 +82,7 @@ struct CustomRuleView {
 }
 
 impl CustomRuleView {
-    fn new(rule: &CustomRule, tx: Sender<Msg>) -> Self {
+    fn new<T: 'static + Clone + Fn(RuleMsg)>(rule: &CustomRule, tx: T) -> Self {
         let id = rule.id;
         let default = String::from("New Rule");
         let name = rule.name.as_ref().unwrap_or(&default);
@@ -94,7 +93,7 @@ impl CustomRuleView {
             let tx = tx.clone();
             name_txt.connect_changed(move |e| {
                 let s = e.get_text().to_string();
-                tx.send(Msg::RuleMsg(RuleMsg::NameChanged(id, s))).expect("Could not send name change");
+                tx(RuleMsg::NameChanged(id, s));
             });
             name_txt.set_text(name);
             container.add(&name_txt);
@@ -104,7 +103,7 @@ impl CustomRuleView {
             let tx = tx.clone();
             regex.connect_changed(move |e| {
                 let s = e.get_text().to_string();
-                tx.send(Msg::RuleMsg(RuleMsg::RegexChanged(id, s))).expect("Could not send regex changed");
+                tx(RuleMsg::RegexChanged(id, s));
             });
             container.add(&regex);
         }
@@ -113,7 +112,7 @@ impl CustomRuleView {
             let tx = tx.clone();
             color_btn.connect_color_set(move |a|{
                 let color = a.get_rgba();
-                tx.send(Msg::RuleMsg(RuleMsg::ColorChanged(id, color.to_string()))).expect("Could not send color change");
+                tx(RuleMsg::ColorChanged(id, color.to_string()));
             });
 
             container.add(&color_btn);
@@ -122,7 +121,7 @@ impl CustomRuleView {
         let btn = gtk::Button::with_label("Delete"); {
             let tx = tx.clone();
             btn.connect_clicked(move |_| {
-                tx.send(Msg::RuleMsg(RuleMsg::DeleteRule(id))).expect("Could not send delete rule");
+                tx(RuleMsg::DeleteRule(id));
             });
             container.add(&btn);
         }
@@ -196,11 +195,11 @@ pub struct RuleListView {
     container: gtk::Box,
     rules: RuleList,
     rule_list: Rc<gtk::Box>,
-    rule_view_id_map: Rc<RefCell<HashMap<Uuid, gtk::Box>>>
+    rule_view_id_map: Rc<RefCell<HashMap<Uuid, gtk::Box>>>,
 }
 
 impl RuleListView {
-    pub fn new(tx: Sender<Msg>) -> Self {
+    pub fn new<T: 'static + Clone + Fn(RuleMsg)>(tx: T) -> Self {
         let rule_list = Rc::new(gtk::Box::new(Orientation::Vertical, 0));
         let toolbar = gtk::Box::new(Orientation::Horizontal, 0);
         let rule_view_id_map = Rc::new(RefCell::new(HashMap::new()));
@@ -219,7 +218,7 @@ impl RuleListView {
                 rule_list.add(&wrapper);
                 rule_id_view_map.borrow_mut().insert(rule_data.id, wrapper);
                 rule_list.show_all();
-                tx.send(Msg::RuleMsg(RuleMsg::AddRule(rule_data))).expect("Could not send add rule");
+                tx(RuleMsg::AddRule(rule_data));
             });
             toolbar.add(&add_btn);
         }
@@ -232,7 +231,7 @@ impl RuleListView {
             container,
             rule_list,
             rule_view_id_map,
-            rules: RuleList::new()
+            rules: RuleList::new(),
         }
     }
 
@@ -268,40 +267,7 @@ impl RuleListView {
         }
     }
 
-    fn view(&self) -> &gtk::Box {
+    pub fn view(&self) -> &gtk::Box {
         &self.container
-    }
-}
-
-pub struct RulesDialog {
-    dlg: gtk::Dialog,
-}
-
-impl RulesDialog {
-    pub fn new(rule_list_view: &RuleListView, tx: Sender<Msg>) -> Self {
-        let dlg = gtk::Dialog::new();
-        dlg.set_position(WindowPosition::Mouse);
-        dlg.set_default_size(400, 200);
-        let header_bar = HeaderBar::new();
-        header_bar.set_show_close_button(true);
-        header_bar.set_title(Some("Rules"));
-        dlg.set_titlebar(Some(&header_bar));
-        dlg.set_modal(true);
-
-        let content = dlg.get_content_area();
-        content.add(rule_list_view.view());
-
-        dlg.connect_delete_event(move |dlg, _| {
-            tx.send(Msg::ApplyRules).expect("Could not send apply rules");
-            dlg.hide();
-            gtk::Inhibit(true)
-        });
-        Self {
-            dlg,
-        }
-    }
-
-    pub fn show(&self) {
-        self.dlg.show_all();
     }
 }
