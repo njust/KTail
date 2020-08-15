@@ -8,7 +8,7 @@ use encoding::all::{UTF_8};
 use encoding::{Encoding, DecoderTrap};
 use glib::bitflags::_core::cmp::Ordering;
 use regex::Regex;
-use crate::file::SearchResultMatch;
+use crate::SearchResultMatch;
 
 pub fn enable_auto_scroll(text_view : &TextView) -> SignalHandlerId {
     text_view.connect_size_allocate(|tv, _b| {

@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 
 use gtk::{Orientation, WidgetExt, ContainerExt, ButtonExt};
-use crate::{RuleMsg};
+use crate::{RuleViewMsg};
 use glib::bitflags::_core::cmp::Ordering;
 use crate::SEARCH_TAG;
 use std::rc::Rc;
@@ -82,7 +82,7 @@ struct CustomRuleView {
 }
 
 impl CustomRuleView {
-    fn new<T: 'static + Clone + Fn(RuleMsg)>(rule: &CustomRule, tx: T) -> Self {
+    fn new<T: 'static + Clone + Fn(RuleViewMsg)>(rule: &CustomRule, tx: T) -> Self {
         let id = rule.id;
         let default = String::from("New Rule");
         let name = rule.name.as_ref().unwrap_or(&default);
@@ -93,7 +93,7 @@ impl CustomRuleView {
             let tx = tx.clone();
             name_txt.connect_changed(move |e| {
                 let s = e.get_text().to_string();
-                tx(RuleMsg::NameChanged(id, s));
+                tx(RuleViewMsg::NameChanged(id, s));
             });
             name_txt.set_text(name);
             container.add(&name_txt);
@@ -103,7 +103,7 @@ impl CustomRuleView {
             let tx = tx.clone();
             regex.connect_changed(move |e| {
                 let s = e.get_text().to_string();
-                tx(RuleMsg::RegexChanged(id, s));
+                tx(RuleViewMsg::RegexChanged(id, s));
             });
             container.add(&regex);
         }
@@ -112,7 +112,7 @@ impl CustomRuleView {
             let tx = tx.clone();
             color_btn.connect_color_set(move |a|{
                 let color = a.get_rgba();
-                tx(RuleMsg::ColorChanged(id, color.to_string()));
+                tx(RuleViewMsg::ColorChanged(id, color.to_string()));
             });
 
             container.add(&color_btn);
@@ -121,7 +121,7 @@ impl CustomRuleView {
         let btn = gtk::Button::with_label("Delete"); {
             let tx = tx.clone();
             btn.connect_clicked(move |_| {
-                tx(RuleMsg::DeleteRule(id));
+                tx(RuleViewMsg::DeleteRule(id));
             });
             container.add(&btn);
         }
@@ -199,7 +199,9 @@ pub struct RuleListView {
 }
 
 impl RuleListView {
-    pub fn new<T: 'static + Clone + Fn(RuleMsg)>(tx: T) -> Self {
+    pub fn new<T>(tx: T) -> Self
+        where T: 'static + Clone + Fn(RuleViewMsg)
+    {
         let rule_list = Rc::new(gtk::Box::new(Orientation::Vertical, 0));
         let toolbar = gtk::Box::new(Orientation::Horizontal, 0);
         let rule_view_id_map = Rc::new(RefCell::new(HashMap::new()));
@@ -218,7 +220,7 @@ impl RuleListView {
                 rule_list.add(&wrapper);
                 rule_id_view_map.borrow_mut().insert(rule_data.id, wrapper);
                 rule_list.show_all();
-                tx(RuleMsg::AddRule(rule_data));
+                tx(RuleViewMsg::AddRule(rule_data));
             });
             toolbar.add(&add_btn);
         }
@@ -239,21 +241,21 @@ impl RuleListView {
         self.rules.get_rules()
     }
 
-    pub fn update(&mut self, msg: RuleMsg) {
+    pub fn update(&mut self, msg: RuleViewMsg) {
         match msg {
-            RuleMsg::AddRule(rule) => {
+            RuleViewMsg::AddRule(rule) => {
                 self.rules.add_rule(rule);
             }
-            RuleMsg::NameChanged(id, name) => {
+            RuleViewMsg::NameChanged(id, name) => {
                 self.rules.name_changed(id, name);
             }
-            RuleMsg::RegexChanged(id, regex) => {
+            RuleViewMsg::RegexChanged(id, regex) => {
                 self.rules.regex_changed(id, regex);
             }
-            RuleMsg::ColorChanged(id, color) => {
+            RuleViewMsg::ColorChanged(id, color) => {
                 self.rules.color_changed(id, color);
             }
-            RuleMsg::DeleteRule(id) => {
+            RuleViewMsg::DeleteRule(id) => {
                 self.rules.delete(id);
                 self.delete(id);
             }

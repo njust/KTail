@@ -17,13 +17,14 @@ use crate::rules::CustomRule;
 pub const SEARCH_TAG: &'static str = "SEARCH";
 
 pub enum Msg {
-    WorkbenchMsg(usize, WorkbenchMsg)
+    WorkbenchMsg(usize, WorkbenchViewMsg)
 }
 
-pub enum WorkbenchMsg {
-    RuleMsg(RuleMsg),
+pub enum WorkbenchViewMsg {
     ApplyRules,
     ToolbarMsg(WorkbenchToolbarMsg),
+    RuleViewMsg(RuleViewMsg),
+    FileViewMsg(FileViewMsg)
 }
 
 pub enum WorkbenchToolbarMsg {
@@ -34,7 +35,7 @@ pub enum WorkbenchToolbarMsg {
     ToggleAutoScroll(bool),
 }
 
-pub enum RuleMsg {
+pub enum RuleViewMsg {
     AddRule(CustomRule),
     DeleteRule(Uuid),
     NameChanged(Uuid, String),
@@ -42,15 +43,31 @@ pub enum RuleMsg {
     ColorChanged(Uuid, String),
 }
 
+pub struct SearchResultMatch {
+    pub line: usize,
+    pub start: usize,
+    pub end: usize,
+}
+
+pub struct SearchResult {
+    tag: String,
+    with_offset: bool,
+    matches: Vec<SearchResultMatch>,
+}
+
+pub enum FileViewMsg {
+    Data(u64, String, Vec<SearchResult>),
+    Clear,
+}
 
 fn main() {
     let application = Application::new(
         Some("de.njust.ktail"),
         Default::default(),
     ).expect("failed to initialize GTK application");
-    let fv = Rc::new(RefCell::new(Vec::<FileViewWorkbench>::new()));
+    let file_views = Rc::new(RefCell::new(Vec::<FileViewWorkbench>::new()));
 
-    let file_views = fv.clone();
+
     application.connect_activate(move |app| {
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
         let window = ApplicationWindow::new(app);
@@ -63,7 +80,7 @@ fn main() {
 
         let container = Rc::new(Notebook::new());
 
-        let file_views = file_views.clone(); {
+        {
             let file_views = file_views.clone();
             rx.attach(None, move |msg| {
                 match msg {
@@ -76,7 +93,6 @@ fn main() {
                 glib::Continue(true)
             });
         }
-
 
         container.set_hexpand(true);
         container.set_vexpand(true);
@@ -113,8 +129,8 @@ fn main() {
                         let file_views = file_views.clone();
                         close_btn.connect_clicked(move |_| {
                             if let Some(page) = notebook.get_nth_page(Some(idx)) {
-                                notebook.detach_tab(&page);
                                 file_views.borrow_mut().remove(idx as usize);
+                                notebook.detach_tab(&page);
                             }
                         });
                     }

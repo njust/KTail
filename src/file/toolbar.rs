@@ -7,7 +7,9 @@ pub struct FileViewToolbar {
 }
 
 impl FileViewToolbar {
-    pub fn new<T: 'static + Clone + Fn(WorkbenchToolbarMsg)>(tx: T) -> Self {
+    pub fn new<T>(tx: T) -> Self
+        where T: 'static + Clone + Fn(WorkbenchToolbarMsg)
+    {
         let toolbar = gtk::Box::new(Orientation::Horizontal, 4);
         toolbar.set_property_margin(4);
 

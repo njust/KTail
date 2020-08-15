@@ -5,11 +5,11 @@ use std::time::Duration;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
-use glib::{SignalHandlerId, Receiver, Sender};
+use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
 use crate::rules::{Rule};
-use crate::{SEARCH_TAG};
-use crate::file::{FileThreadMsg, CustomRule, FileUiMsg, RuleChanges, ActiveRule, SearchResult};
+use crate::{SEARCH_TAG, FileViewMsg, SearchResult};
+use crate::file::{FileThreadMsg, CustomRule, RuleChanges, ActiveRule};
 
 pub struct FileView {
     container: gtk::Box,
@@ -21,15 +21,18 @@ pub struct FileView {
 }
 
 impl FileView {
-    pub fn new(path: PathBuf) -> Self {
-        let (ui_action_sender, ui_action_receiver) =
-            glib::MainContext::channel::<FileUiMsg>(glib::PRIORITY_DEFAULT);
-
+    pub fn new<T>(path: PathBuf, sender: T) -> Self
+        where T : 'static + Send + Clone + Fn(FileViewMsg)
+    {
         let (thread_action_sender, thread_action_receiver) =
             std::sync::mpsc::channel::<FileThreadMsg>();
 
         let stop_handle = Arc::new((Mutex::new(false), Condvar::new()));
-        register_file_watcher_thread(path, ui_action_sender.clone(), stop_handle.clone(), thread_action_receiver);
+
+        let file_thread_tx = sender.clone();
+        register_file_watcher_thread(move |msg| {
+            file_thread_tx(msg);
+        }, path, stop_handle.clone(), thread_action_receiver);
 
         let search = TextTag::new(Some(SEARCH_TAG));
         search.set_property_background(Some("#FFF135"));
@@ -50,8 +53,6 @@ impl FileView {
         container.set_hexpand(true);
         container.add(&scroll_wnd);
 
-        attach_text_view_update(text_view.clone(), ui_action_receiver);
-
         Self {
             container,
             stop_handle,
@@ -59,6 +60,37 @@ impl FileView {
             thread_action_sender,
             autoscroll_handler: None,
             rules: vec![],
+        }
+    }
+
+    pub fn update(&mut self, msg: FileViewMsg) {
+        match msg {
+            FileViewMsg::Data(read, data, search_result_list) => {
+                if let Some(buffer) = &self.text_view.get_buffer() {
+                    let (_start, mut end) = buffer.get_bounds();
+                    let line_offset = end.get_line();
+                    if read > 0 {
+                        buffer.insert(&mut end, &data);
+                    }
+                    for search_result in search_result_list {
+                        for search_match in search_result.matches {
+                            let line = if search_result.with_offset {
+                                line_offset + search_match.line as i32
+                            } else {
+                                search_match.line as i32
+                            };
+                            let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
+                            let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
+                            buffer.apply_tag_by_name(&search_result.tag, &iter_start, &iter_end);
+                        }
+                    }
+                }
+            }
+            FileViewMsg::Clear => {
+                if let Some(buffer) = &self.text_view.get_buffer() {
+                    buffer.set_text("");
+                }
+            }
         }
     }
 
@@ -153,44 +185,10 @@ fn clear_search(text_view: &TextView) {
     }
 }
 
-fn attach_text_view_update(text_view: Rc<TextView>, rx: Receiver<FileUiMsg>) {
-    let text_view = text_view.clone();
-    rx.attach(None, move |msg| {
-        match msg {
-            FileUiMsg::Data(read, data, search_result_list) => {
-                if let Some(buffer) = &text_view.get_buffer() {
-                    let (_start, mut end) = buffer.get_bounds();
-                    let line_offset = end.get_line();
-                    if read > 0 {
-                        buffer.insert(&mut end, &data);
-                    }
-                    for search_result in search_result_list {
-                        for search_match in search_result.matches {
-                            let line = if search_result.with_offset {
-                                line_offset + search_match.line as i32
-                            } else {
-                                search_match.line as i32
-                            };
-                            let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
-                            let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
-                            buffer.apply_tag_by_name(&search_result.tag, &iter_start, &iter_end);
-                        }
-                    }
-                }
-            }
-            FileUiMsg::Clear => {
-                if let Some(buffer) = &text_view.get_buffer() {
-                    buffer.set_text("");
-                }
-            }
-        }
-        glib::Continue(true)
-    });
-}
 
-
-
-fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>) {
+fn register_file_watcher_thread<T>(sender: T, path: PathBuf, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>)
+    where T : 'static + Send + Clone + Fn(FileViewMsg)
+{
     std::thread::spawn(move || {
         let mut file_byte_offset = 0;
         let mut utf8_byte_offset = 0;
@@ -204,7 +202,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                 if len < file_byte_offset {
                     file_byte_offset = 0;
                     utf8_byte_offset = 0;
-                    tx.send(FileUiMsg::Clear).expect("Could not send clear file");
+                    sender(FileViewMsg::Clear);
                 }
             }
 
@@ -300,7 +298,7 @@ fn register_file_watcher_thread(path: PathBuf, tx: Sender<FileUiMsg>, thread_sto
                     &content[0..]
                 };
 
-                tx.send(FileUiMsg::Data(read_bytes, String::from(delta_content), re_list_matches)).expect("Could not send file data");
+                sender(FileViewMsg::Data(read_bytes, String::from(delta_content), re_list_matches));
             }
 
             stopped = wait_handle.wait_timeout(stopped, Duration::from_millis(500)).unwrap().0;
