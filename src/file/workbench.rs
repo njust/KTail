@@ -2,10 +2,11 @@ use gtk::prelude::*;
 use crate::file::toolbar::FileViewToolbar;
 use std::path::PathBuf;
 use gtk::{Orientation, WindowPosition, HeaderBar};
-use crate::rules::{RuleListView};
+use crate::rules::{RuleListView, SEARCH_ID, Rule};
 use crate::file::file_view::{FileView};
 use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg};
 use std::rc::Rc;
+use uuid::Uuid;
 
 pub struct FileViewWorkbench {
     container: gtk::Box,
@@ -34,8 +35,15 @@ impl FileViewWorkbench {
         container.add(file_view.view());
 
         let rule_msg = sender.clone();
-        let rules_view = RuleListView::new(move |msg| {
+        let mut rules_view = RuleListView::new(move |msg| {
             rule_msg(WorkbenchViewMsg::RuleViewMsg(msg));
+        });
+
+        &rules_view.add_rule(Rule {
+            id: Uuid::parse_str(SEARCH_ID).unwrap(),
+            regex: None,
+            color: Some(String::from("rgba(229,190,90,1)")),
+            name: Some(String::from("Search"))
         });
 
         Self {
@@ -53,10 +61,23 @@ impl FileViewWorkbench {
             WorkbenchViewMsg::ToolbarMsg(msg) => {
                 match msg {
                     WorkbenchToolbarMsg::SearchPressed => {
-                        self.file_view.search(self.search_text.clone());
+                        if let Some(rule_view) = self.rules_view.get_rule_by_id(SEARCH_ID) {
+                            let regex = if self.search_text.len() > 0 {
+                                Some(self.search_text.clone())
+                            } else {
+                                None
+                            };
+                            rule_view.set_regex(regex);
+                        }
+                        let rules = self.rules_view.get_rules();
+                        self.file_view.apply_rules(rules);
                     }
                     WorkbenchToolbarMsg::ClearSearchPressed => {
-                        self.file_view.clear_search(&self.search_text.clone());
+                        if let Some(rule_view) = self.rules_view.get_rule_by_id(SEARCH_ID) {
+                            rule_view.set_regex(None);
+                        }
+                        let rules = self.rules_view.get_rules();
+                        self.file_view.apply_rules(rules);
                     }
                     WorkbenchToolbarMsg::ShowRules => {
                         self.show_dlg();
@@ -112,5 +133,12 @@ impl FileViewWorkbench {
         if let Some(dlg)= &self.rules_dlg {
             dlg.show_all();
         }
+    }
+}
+
+
+impl Drop for FileViewWorkbench {
+    fn drop(&mut self) {
+        println!("Drop workbench");
     }
 }

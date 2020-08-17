@@ -1,72 +1,23 @@
 use gtk::prelude::*;
 
 use gtk::{Orientation, WidgetExt, ContainerExt, ButtonExt};
-use crate::{RuleViewMsg};
+use crate::{RuleViewMsg, RuleListViewMsg};
 use glib::bitflags::_core::cmp::Ordering;
-use crate::SEARCH_TAG;
 use std::rc::Rc;
 use uuid::Uuid;
 use std::collections::HashMap;
 use glib::bitflags::_core::cell::RefCell;
-
-
-#[derive(Debug, Clone)]
-pub enum Rule {
-    UserSearch(String),
-    CustomRule(CustomRule),
-}
-
-impl Rule {
-    pub fn get_regex(&self) -> Option<&String> {
-        match self {
-            Rule::UserSearch(s) => Some(s),
-            Rule::CustomRule(rule) => rule.regex.as_ref()
-        }
-    }
-
-    pub fn get_id(&self) -> String {
-        match self {
-            Rule::UserSearch(s) => s.clone(),
-            Rule::CustomRule(rule) => rule.id.to_string()
-        }
-    }
-
-    pub fn get_tag(&self) -> String {
-        match self {
-            Rule::UserSearch(_) => String::from(SEARCH_TAG),
-            Rule::CustomRule(rule) => rule.id.to_string()
-        }
-    }
-}
-
-impl PartialEq for Rule {
-    fn eq(&self, other: &Self) -> bool {
-        match self {
-            Rule::UserSearch(s) => {
-                if let Rule::UserSearch(s2) = other {
-                    return s == s2;
-                }
-            }
-            Rule::CustomRule(rule) => {
-                if let Rule::CustomRule(rule2) = other {
-                    return rule.regex == rule2.regex && rule.name == rule2.name;
-                }
-            }
-        }
-
-        false
-    }
-}
+use gdk::RGBA;
 
 #[derive(Debug, Default, Clone)]
-pub struct CustomRule {
+pub struct Rule {
     pub id: uuid::Uuid,
     pub name: Option<String>,
     pub color: Option<String>,
     pub regex: Option<String>,
 }
 
-impl CustomRule {
+impl Rule {
     pub fn new() -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
@@ -77,13 +28,14 @@ impl CustomRule {
     }
 }
 
-struct CustomRuleView {
+pub struct RuleView {
     container: gtk::Box,
+    data: Rule,
+    regex_txt: gtk::Entry,
 }
 
-impl CustomRuleView {
-    fn new<T: 'static + Clone + Fn(RuleViewMsg)>(rule: &CustomRule, tx: T) -> Self {
-        let id = rule.id;
+impl RuleView {
+    fn new<T: 'static + Clone + Fn(RuleViewMsg)>(rule: Rule, tx: T) -> Self {
         let default = String::from("New Rule");
         let name = rule.name.as_ref().unwrap_or(&default);
 
@@ -93,7 +45,7 @@ impl CustomRuleView {
             let tx = tx.clone();
             name_txt.connect_changed(move |e| {
                 let s = e.get_text().to_string();
-                tx(RuleViewMsg::NameChanged(id, s));
+                tx(RuleViewMsg::NameChanged(s));
             });
             name_txt.set_text(name);
             container.add(&name_txt);
@@ -103,7 +55,7 @@ impl CustomRuleView {
             let tx = tx.clone();
             regex.connect_changed(move |e| {
                 let s = e.get_text().to_string();
-                tx(RuleViewMsg::RegexChanged(id, s));
+                tx(RuleViewMsg::RegexChanged(s));
             });
             container.add(&regex);
         }
@@ -112,23 +64,55 @@ impl CustomRuleView {
             let tx = tx.clone();
             color_btn.connect_color_set(move |a|{
                 let color = a.get_rgba();
-                tx(RuleViewMsg::ColorChanged(id, color.to_string()));
+                tx(RuleViewMsg::ColorChanged(color.to_string()));
             });
 
             container.add(&color_btn);
+            if let Some(color) = &rule.color {
+                let rgba = color.parse::<RGBA>().unwrap();
+                color_btn.set_rgba(&rgba);
+            }
         }
 
         let btn = gtk::Button::with_label("Delete"); {
             let tx = tx.clone();
             btn.connect_clicked(move |_| {
-                tx(RuleViewMsg::DeleteRule(id));
+                tx(RuleViewMsg::DeleteRule);
             });
             container.add(&btn);
         }
 
         Self {
-            container
+            container,
+            regex_txt: regex,
+            data: rule.clone()
         }
+    }
+
+    pub fn update(&mut self, msg: RuleViewMsg) {
+        match msg {
+            RuleViewMsg::RegexChanged(regex) => {
+                self.set_regex(Some(regex));
+            }
+            RuleViewMsg::NameChanged(name) => {
+                self.data.name = Some(name);
+            }
+            RuleViewMsg::ColorChanged(color) => {
+                self.data.color = Some(color);
+            }
+            RuleViewMsg::DeleteRule => {
+                // Msg is handled in list view
+            }
+        }
+    }
+
+    pub fn set_regex(&mut self, regex: Option<String>) {
+        if let Some(regex) = &regex {
+            self.regex_txt.set_text(regex.as_str());
+        }else {
+            self.regex_txt.set_text("");
+        }
+        self.data.regex = regex;
     }
 
     fn view(&self) -> &gtk::Box {
@@ -136,13 +120,13 @@ impl CustomRuleView {
     }
 }
 
-impl PartialEq for CustomRule {
+impl PartialEq for Rule {
     fn eq(&self, other: &Self) -> bool {
         self.id.eq(&other.id)
     }
 }
 
-impl PartialOrd for CustomRule {
+impl PartialOrd for Rule {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.id.partial_cmp(&other.id)
     }
@@ -150,77 +134,34 @@ impl PartialOrd for CustomRule {
 
 #[derive(Clone)]
 pub struct RuleList {
-    rules: HashMap<Uuid, CustomRule>
+    rules: HashMap<Uuid, Rule>
 }
 
-impl RuleList {
-    pub fn new() -> Self {
-        Self {
-            rules: HashMap::new()
-        }
-    }
-    pub fn color_changed(&mut self, id: Uuid, color: String) {
-        if let Some(rule) = self.rules.get_mut(&id) {
-            rule.color = Some(color)
-        }
-    }
+pub const SEARCH_ID: &'static str = "ba5b70bb-57b9-4f5c-95c9-e80953ae113e";
 
-    pub fn name_changed(&mut self, id: Uuid, name: String) {
-        if let Some(rule) = self.rules.get_mut(&id) {
-            rule.name = Some(name)
-        }
-    }
-
-    pub fn regex_changed(&mut self, id: Uuid, regex: String) {
-        if let Some(rule) = self.rules.get_mut(&id) {
-            rule.regex = Some(regex)
-        }
-    }
-
-    pub fn add_rule(&mut self, rule: CustomRule) {
-        self.rules.insert(rule.id, rule);
-    }
-
-    pub fn get_rules(&self) -> Vec<CustomRule> {
-        self.rules.values().map(|e|e.clone()).collect()
-    }
-
-    pub fn delete(&mut self, id: Uuid) {
-        self.rules.remove(&id);
-    }
-
-}
 
 pub struct RuleListView {
     container: gtk::Box,
-    rules: RuleList,
+    rules: HashMap<Uuid, RuleView>,
     rule_list: Rc<gtk::Box>,
     rule_view_id_map: Rc<RefCell<HashMap<Uuid, gtk::Box>>>,
+    tx: Rc<dyn 'static + Fn(RuleListViewMsg)>
 }
 
 impl RuleListView {
     pub fn new<T>(tx: T) -> Self
-        where T: 'static + Clone + Fn(RuleViewMsg)
+        where T: 'static + Clone + Fn(RuleListViewMsg)
     {
         let rule_list = Rc::new(gtk::Box::new(Orientation::Vertical, 0));
         let toolbar = gtk::Box::new(Orientation::Horizontal, 0);
         let rule_view_id_map = Rc::new(RefCell::new(HashMap::new()));
 
+
         let add_btn = gtk::Button::with_label("Add"); {
             let tx = tx.clone();
-            let rule_list = rule_list.clone();
-            let rule_id_view_map = rule_view_id_map.clone();
             add_btn.connect_clicked(move |_| {
-                let rule_data = CustomRule::new();
-                let rule_view = CustomRuleView::new(&rule_data, tx.clone());
-
-                let wrapper = gtk::Box::new(Orientation::Horizontal, 0);
-                wrapper.add(rule_view.view());
-
-                rule_list.add(&wrapper);
-                rule_id_view_map.borrow_mut().insert(rule_data.id, wrapper);
-                rule_list.show_all();
-                tx(RuleViewMsg::AddRule(rule_data));
+                let rule_data = Rule::new();
+                tx(RuleListViewMsg::AddRule(rule_data));
             });
             toolbar.add(&add_btn);
         }
@@ -233,31 +174,51 @@ impl RuleListView {
             container,
             rule_list,
             rule_view_id_map,
-            rules: RuleList::new(),
+            rules: HashMap::new(),
+            tx: Rc::new(tx.clone())
         }
     }
 
-    pub fn get_rules(&self) -> Vec<CustomRule> {
-        self.rules.get_rules()
+    pub fn add_rule(&mut self, data: Rule) {
+        let tx = self.tx.clone();
+        let wrapper = gtk::Box::new(Orientation::Horizontal, 0);
+        self.rule_list.add(&wrapper);
+        let id = data.id.clone();
+        let view = RuleView::new(data, move |msg| {
+            (*tx)(RuleListViewMsg::RuleViewMsg(id.clone(), msg));
+        });
+
+        wrapper.add(view.view());
+        self.rules.insert(id.clone(), view);
+        self.rule_view_id_map.borrow_mut().insert(id, wrapper);
+        self.rule_list.show_all();
     }
 
-    pub fn update(&mut self, msg: RuleViewMsg) {
+    pub fn get_rules(&self) -> Vec<Rule> {
+        self.rules.values().map(|v|v.data.clone()).collect()
+    }
+
+    pub fn get_rule_by_id(&mut self, id: &str) -> Option<&mut RuleView> {
+        let id = Uuid::parse_str(id).unwrap();
+        self.rules.get_mut(&id)
+    }
+
+    pub fn update(&mut self, msg: RuleListViewMsg) {
         match msg {
-            RuleViewMsg::AddRule(rule) => {
-                self.rules.add_rule(rule);
+            RuleListViewMsg::AddRule(rule) => {
+                self.add_rule(rule.clone());
             }
-            RuleViewMsg::NameChanged(id, name) => {
-                self.rules.name_changed(id, name);
-            }
-            RuleViewMsg::RegexChanged(id, regex) => {
-                self.rules.regex_changed(id, regex);
-            }
-            RuleViewMsg::ColorChanged(id, color) => {
-                self.rules.color_changed(id, color);
-            }
-            RuleViewMsg::DeleteRule(id) => {
-                self.rules.delete(id);
-                self.delete(id);
+            RuleListViewMsg::RuleViewMsg(id, msg) => {
+                match msg {
+                    RuleViewMsg::DeleteRule => {
+                        self.delete(id);
+                    }
+                    _ => {
+                        if let Some(rule_view) = self.rules.get_mut(&id) {
+                            rule_view.update(msg);
+                        }
+                    }
+                }
             }
         }
     }
@@ -267,6 +228,7 @@ impl RuleListView {
         if let Some(existing) = map.get(&id) {
             self.rule_list.remove(existing);
         }
+        self.rules.remove(&id);
     }
 
     pub fn view(&self) -> &gtk::Box {

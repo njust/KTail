@@ -484,6 +484,7 @@ name = "ktail"
 version = "0.1.0"
 dependencies = [
  "encoding",
+ "gdk",
  "gio",
  "glib",
  "gtk",

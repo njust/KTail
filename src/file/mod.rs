@@ -1,7 +1,7 @@
 pub mod workbench;
 pub mod toolbar;
 pub mod file_view;
-use crate::rules::{CustomRule, Rule};
+use crate::rules::{Rule};
 
 
 struct ActiveRule {
@@ -10,13 +10,11 @@ struct ActiveRule {
 }
 
 struct RuleChanges {
-    add: Vec<CustomRule>,
+    add: Vec<Rule>,
     remove: Vec<String>,
-    update: Vec<CustomRule>,
+    update: Vec<Rule>,
 }
 
 enum FileThreadMsg {
-    AddRule(Rule),
-    DeleteRule(Rule),
     ApplyRules(RuleChanges),
 }

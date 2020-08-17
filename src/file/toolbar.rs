@@ -1,6 +1,7 @@
 use gtk::prelude::*;
 use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button};
 use crate::{WorkbenchToolbarMsg};
+use crate::Msg::WorkbenchMsg;
 
 pub struct FileViewToolbar {
     container: gtk::Box,
@@ -15,10 +16,14 @@ impl FileViewToolbar {
 
         let search_txt = SearchEntry::new(); {
             search_txt.set_width_chars(40);
-            let tx = tx.clone();
+            let tx2 = tx.clone();
             search_txt.connect_changed(move |e| {
                 let text = e.get_text().to_string();
-                tx(WorkbenchToolbarMsg::TextChange(text));
+                tx2(WorkbenchToolbarMsg::TextChange(text));
+            });
+            let tx = tx.clone();
+            search_txt.connect_icon_release(move |e,b,c| {
+                tx(WorkbenchToolbarMsg::ClearSearchPressed);
             });
             search_txt.set_text(r".*\s((?i)error|fatal(?-i))\s.*");
             toolbar.add(&search_txt);
@@ -30,14 +35,6 @@ impl FileViewToolbar {
                 tx(WorkbenchToolbarMsg::SearchPressed);
             });
             toolbar.add(&search_btn);
-        }
-
-        let clear_search_btn = Button::with_label("Clear"); {
-            let tx = tx.clone();
-            clear_search_btn.connect_clicked(move |_| {
-                tx(WorkbenchToolbarMsg::ClearSearchPressed);
-            });
-            toolbar.add(&clear_search_btn);
         }
 
         let show_rules_btn = Button::with_label("Rules"); {

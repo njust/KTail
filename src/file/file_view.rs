@@ -7,9 +7,8 @@ use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
-use crate::rules::{Rule};
 use crate::{SEARCH_TAG, FileViewMsg, SearchResult};
-use crate::file::{FileThreadMsg, CustomRule, RuleChanges, ActiveRule};
+use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 
 pub struct FileView {
     container: gtk::Box,
@@ -17,7 +16,7 @@ pub struct FileView {
     text_view: Rc<TextView>,
     thread_action_sender: std::sync::mpsc::Sender<FileThreadMsg>,
     autoscroll_handler: Option<SignalHandlerId>,
-    rules: Vec<CustomRule>,
+    rules: Vec<Rule>,
 }
 
 impl FileView {
@@ -94,16 +93,7 @@ impl FileView {
         }
     }
 
-    pub fn search(&mut self, search_text: String) {
-        self.thread_action_sender.send(FileThreadMsg::AddRule(Rule::UserSearch(search_text))).expect("Could not send add rule");
-    }
-
-    pub fn clear_search(&mut self, search: &str) {
-        self.thread_action_sender.send(FileThreadMsg::DeleteRule(Rule::UserSearch(search.to_string()))).expect("Could not send delete rule");
-        clear_search(&self.text_view);
-    }
-
-    pub fn apply_rules(&mut self, mut rules: Vec<CustomRule>) {
+    pub fn apply_rules(&mut self, mut rules: Vec<Rule>) {
         let mut add = vec![];
         let mut remove = vec![];
         let mut update = vec![];
@@ -178,14 +168,6 @@ impl FileView {
     }
 }
 
-fn clear_search(text_view: &TextView) {
-    if let Some(buffer) = text_view.get_buffer() {
-        let (start, end) = buffer.get_bounds();
-        buffer.remove_tag_by_name(SEARCH_TAG, &start, &end);
-    }
-}
-
-
 fn register_file_watcher_thread<T>(sender: T, path: PathBuf, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>)
     where T : 'static + Send + Clone + Fn(FileViewMsg)
 {
@@ -209,43 +191,31 @@ fn register_file_watcher_thread<T>(sender: T, path: PathBuf, thread_stop_handle:
             let mut read_full_file = false;
             if let Some(msg) = rx.try_iter().peekable().peek() {
                 match msg {
-                    FileThreadMsg::AddRule(rule) => {
-                        read_full_file = true;
-                        active_rules.push(ActiveRule {
-                            rule: rule.clone(),
-                            is_new: true,
-                        });
-                    }
-                    FileThreadMsg::DeleteRule(rule) => {
-                        if let Some((idx, _search)) = active_rules.iter().enumerate().find(|(_, item)| &item.rule == rule) {
-                            active_rules.remove(idx);
-                        }
-                    }
                     FileThreadMsg::ApplyRules(changes) => {
                         for new in &changes.add {
                             if new.regex.is_some() {
                                 read_full_file = true;
                             }
                             active_rules.push(ActiveRule {
-                                rule: Rule::CustomRule(new.clone()),
+                                rule: new.clone(),
                                 is_new: true,
                             });
                         }
                         for remove in &changes.remove {
-                            if let Some((idx, _item)) = active_rules.iter().enumerate().find(|(_, e)| &e.rule.get_id() == remove) {
+                            if let Some((idx, _item)) = active_rules.iter().enumerate().find(|(_, e)| &e.rule.id.to_string() == remove) {
                                 active_rules.remove(idx);
                             }
                         }
 
                         for update in &changes.update {
-                            if let Some((idx, _search)) = active_rules.iter().enumerate().find(|(_, item)| item.rule.get_id() == update.id.to_string()) {
+                            if let Some((idx, _search)) = active_rules.iter().enumerate().find(|(_, item)| item.rule.id == update.id) {
                                 if update.regex.is_some() {
                                     read_full_file = true;
                                 }
 
                                 active_rules.remove(idx);
                                 active_rules.push(ActiveRule {
-                                    rule: Rule::CustomRule(update.clone()),
+                                    rule: update.clone(),
                                     is_new: true,
                                 });
                             }
@@ -269,14 +239,16 @@ fn register_file_watcher_thread<T>(sender: T, path: PathBuf, thread_stop_handle:
                         }
                     };
 
-                    if let Some(regex) = search_data.rule.get_regex() {
-                        let matches = search(search_content, regex).unwrap_or(vec![]);
-                        if matches.len() > 0 {
-                            re_list_matches.push(SearchResult {
-                                matches,
-                                tag: search_data.rule.get_tag(),
-                                with_offset: !search_data.is_new,
-                            });
+                    if let Some(regex) = &search_data.rule.regex {
+                        if regex.len() > 0 {
+                            let matches = search(search_content, regex).unwrap_or(vec![]);
+                            if matches.len() > 0 {
+                                re_list_matches.push(SearchResult {
+                                    matches,
+                                    tag: search_data.rule.id.to_string(),
+                                    with_offset: !search_data.is_new,
+                                });
+                            }
                         }
                         search_data.is_new = false;
                     }

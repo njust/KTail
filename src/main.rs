@@ -12,7 +12,7 @@ pub mod util;
 use glib::bitflags::_core::cell::RefCell;
 use crate::file::workbench::FileViewWorkbench;
 use uuid::Uuid;
-use crate::rules::CustomRule;
+use crate::rules::Rule;
 
 pub const SEARCH_TAG: &'static str = "SEARCH";
 
@@ -23,7 +23,7 @@ pub enum Msg {
 pub enum WorkbenchViewMsg {
     ApplyRules,
     ToolbarMsg(WorkbenchToolbarMsg),
-    RuleViewMsg(RuleViewMsg),
+    RuleViewMsg(RuleListViewMsg),
     FileViewMsg(FileViewMsg)
 }
 
@@ -35,12 +35,16 @@ pub enum WorkbenchToolbarMsg {
     ToggleAutoScroll(bool),
 }
 
+pub enum RuleListViewMsg {
+    AddRule(Rule),
+    RuleViewMsg(Uuid, RuleViewMsg)
+}
+
 pub enum RuleViewMsg {
-    AddRule(CustomRule),
-    DeleteRule(Uuid),
-    NameChanged(Uuid, String),
-    RegexChanged (Uuid, String),
-    ColorChanged(Uuid, String),
+    NameChanged(String),
+    RegexChanged (String),
+    ColorChanged(String),
+    DeleteRule,
 }
 
 pub struct SearchResultMatch {
