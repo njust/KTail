@@ -1,6 +1,6 @@
 use gtk::prelude::*;
 
-use gtk::{Orientation, WidgetExt, ContainerExt, ButtonExt};
+use gtk::{Orientation, WidgetExt, ContainerExt, ButtonExt, IconSize, ReliefStyle};
 use crate::{RuleViewMsg, RuleListViewMsg};
 use glib::bitflags::_core::cmp::Ordering;
 use std::rc::Rc;
@@ -15,6 +15,7 @@ pub struct Rule {
     pub name: Option<String>,
     pub color: Option<String>,
     pub regex: Option<String>,
+    pub is_system: bool,
 }
 
 impl Rule {
@@ -24,6 +25,7 @@ impl Rule {
             name: None,
             color: None,
             regex: None,
+            is_system: false,
         }
     }
 }
@@ -39,7 +41,7 @@ impl RuleView {
         let default = String::from("New Rule");
         let name = rule.name.as_ref().unwrap_or(&default);
 
-        let container = gtk::Box::new(Orientation::Horizontal, 20);
+        let container = gtk::Box::new(Orientation::Horizontal, 4);
 
         let name_txt = gtk::Entry::new(); {
             let tx = tx.clone();
@@ -48,6 +50,7 @@ impl RuleView {
                 tx(RuleViewMsg::NameChanged(s));
             });
             name_txt.set_text(name);
+            name_txt.set_sensitive(!rule.is_system);
             container.add(&name_txt);
         }
 
@@ -58,6 +61,8 @@ impl RuleView {
                 tx(RuleViewMsg::RegexChanged(s));
             });
             container.add(&regex);
+
+            regex.set_sensitive(!rule.is_system);
         }
 
         let color_btn = gtk::ColorButton::new(); {
@@ -74,11 +79,13 @@ impl RuleView {
             }
         }
 
-        let btn = gtk::Button::with_label("Delete"); {
+        let btn = gtk::Button::from_icon_name(Some("edit-delete-symbolic"), IconSize::Button); {
+            btn.set_relief(ReliefStyle::None);
             let tx = tx.clone();
             btn.connect_clicked(move |_| {
                 tx(RuleViewMsg::DeleteRule);
             });
+            btn.set_sensitive(!rule.is_system);
             container.add(&btn);
         }
 
@@ -152,12 +159,14 @@ impl RuleListView {
     pub fn new<T>(tx: T) -> Self
         where T: 'static + Clone + Fn(RuleListViewMsg)
     {
-        let rule_list = Rc::new(gtk::Box::new(Orientation::Vertical, 0));
+        let rule_list = Rc::new(gtk::Box::new(Orientation::Vertical, 4));
         let toolbar = gtk::Box::new(Orientation::Horizontal, 0);
+        toolbar.set_margin_bottom(4);
         let rule_view_id_map = Rc::new(RefCell::new(HashMap::new()));
 
 
-        let add_btn = gtk::Button::with_label("Add"); {
+        let add_btn = gtk::Button::from_icon_name(Some("list-add-symbolic"), IconSize::Button); {
+            add_btn.set_relief(ReliefStyle::None);
             let tx = tx.clone();
             add_btn.connect_clicked(move |_| {
                 let rule_data = Rule::new();

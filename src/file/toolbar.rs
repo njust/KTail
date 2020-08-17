@@ -1,7 +1,6 @@
 use gtk::prelude::*;
 use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button};
 use crate::{WorkbenchToolbarMsg};
-use crate::Msg::WorkbenchMsg;
 
 pub struct FileViewToolbar {
     container: gtk::Box,
@@ -22,10 +21,10 @@ impl FileViewToolbar {
                 tx2(WorkbenchToolbarMsg::TextChange(text));
             });
             let tx = tx.clone();
-            search_txt.connect_icon_release(move |e,b,c| {
+            search_txt.connect_icon_release(move |_,_,_| {
                 tx(WorkbenchToolbarMsg::ClearSearchPressed);
             });
-            search_txt.set_text(r".*\s((?i)error|fatal(?-i))\s.*");
+            // search_txt.set_text(r".*\s((?i)error|fatal(?-i))\s.*");
             toolbar.add(&search_txt);
         }
 

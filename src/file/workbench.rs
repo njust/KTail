@@ -43,7 +43,8 @@ impl FileViewWorkbench {
             id: Uuid::parse_str(SEARCH_ID).unwrap(),
             regex: None,
             color: Some(String::from("rgba(229,190,90,1)")),
-            name: Some(String::from("Search"))
+            name: Some(String::from("Search")),
+            is_system: true
         });
 
         Self {
