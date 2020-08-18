@@ -1,19 +1,20 @@
 use gtk::prelude::*;
 
-use gtk::{ScrolledWindow, TextView, Orientation, TextBuffer, TextTag, TextTagTable};
+use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::time::Duration;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
-use crate::{SEARCH_TAG, FileViewMsg, SearchResult};
+use crate::{FileViewMsg, SearchResult};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
+use sourceview::{ViewExt};
 
 pub struct FileView {
     container: gtk::Box,
     stop_handle: Arc<(Mutex<bool>, Condvar)>,
-    text_view: Rc<TextView>,
+    text_view: Rc<sourceview::View>,
     thread_action_sender: std::sync::mpsc::Sender<FileThreadMsg>,
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<Rule>,
@@ -33,24 +34,29 @@ impl FileView {
             file_thread_tx(msg);
         }, path, stop_handle.clone(), thread_action_receiver);
 
-        let search = TextTag::new(Some(SEARCH_TAG));
-        search.set_property_background(Some("#FFF135"));
-
         let tag_table = TextTagTable::new();
-        tag_table.add(&search);
+        let text_buffer = sourceview::Buffer::new(Some(&tag_table));
+        let tv = sourceview::View::new_with_buffer(&text_buffer);
+        tv.set_show_line_numbers(true);
+        tv.set_child_visible(true);
 
-        let text_buffer = TextBuffer::new(Some(&tag_table));
-        let text_view = Rc::new(TextView::with_buffer(&text_buffer));
+        let minimap = sourceview::MapBuilder::new()
+            .vexpand_set(true)
+            .view(&tv)
+            .width_request(200)
+            .buffer(&text_buffer)
+            .highlight_current_line(true)
+            .build();
 
-        let scroll_wnd = ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
+        let text_view = Rc::new(tv);
+        let scroll_wnd = ScrolledWindow::new(text_view.get_hadjustment().as_ref(), text_view.get_vadjustment().as_ref());
         scroll_wnd.set_vexpand(true);
         scroll_wnd.set_hexpand(true);
         scroll_wnd.add(&*text_view);
 
-        let container = gtk::Box::new(Orientation::Vertical, 0);
-        container.set_vexpand(true);
-        container.set_hexpand(true);
+        let container = gtk::Box::new(Orientation::Horizontal, 0);
         container.add(&scroll_wnd);
+        container.add(&minimap);
 
         Self {
             container,

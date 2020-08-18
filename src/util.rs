@@ -1,5 +1,4 @@
 use gtk::prelude::*;
-use gtk::{TextView};
 use glib::{SignalHandlerId};
 use std::path::PathBuf;
 use std::io::{BufReader, SeekFrom, Read, Seek};
@@ -10,7 +9,7 @@ use glib::bitflags::_core::cmp::Ordering;
 use regex::Regex;
 use crate::SearchResultMatch;
 
-pub fn enable_auto_scroll(text_view : &TextView) -> SignalHandlerId {
+pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     text_view.connect_size_allocate(|tv, _b| {
         if let Some(buffer) = tv.get_buffer() {
             let mut end = buffer.get_end_iter();
