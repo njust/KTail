@@ -3,8 +3,8 @@ use glib::{SignalHandlerId};
 use std::path::PathBuf;
 use std::io::{BufReader, SeekFrom, Read, Seek};
 use std::error::Error;
-use encoding::all::{UTF_8};
-use encoding::{Encoding, DecoderTrap};
+use encoding::all::{UTF_8, UTF_16LE, UTF_16BE};
+use encoding::{DecoderTrap};
 use glib::bitflags::_core::cmp::Ordering;
 use regex::Regex;
 use crate::SearchResultMatch;
@@ -18,7 +18,27 @@ pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     })
 }
 
-pub fn read_file(path: &PathBuf, start: u64) -> Result<(u64, String), Box<dyn Error>> {
+pub fn get_encoding(bytes: &Vec<u8>) -> &'static dyn encoding::types::Encoding {
+    if bytes.len() <= 2 {
+        return UTF_8;
+    }
+
+    let bom = &bytes[0..2];
+    match &bom {
+        &[239u8, 187u8] => UTF_8,
+        &[254u8, 255u8] => UTF_16BE,
+        &[255u8, 254u8] => UTF_16LE,
+        _ => UTF_8
+    }
+}
+
+pub struct ReadResult {
+    pub read_bytes: u64,
+    pub data: String,
+    pub encoding: Option<&'static dyn encoding::types::Encoding>
+}
+
+pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encoding::types::Encoding>) -> Result<ReadResult, Box<dyn Error>> {
     let file = std::fs::File::open(path)?;
     let mut reader = BufReader::new(file);
     let mut buffer = vec![];
@@ -26,9 +46,19 @@ pub fn read_file(path: &PathBuf, start: u64) -> Result<(u64, String), Box<dyn Er
         reader.seek(SeekFrom::Start(start))?;
     }
 
-    let read = reader.read_to_end(&mut buffer)?;
-    let s = UTF_8.decode(buffer.as_slice(), DecoderTrap::Replace)?;
-    Ok((read as u64, s))
+    let read_bytes = reader.read_to_end(&mut buffer)?;
+    let encoding = if let Some(encoding) = encoding {
+        encoding
+    }else {
+        get_encoding(&buffer)
+    };
+
+    let data = encoding.decode(buffer.as_slice(), DecoderTrap::Replace)?;
+    Ok(ReadResult {
+        read_bytes: read_bytes as u64,
+        data,
+        encoding: Some(encoding)
+    })
 }
 
 pub fn search(text: &str, search: &str) -> Result<Vec<SearchResultMatch>, Box<dyn Error>> {

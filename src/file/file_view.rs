@@ -184,6 +184,7 @@ fn register_file_watcher_thread<T>(sender: T, path: PathBuf, thread_stop_handle:
         let mut stopped = lock.lock().unwrap();
 
         let mut active_rules: Vec<ActiveRule> = vec![];
+        let mut encoding: Option<&'static dyn encoding::types::Encoding> = None;
         while !*stopped {
             if let Ok(metadata) = std::fs::metadata(&path) {
                 let len = metadata.len();
@@ -231,7 +232,13 @@ fn register_file_watcher_thread<T>(sender: T, path: PathBuf, thread_stop_handle:
             }
 
             let tmp_file_offset = if read_full_file { 0 } else { file_byte_offset };
-            if let Ok((read_bytes, content)) = read_file(&path, tmp_file_offset) {
+            if let Ok(result) = read_file(&path, tmp_file_offset, encoding) {
+                if result.encoding.is_some() {
+                    encoding = result.encoding;
+                }
+
+                let content = result.data;
+                let read_bytes = result.read_bytes;
                 let read_utf8 = content.as_bytes().len();
                 let mut re_list_matches = vec![];
                 for search_data in active_rules.iter_mut() {
