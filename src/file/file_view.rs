@@ -7,9 +7,11 @@ use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
-use crate::{FileViewMsg, SearchResult};
+use crate::{FileViewMsg, SearchResult, FileViewData};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
+use std::process::Stdio;
+use std::io::{Read, Write};
 
 pub struct FileView {
     container: gtk::Box,
@@ -21,7 +23,7 @@ pub struct FileView {
 }
 
 impl FileView {
-    pub fn new<T>(path: PathBuf, sender: T) -> Self
+    pub fn new<T>(data: FileViewData, sender: T) -> Self
         where T : 'static + Send + Clone + Fn(FileViewMsg)
     {
         let (thread_action_sender, thread_action_receiver) =
@@ -30,9 +32,48 @@ impl FileView {
         let stop_handle = Arc::new((Mutex::new(false), Condvar::new()));
 
         let file_thread_tx = sender.clone();
-        register_file_watcher_thread(move |msg| {
-            file_thread_tx(msg);
-        }, path, stop_handle.clone(), thread_action_receiver);
+        match data {
+            FileViewData::File(path) => {
+                let path = path.clone();
+                register_file_watcher_thread(move |msg| {
+                    file_thread_tx(msg);
+                }, path, stop_handle.clone(), thread_action_receiver);
+            }
+            FileViewData::Kube(services) => {
+                let path = "/tmp/gerda.log";
+                {
+                    let target = std::fs::File::create(path).unwrap();
+                }
+                std::thread::spawn(move || {
+                    let path = "/tmp/gerda.log";
+                    let p = std::process::Command::new("stern")
+                        .stdout(Stdio::piped())
+                        .arg("--template")
+                        .arg("{{.ContainerName}} {{.Message}}")
+                        .arg(services.join("|"))
+                        .spawn()
+                        .unwrap();
+
+                    if let Ok(mut file) = std::fs::OpenOptions::new()
+                        .write(true)
+                        .append(true)
+                        .open(path) {
+                        if let Some(mut stdout) = p.stdout {
+                            let mut buffer = [0; 4096];
+                            while let Ok(read) = stdout.read(&mut buffer) {
+                                if let Err(e) = file.write(&buffer[0..read]) {
+                                    eprintln!("Error: {:?}", e);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                register_file_watcher_thread(move |msg| {
+                    file_thread_tx(msg);
+                }, PathBuf::from(path), stop_handle.clone(), thread_action_receiver);
+            }
+        }
 
         let tag_table = TextTagTable::new();
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));

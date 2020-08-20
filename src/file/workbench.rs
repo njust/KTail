@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use gtk::{Orientation, WindowPosition, HeaderBar};
 use crate::rules::{RuleListView, SEARCH_ID, Rule};
 use crate::file::file_view::{FileView};
-use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg};
+use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg, FileViewData};
 use std::rc::Rc;
 use uuid::Uuid;
 
@@ -18,7 +18,7 @@ pub struct FileViewWorkbench {
 }
 
 impl FileViewWorkbench {
-    pub fn new<T>(path: PathBuf, sender: T) -> Self
+    pub fn new<T>(data: FileViewData, sender: T) -> Self
         where T: 'static + Send + Clone + Fn(WorkbenchViewMsg)
     {
         let toolbar_msg = sender.clone();
@@ -27,7 +27,7 @@ impl FileViewWorkbench {
         });
 
         let file_tx = sender.clone();
-        let file_view = FileView::new(path, move |msg| {
+        let file_view = FileView::new(data, move |msg| {
             file_tx(WorkbenchViewMsg::FileViewMsg(msg));
         });
         let container = gtk::Box::new(Orientation::Vertical, 0);

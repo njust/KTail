@@ -1,5 +1,5 @@
 use gtk::prelude::*;
-use glib::{SignalHandlerId};
+use glib::{SignalHandlerId, Value};
 use std::path::PathBuf;
 use std::io::{BufReader, SeekFrom, Read, Seek};
 use std::error::Error;
@@ -8,6 +8,11 @@ use encoding::{DecoderTrap};
 use glib::bitflags::_core::cmp::Ordering;
 use regex::Regex;
 use crate::SearchResultMatch;
+use serde::Deserialize;
+use std::process::{Command, Stdio};
+use std::collections::HashSet;
+use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore};
+use std::rc::Rc;
 
 pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     text_view.connect_size_allocate(|tv, _b| {
@@ -23,6 +28,7 @@ pub fn get_encoding(bytes: &Vec<u8>) -> &'static dyn encoding::types::Encoding {
         return UTF_8;
     }
 
+    // https://de.wikipedia.org/wiki/Byte_Order_Mark
     let bom = &bytes[0..2];
     match &bom {
         &[239u8, 187u8] => UTF_8,
@@ -135,6 +141,127 @@ impl<'a, 'b, T: PartialOrd> Iterator for SortedListCompare<'a, 'b, T> {
             }
         }
     }
+}
+
+#[derive(Deserialize)]
+struct PodContainer {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct PodSpec {
+    containers: Vec<PodContainer>,
+}
+
+#[derive(Deserialize)]
+struct PodItems {
+    spec: PodSpec,
+}
+
+#[derive(Deserialize)]
+struct GetPodsResult {
+    items: Vec<PodItems>
+}
+
+
+#[test]
+pub fn test_get_pods() {
+    if let Ok(p) = get_pods() {
+        println!("P: {:?}", p);
+    }
+}
+
+pub fn kubectl_file_name() -> &'static str {
+    #[cfg(target_family = "windows")]
+        let bin = "kubectl.exe";
+    #[cfg(target_family = "unix")]
+        let bin = "kubectl";
+    bin
+}
+
+pub fn kubectl_in_path() -> bool {
+    let bin = kubectl_file_name();
+    is_file_in_path(bin)
+}
+
+pub enum ColumnType {
+    String,
+    Bool
+}
+
+pub fn create_col(title: Option<&str>, idx: i32, col_type: ColumnType, ts: Rc<TreeStore>) -> TreeViewColumn {
+    let col = TreeViewColumn::new();
+    match col_type {
+        ColumnType::String => {
+            let cell = CellRendererText::new();
+            col.pack_start(&cell, true);
+            col.add_attribute(&cell, "text", idx);
+        }
+        ColumnType::Bool => {
+            col.set_fixed_width(32);
+            let cell = CellRendererToggle::new();
+            cell.set_activatable(true);
+            cell.connect_toggled(move |e,b| {
+                let ts = &*ts;
+                if let Some(i) = ts.get_iter(&b) {
+                    ts.set_value(&i,1, &Value::from(&!e.get_active()));
+                }
+
+            });
+            col.pack_start(&cell, false);
+            col.add_attribute(&cell, "active", idx);
+        }
+    }
+    if let Some(title) = title {
+        col.set_title(title);
+    }
+    col.set_resizable(true);
+    col.set_sort_column_id(idx);
+    col.set_expand(true);
+    col
+}
+
+pub fn get_pods() -> Result<Vec<String>, Box<dyn Error>> {
+    let bin = kubectl_file_name();
+    let cmd = Command::new(bin)
+        .stdout(Stdio::piped())
+        .arg("get")
+        .arg("pods")
+        .arg("-o")
+        .arg("json")
+        .spawn()?;
+
+
+    let mut names = HashSet::new();
+    if let Some(mut out)=cmd.stdout {
+        let mut data = String::new();
+        out.read_to_string(&mut data)?;
+        let res = serde_json::from_str::<GetPodsResult>(&data)?;
+        for item in res.items {
+            if let Some(f) = &item.spec.containers.first() {
+                names.insert(f.name.clone());
+            }
+        }
+    }
+    Ok(names.into_iter().collect())
+}
+
+pub fn is_file_in_path(file_name: &str) -> bool {
+    #[cfg(target_family = "windows")]
+    let separator = ";";
+    #[cfg(target_family = "unix")]
+    let separator = ":";
+
+    if let Ok(path) = std::env::var("PATH") {
+        let seg = path.split(separator);
+        for current_path in seg {
+            let file_path = std::path::Path::new(current_path).join(file_name);
+            if file_path.exists() {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 impl<'a, 'b, T:PartialOrd> SortedListCompare<'a, 'b, T> {
