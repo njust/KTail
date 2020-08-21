@@ -13,6 +13,9 @@ use std::process::{Command, Stdio};
 use std::collections::HashSet;
 use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore};
 use std::rc::Rc;
+use std::os::windows::process::CommandExt;
+
+pub const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     text_view.connect_size_allocate(|tv, _b| {
@@ -223,14 +226,18 @@ pub fn create_col(title: Option<&str>, idx: i32, col_type: ColumnType, ts: Rc<Tr
 
 pub fn get_pods() -> Result<Vec<String>, Box<dyn Error>> {
     let bin = kubectl_file_name();
-    let cmd = Command::new(bin)
+
+    let mut cmd = Command::new(bin);
+    #[cfg(target_family = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let mut cmd = cmd
         .stdout(Stdio::piped())
         .arg("get")
         .arg("pods")
         .arg("-o")
         .arg("json")
         .spawn()?;
-
 
     let mut names = HashSet::new();
     if let Some(mut out)=cmd.stdout {

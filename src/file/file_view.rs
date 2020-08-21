@@ -6,7 +6,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
-use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
+use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult, CREATE_NO_WINDOW};
 use crate::{FileViewMsg, SearchResult, FileViewData};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
@@ -57,10 +57,18 @@ impl FileView {
                     .append(true)
                     .open(&tmp_file) {
 
-                    let process = subprocess::Popen::create(&["stern", "--template", "{{.ContainerName}} {{.Message}}", &services.join("|")], PopenConfig {
+                    let mut cfg = PopenConfig {
                         stdout: Redirection::File(file),
+                        detached: true,
                         ..Default::default()
-                    }).unwrap();
+                    };
+
+                    #[cfg(target_family = "windows")]
+                    {
+                        cfg.creation_flags = CREATE_NO_WINDOW;
+                    }
+
+                    let process = subprocess::Popen::create(&["stern", "--template", "{{.ContainerName}} {{.Message}}", &services.join("|")], cfg).unwrap();
 
                     kube_log_process = Some(process);
                 }
