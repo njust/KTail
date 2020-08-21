@@ -11,7 +11,10 @@ use crate::{FileViewMsg, SearchResult, FileViewData};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
 use std::process::Stdio;
-use std::io::{Read, Write};
+use std::io::{Read, Write, BufReader};
+use std::thread::JoinHandle;
+use subprocess::{PopenConfig, Redirection, Popen};
+use uuid::Uuid;
 
 pub struct FileView {
     container: gtk::Box,
@@ -20,6 +23,8 @@ pub struct FileView {
     thread_action_sender: std::sync::mpsc::Sender<FileThreadMsg>,
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<Rule>,
+    kube_log_process: Option<Popen>,
+    kube_log_path: Option<PathBuf>,
 }
 
 impl FileView {
@@ -32,46 +37,38 @@ impl FileView {
         let stop_handle = Arc::new((Mutex::new(false), Condvar::new()));
 
         let file_thread_tx = sender.clone();
+        let mut kube_log_process = None;
+        let mut kube_log_path = None;
         match data {
             FileViewData::File(path) => {
                 let path = path.clone();
                 register_file_watcher_thread(move |msg| {
                     file_thread_tx(msg);
-                }, path, stop_handle.clone(), thread_action_receiver);
+                }, &path, stop_handle.clone(), thread_action_receiver);
             }
             FileViewData::Kube(services) => {
-                let path = "/tmp/gerda.log";
+                let tmp_file = std::env::temp_dir().join(Uuid::new_v4().to_string());
                 {
-                    let target = std::fs::File::create(path).unwrap();
+                    std::fs::File::create(&tmp_file).unwrap();
                 }
-                std::thread::spawn(move || {
-                    let path = "/tmp/gerda.log";
-                    let p = std::process::Command::new("stern")
-                        .stdout(Stdio::piped())
-                        .arg("--template")
-                        .arg("{{.ContainerName}} {{.Message}}")
-                        .arg(services.join("|"))
-                        .spawn()
-                        .unwrap();
 
-                    if let Ok(mut file) = std::fs::OpenOptions::new()
-                        .write(true)
-                        .append(true)
-                        .open(path) {
-                        if let Some(mut stdout) = p.stdout {
-                            let mut buffer = [0; 4096];
-                            while let Ok(read) = stdout.read(&mut buffer) {
-                                if let Err(e) = file.write(&buffer[0..read]) {
-                                    eprintln!("Error: {:?}", e);
-                                }
-                            }
-                        }
-                    }
-                });
+                if let Ok(file) = std::fs::OpenOptions::new()
+                    .write(true)
+                    .append(true)
+                    .open(&tmp_file) {
+
+                    let process = subprocess::Popen::create(&["stern", "--template", "{{.ContainerName}} {{.Message}}", &services.join("|")], PopenConfig {
+                        stdout: Redirection::File(file),
+                        ..Default::default()
+                    }).unwrap();
+
+                    kube_log_process = Some(process);
+                }
 
                 register_file_watcher_thread(move |msg| {
                     file_thread_tx(msg);
-                }, PathBuf::from(path), stop_handle.clone(), thread_action_receiver);
+                }, &tmp_file, stop_handle.clone(), thread_action_receiver);
+                kube_log_path = Some(tmp_file);
             }
         }
 
@@ -106,6 +103,8 @@ impl FileView {
             thread_action_sender,
             autoscroll_handler: None,
             rules: vec![],
+            kube_log_process,
+            kube_log_path
         }
     }
 
@@ -215,9 +214,10 @@ impl FileView {
     }
 }
 
-fn register_file_watcher_thread<T>(sender: T, path: PathBuf, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>)
+fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>)
     where T : 'static + Send + Clone + Fn(FileViewMsg)
 {
+    let path = path.clone();
     std::thread::spawn(move || {
         let mut file_byte_offset = 0;
         let mut utf8_byte_offset = 0;
@@ -339,5 +339,18 @@ impl Drop for FileView {
         let mut stop = lock.lock().unwrap();
         *stop = true;
         cvar.notify_one();
+        if let Some(mut p) = self.kube_log_process.take() {
+            println!("Waiting process to exit");
+            match p.kill() {
+                Ok(_) => println!("Killed subprocess"),
+                Err(e) => eprintln!("Failed to kill subprocess: {}", e),
+            }
+            println!("OK!");
+        }
+        if let Some(tmp_file) = self.kube_log_path.take() {
+            if let Err(e) = std::fs::remove_file(&tmp_file) {
+                eprintln!("Could not delete tmp file: {:?} error was: {}", tmp_file, e);
+            }
+        }
     }
 }

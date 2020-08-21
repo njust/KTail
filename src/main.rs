@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use gtk::prelude::*;
 use gio::prelude::*;
 
@@ -188,6 +190,7 @@ fn create_open_dlg_action(tx: Sender<Msg>) -> SimpleAction {
     });
     open_action
 }
+
 
 fn main() {
     let application = Application::new(
