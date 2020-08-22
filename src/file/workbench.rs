@@ -111,11 +111,11 @@ impl FileViewWorkbench {
     pub fn show_dlg(&mut self) {
         if self.rules_dlg.is_none() {
             let dlg = gtk::Dialog::new();
-            dlg.set_position(WindowPosition::Mouse);
+            dlg.set_position(WindowPosition::CenterOnParent);
             dlg.set_default_size(400, 200);
             let header_bar = HeaderBar::new();
             header_bar.set_show_close_button(true);
-            header_bar.set_title(Some("Rules"));
+            header_bar.set_title(Some("Highlighters"));
             dlg.set_titlebar(Some(&header_bar));
             dlg.set_modal(true);
 

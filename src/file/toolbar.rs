@@ -36,7 +36,7 @@ impl FileViewToolbar {
             toolbar.add(&search_btn);
         }
 
-        let show_rules_btn = Button::with_label("Rules"); {
+        let show_rules_btn = Button::with_label("Highlighters"); {
             let tx = tx.clone();
             show_rules_btn.connect_clicked(move |_| {
                 tx(WorkbenchToolbarMsg::ShowRules);

@@ -83,6 +83,7 @@ impl FileView {
         let tag_table = TextTagTable::new();
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));
         let tv = sourceview::View::new_with_buffer(&text_buffer);
+        tv.set_editable(false);
         tv.set_show_line_numbers(true);
         tv.set_child_visible(true);
 

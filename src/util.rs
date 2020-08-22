@@ -13,7 +13,6 @@ use std::process::{Command, Stdio};
 use std::collections::HashSet;
 use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore};
 use std::rc::Rc;
-use std::os::windows::process::CommandExt;
 
 pub const CREATE_NO_WINDOW: u32 = 0x08000000;
 
@@ -199,9 +198,10 @@ pub fn create_col(title: Option<&str>, idx: i32, col_type: ColumnType, ts: Rc<Tr
             let cell = CellRendererText::new();
             col.pack_start(&cell, true);
             col.add_attribute(&cell, "text", idx);
+            col.set_resizable(true);
+            col.set_sort_column_id(idx);
         }
         ColumnType::Bool => {
-            col.set_fixed_width(32);
             let cell = CellRendererToggle::new();
             cell.set_activatable(true);
             cell.connect_toggled(move |e,b| {
@@ -211,16 +211,14 @@ pub fn create_col(title: Option<&str>, idx: i32, col_type: ColumnType, ts: Rc<Tr
                 }
 
             });
-            col.pack_start(&cell, false);
+            col.pack_start(&cell, true);
             col.add_attribute(&cell, "active", idx);
         }
     }
     if let Some(title) = title {
         col.set_title(title);
     }
-    col.set_resizable(true);
-    col.set_sort_column_id(idx);
-    col.set_expand(true);
+
     col
 }
 

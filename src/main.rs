@@ -3,7 +3,7 @@
 use gtk::prelude::*;
 use gio::prelude::*;
 
-use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter};
+use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow, Widget};
 use std::rc::Rc;
 use gio::{SimpleAction};
 
@@ -17,6 +17,7 @@ use crate::rules::Rule;
 use crate::util::{get_pods, create_col, ColumnType};
 use std::path::PathBuf;
 use glib::Sender;
+use std::collections::HashMap;
 
 pub const SEARCH_TAG: &'static str = "SEARCH";
 
@@ -35,9 +36,9 @@ impl FileViewData {
 }
 
 pub enum Msg {
-    CloseTab(usize),
+    CloseTab(Uuid),
     CreateTab(FileViewData),
-    WorkbenchMsg(usize, WorkbenchViewMsg)
+    WorkbenchMsg(Uuid, WorkbenchViewMsg)
 }
 
 pub enum WorkbenchViewMsg {
@@ -90,11 +91,11 @@ fn map_model(model: &TreeStore, iter: &TreeIter) -> Option<(String, bool)> {
     Some((name, active))
 }
 
-fn create_tab(data: FileViewData, tx: Sender<Msg>, idx: usize) -> (gtk::Box, FileViewWorkbench) {
+fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid) -> (gtk::Box, FileViewWorkbench) {
     let tx2 = tx.clone();
     let tab_name = data.get_name();
     let file_view = FileViewWorkbench::new(data, move |msg| {
-        tx2.send(Msg::WorkbenchMsg(idx, msg)).expect("Could not send msg");
+        tx2.send(Msg::WorkbenchMsg(id, msg)).expect("Could not send msg");
     });
 
     let close_btn = Button::from_icon_name(Some("window-close-symbolic"), IconSize::Menu);
@@ -107,60 +108,66 @@ fn create_tab(data: FileViewData, tx: Sender<Msg>, idx: usize) -> (gtk::Box, Fil
 
     let tx = tx.clone();
     close_btn.connect_clicked(move |_| {
-        tx.send(Msg::CloseTab(idx as usize));
+        tx.send(Msg::CloseTab(id));
     });
 
     tab_header.show_all();
     (tab_header, file_view)
 }
 
-fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
+fn create_open_kube_action<P: IsA<Widget>>(tx: Sender<Msg>, parent: &P) -> SimpleAction {
     let kube_action = SimpleAction::new("kube", None);
+    let dlg = gtk::Dialog::new();
+    let service_model = Rc::new(TreeStore::new(&[glib::Type::String, glib::Type::Bool]));
+    service_model.set_sort_column_id(SortColumn::Index(0), SortType::Ascending);
+    let list = gtk::TreeView::with_model(&*service_model);
+
+    list.append_column(&create_col(Some("Add"), 1, ColumnType::Bool, service_model.clone()));
+    list.append_column(&create_col(Some("Service"), 0, ColumnType::String, service_model.clone()));
+
+    dlg.set_position(WindowPosition::CenterOnParent);
+    dlg.set_default_size(300, 400);
+    let header_bar = HeaderBar::new();
+    header_bar.set_show_close_button(true);
+    header_bar.set_title(Some("Services"));
+    dlg.set_titlebar(Some(&header_bar));
+    dlg.set_modal(true);
+
+    let content = dlg.get_content_area();
+    let scroll_wnd = ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
+    scroll_wnd.set_property_expand(true);
+    scroll_wnd.add(&list);
+    content.add(&scroll_wnd);
+
+    dlg.connect_delete_event(move |dlg, _| {
+        dlg.hide();
+        gtk::Inhibit(true)
+    });
+
+    dlg.add_button("_Cancel", ResponseType::Cancel);
+    dlg.add_button("_Open", ResponseType::Accept);
+
     kube_action.connect_activate(move |a,b| {
-        let m = Rc::new(TreeStore::new(&[glib::Type::String, glib::Type::Bool]));
-        let list = gtk::TreeView::with_model(&*m);
-
-        list.append_column(&create_col(None, 1, ColumnType::Bool, m.clone()));
-        list.append_column(&create_col(Some("Service"), 0, ColumnType::String, m.clone()));
-
-        let dlg = gtk::Dialog::new();
-        dlg.set_position(WindowPosition::Mouse);
-        dlg.set_default_size(400, 200);
-        let header_bar = HeaderBar::new();
-        header_bar.set_show_close_button(true);
-        header_bar.set_title(Some("Services"));
-        dlg.set_titlebar(Some(&header_bar));
-        dlg.set_modal(true);
-
-        let content = dlg.get_content_area();
-        content.add(&list);
-
-        dlg.connect_delete_event(move |dlg, _| {
-            dlg.hide();
-            gtk::Inhibit(true)
-        });
-
-        dlg.add_button("_Cancel", ResponseType::Cancel);
-        dlg.add_button("_Open", ResponseType::Accept);
-        dlg.show_all();
+        service_model.clear();
         if let Ok(pods) = get_pods() {
             for pod in pods {
-                m.insert_with_values(None, None, &[0, 1], &[&pod, &false]);
+                service_model.insert_with_values(None, None, &[0, 1], &[&pod, &false]);
             }
         }
+        dlg.show_all();
 
         let res = dlg.run();
         dlg.close();
         if res == ResponseType::Accept {
             let mut models = vec![];
-            if let Some(iter)  = m.get_iter_first() {
-                if let Some((service, active)) = map_model(&m, &iter) {
+            if let Some(iter)  = service_model.get_iter_first() {
+                if let Some((service, active)) = map_model(&service_model, &iter) {
                     if active {
                         models.push(service);
                     }
                 }
-                while m.iter_next(&iter) {
-                    if let Some((service, active)) = map_model(&m, &iter) {
+                while service_model.iter_next(&iter) {
+                    if let Some((service, active)) = map_model(&service_model, &iter) {
                         if active {
                             models.push(service);
                         }
@@ -200,9 +207,10 @@ fn main() {
 
     application.connect_activate(move |app| {
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
+        let notebook = Notebook::new();
         let open_action = create_open_dlg_action(tx.clone());
         app.add_action(&open_action);
-        let kube_action = create_open_kube_action(tx.clone());
+        let kube_action = create_open_kube_action(tx.clone(), &notebook);
         app.add_action(&kube_action);
 
         let exit_action = SimpleAction::new("quit", None);
@@ -213,10 +221,10 @@ fn main() {
         });
         app.add_action(&exit_action);
 
-        let mut file_views = Vec::<FileViewWorkbench>::new();
+        let mut file_views = HashMap::<Uuid, FileViewWorkbench>::new();
         let window = ApplicationWindow::new(app);
 
-        let notebook = Notebook::new();
+
         notebook.set_hexpand(true);
         notebook.set_vexpand(true);
         window.add(&notebook);
@@ -224,22 +232,22 @@ fn main() {
         let tx = tx.clone();
         rx.attach(None, move |msg| {
             match msg {
-                Msg::WorkbenchMsg(idx, msg) => {
-                    if let Some(tab) = file_views.get_mut(idx) {
+                Msg::WorkbenchMsg(id, msg) => {
+                    if let Some(tab) = file_views.get_mut(&id) {
                         tab.update(msg);
                     }
                 }
-                Msg::CloseTab(idx) => {
-                    if let Some(page) = notebook.get_nth_page(Some(idx as u32)) {
-                        file_views.remove(idx as usize);
-                        notebook.detach_tab(&page);
+                Msg::CloseTab(id) => {
+                    if let Some(tab) = file_views.get_mut(&id) {
+                        notebook.detach_tab(tab.view());
+                        file_views.remove(&id);
                     }
                 }
                 Msg::CreateTab(tab) => {
-                    let idx = file_views.len();
-                    let (tab_header, file_view) = create_tab(tab, tx.clone(), idx);
+                    let id = Uuid::new_v4();
+                    let (tab_header, file_view) = create_tab(tab, tx.clone(), id);
                     notebook.append_page(file_view.view(), Some(&tab_header));
-                    file_views.push(file_view);
+                    file_views.insert(id, file_view);
                     notebook.show_all();
                 }
             }
