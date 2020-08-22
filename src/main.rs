@@ -38,7 +38,8 @@ impl FileViewData {
 pub enum Msg {
     CloseTab(Uuid),
     CreateTab(FileViewData),
-    WorkbenchMsg(Uuid, WorkbenchViewMsg)
+    WorkbenchMsg(Uuid, WorkbenchViewMsg),
+    Exit
 }
 
 pub enum WorkbenchViewMsg {
@@ -207,23 +208,28 @@ fn main() {
 
     application.connect_activate(move |app| {
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
+
         let notebook = Notebook::new();
         let open_action = create_open_dlg_action(tx.clone());
         app.add_action(&open_action);
         let kube_action = create_open_kube_action(tx.clone(), &notebook);
         app.add_action(&kube_action);
 
-        let exit_action = SimpleAction::new("quit", None);
-        exit_action.connect_activate(|_a, _b| {
-            gio::Application::get_default()
-                .expect("no default Application!")
-                .quit();
+        let tx2 = tx.clone();
+        app.connect_shutdown(move|_| {
+            tx2.send(Msg::Exit);
         });
-        app.add_action(&exit_action);
+
+        let exit_action = SimpleAction::new("quit", None); {
+            let tx = tx.clone();
+            exit_action.connect_activate(move |_a, _b| {
+                tx.send(Msg::Exit);
+            });
+            app.add_action(&exit_action);
+        }
 
         let mut file_views = HashMap::<Uuid, FileViewWorkbench>::new();
         let window = ApplicationWindow::new(app);
-
 
         notebook.set_hexpand(true);
         notebook.set_vexpand(true);
@@ -242,6 +248,15 @@ fn main() {
                         notebook.detach_tab(tab.view());
                         file_views.remove(&id);
                     }
+                }
+                Msg::Exit => {
+                    for tab in file_views.values() {
+                        notebook.detach_tab(tab.view());
+                    }
+                    file_views.clear();
+                    gio::Application::get_default()
+                        .expect("no default Application!")
+                        .quit();
                 }
                 Msg::CreateTab(tab) => {
                     let id = Uuid::new_v4();
