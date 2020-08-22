@@ -227,7 +227,10 @@ pub fn get_pods() -> Result<Vec<String>, Box<dyn Error>> {
 
     let mut cmd = Command::new(bin);
     #[cfg(target_family = "windows")]
-    cmd.creation_flags(CREATE_NO_WINDOW);
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
 
     let mut cmd = cmd
         .stdout(Stdio::piped())
