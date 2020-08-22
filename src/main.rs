@@ -275,8 +275,8 @@ fn main() {
 
         let menu_model = gio::Menu::new();
         menu_model.append_item(&gio::MenuItem::new(Some("Open"), Some("app.open")));
-        menu_model.append_item(&gio::MenuItem::new(Some("Quit"), Some("app.quit")));
         menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));
+        menu_model.append_item(&gio::MenuItem::new(Some("Quit"), Some("app.quit")));
 
         let menu_button = MenuButton::new();
         menu_button.set_relief(ReliefStyle::None);

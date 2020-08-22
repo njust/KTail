@@ -68,7 +68,13 @@ impl FileView {
                         cfg.creation_flags = CREATE_NO_WINDOW;
                     }
 
-                    let process = subprocess::Popen::create(&["stern", "--since", "12h", "--template", "{{.ContainerName}} {{.Message}}", &services.join("|")], cfg).unwrap();
+                    let template = if services.len() == 1 {
+                        "{{.Message}}"
+                    }else {
+                        "{{.ContainerName}} {{.Message}}"
+                    };
+
+                    let process = subprocess::Popen::create(&["stern", "--since", "12h", "--template", template, &services.join("|")], cfg).unwrap();
 
                     kube_log_process = Some(process);
                 }
