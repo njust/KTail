@@ -24,7 +24,6 @@ impl FileViewToolbar {
             search_txt.connect_icon_release(move |_,_,_| {
                 tx(WorkbenchToolbarMsg::ClearSearchPressed);
             });
-            // search_txt.set_text(r".*\s((?i)error|fatal(?-i))\s.*");
             toolbar.add(&search_txt);
         }
 

@@ -61,8 +61,10 @@ impl RuleView {
                 tx(RuleViewMsg::RegexChanged(s));
             });
             container.add(&regex);
-
             regex.set_sensitive(!rule.is_system);
+            if let Some(r) = &rule.regex {
+                regex.set_text(r);
+            }
         }
 
         let color_btn = gtk::ColorButton::new(); {
