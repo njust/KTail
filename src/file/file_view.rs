@@ -1,4 +1,6 @@
-use gtk::prelude::*;
+use gtk::{
+    prelude::*,
+};
 
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::time::Duration;
@@ -6,7 +8,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
-use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult, CREATE_NO_WINDOW};
+use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult, CREATE_NO_WINDOW, get_encoding};
 use crate::{FileViewMsg, SearchResult, FileViewData};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
@@ -44,7 +46,7 @@ impl FileView {
                 let path = path.clone();
                 register_file_watcher_thread(move |msg| {
                     file_thread_tx(msg);
-                }, &path, stop_handle.clone(), thread_action_receiver);
+                }, &path,  stop_handle.clone(), thread_action_receiver);
             }
             FileViewData::Kube(services) => {
                 let tmp_file = std::env::temp_dir().join(Uuid::new_v4().to_string());
@@ -101,6 +103,18 @@ impl FileView {
             .highlight_current_line(true)
             .build();
 
+        minimap.set_widget_name("minimap");
+        let css = r##"
+            #minimap {
+                  font: 2.5px "Monospace";
+            }
+        "##;
+        let css_provider = gtk::CssProvider::new();
+        css_provider.load_from_data(css.as_bytes());
+        let sc = minimap.get_style_context();
+        sc.add_provider(&css_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+
         let text_view = Rc::new(tv);
         let scroll_wnd = ScrolledWindow::new(text_view.get_hadjustment().as_ref(), text_view.get_vadjustment().as_ref());
         scroll_wnd.set_vexpand(true);
@@ -121,6 +135,10 @@ impl FileView {
             kube_log_process,
             kube_log_path
         }
+    }
+
+    pub fn set_rules(&mut self, rules: Vec<Rule>) {
+        self.rules = rules;
     }
 
     pub fn update(&mut self, msg: FileViewMsg) {
@@ -239,7 +257,7 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
         let (lock, wait_handle) = thread_stop_handle.as_ref();
         let mut stopped = lock.lock().unwrap();
 
-        let mut active_rules: Vec<ActiveRule> = vec![];
+        let mut active_rules = vec![];
         let mut encoding: Option<&'static dyn encoding::types::Encoding> = None;
         while !*stopped {
             if let Ok(metadata) = std::fs::metadata(&path) {

@@ -25,7 +25,7 @@ pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     })
 }
 
-pub fn get_encoding(bytes: &Vec<u8>) -> &'static dyn encoding::types::Encoding {
+pub fn get_encoding(bytes: &[u8]) -> &'static dyn encoding::types::Encoding {
     if bytes.len() <= 2 {
         return UTF_8;
     }
@@ -48,6 +48,7 @@ pub struct ReadResult {
 
 pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encoding::types::Encoding>) -> Result<ReadResult, Box<dyn Error>> {
     let file = std::fs::File::open(path)?;
+
     let mut reader = BufReader::new(file);
     let mut buffer = vec![];
     if start > 0 {
@@ -62,18 +63,20 @@ pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encod
     };
 
     let data = encoding.decode(buffer.as_slice(), DecoderTrap::Replace)?;
+    let data = data.replace("\n\r", "\n");
+    let data = data.replace("\r\n", "\n");
+
     Ok(ReadResult {
         read_bytes: read_bytes as u64,
         data,
-        encoding: Some(encoding)
+        encoding: if read_bytes > 0 {Some(encoding) } else {None}
     })
 }
 
 pub fn search(text: &str, search: &str) -> Result<Vec<SearchResultMatch>, Box<dyn Error>> {
-    let lines = text.split("\n");
     let re = Regex::new(search)?;
     let mut matches = vec![];
-    for (n, line) in lines.enumerate() {
+    for (n, line) in text.lines().enumerate() {
         for mat in re.find_iter(&line) {
             matches.push(SearchResultMatch {
                 line: n,

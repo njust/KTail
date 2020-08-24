@@ -86,6 +86,25 @@ pub enum FileViewMsg {
     Clear,
 }
 
+pub fn get_default_highlighters() -> Vec<Rule> {
+    vec![
+        Rule {
+            id: Uuid::new_v4(),
+            regex: Some(r".*\s((?i)error|fatal(?-i))\s.*".into()),
+            color: Some(String::from("rgba(191,64,64,1)")),
+            name: Some(String::from("Error")),
+            is_system: false
+        },
+        Rule {
+            id: Uuid::new_v4(),
+            regex: Some(r".*\s((?i)warning(?-i))\s.*".into()),
+            color: Some(String::from("rgba(207,111,57,1)")),
+            name: Some(String::from("Warning")),
+            is_system: false
+        }
+    ]
+}
+
 fn map_model(model: &TreeStore, iter: &TreeIter) -> Option<(String, bool)> {
     let name = model.get_value(iter, 0).get::<String>().unwrap_or(None)?;
     let active = model.get_value(iter, 1).get::<bool>().unwrap_or(None)?;
@@ -102,7 +121,6 @@ fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid) -> (gtk::Box, FileV
     let close_btn = Button::from_icon_name(Some("window-close-symbolic"), IconSize::Menu);
     close_btn.set_relief(ReliefStyle::None);
 
-
     let tab_header = gtk::Box::new(Orientation::Horizontal, 0);
     tab_header.add(&Label::new(Some(&tab_name)));
     tab_header.add(&close_btn);
@@ -116,7 +134,7 @@ fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid) -> (gtk::Box, FileV
     (tab_header, file_view)
 }
 
-fn create_open_kube_action<P: IsA<Widget>>(tx: Sender<Msg>, parent: &P) -> SimpleAction {
+fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
     let kube_action = SimpleAction::new("kube", None);
     let dlg = gtk::Dialog::new();
     let service_model = Rc::new(TreeStore::new(&[glib::Type::String, glib::Type::Bool]));
@@ -208,11 +226,10 @@ fn main() {
 
     application.connect_activate(move |app| {
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
-
         let notebook = Notebook::new();
         let open_action = create_open_dlg_action(tx.clone());
         app.add_action(&open_action);
-        let kube_action = create_open_kube_action(tx.clone(), &notebook);
+        let kube_action = create_open_kube_action(tx.clone());
         app.add_action(&kube_action);
 
         let tx2 = tx.clone();

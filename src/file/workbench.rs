@@ -47,22 +47,6 @@ impl FileViewWorkbench {
             is_system: true
         });
 
-        &rules_view.add_rule(Rule {
-            id: Uuid::new_v4(),
-            regex: Some(r".*\s((?i)error|fatal(?-i))\s.*".into()),
-            color: Some(String::from("rgba(191,64,64,1)")),
-            name: Some(String::from("Error")),
-            is_system: false
-        });
-
-        &rules_view.add_rule(Rule {
-            id: Uuid::new_v4(),
-            regex: Some(r".*\s((?i)warning(?-i))\s.*".into()),
-            color: Some(String::from("rgba(207,111,57,1)")),
-            name: Some(String::from("Warning")),
-            is_system: false
-        });
-
         Self {
             container,
             rules_view,

@@ -190,6 +190,12 @@ impl RuleListView {
         }
     }
 
+    pub fn add_rules(&mut self, data: Vec<Rule>) {
+        for rule in data {
+            self.add_rule(rule);
+        }
+    }
+
     pub fn add_rule(&mut self, data: Rule) {
         let tx = self.tx.clone();
         let wrapper = gtk::Box::new(Orientation::Horizontal, 0);
