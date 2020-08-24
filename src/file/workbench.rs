@@ -1,6 +1,5 @@
 use gtk::prelude::*;
 use crate::file::toolbar::FileViewToolbar;
-use std::path::PathBuf;
 use gtk::{Orientation, WindowPosition, HeaderBar};
 use crate::rules::{RuleListView, SEARCH_ID, Rule};
 use crate::file::file_view::{FileView};
@@ -17,19 +16,44 @@ pub struct FileViewWorkbench {
     sender: Rc<dyn Fn(WorkbenchViewMsg)>
 }
 
+pub fn get_default_rules() -> Vec<Rule> {
+    vec![
+        Rule {
+            id: Uuid::new_v4(),
+            // regex: Some(r".*\s((?i)get(?-i))\s.*".into()),
+            regex: Some(r".*((?i)get(?-i)).*".into()),
+            color: Some(String::from("rgba(191,64,64,1)")),
+            name: Some(String::from("Error")),
+            is_system: false
+        },
+        Rule {
+            id: Uuid::new_v4(),
+            regex: Some(r".*((?i)post(?-i)).*".into()),
+            // regex: Some(r".*\s((?i)warning(?-i))\s.*".into()),
+            color: Some(String::from("rgba(207,111,57,1)")),
+            name: Some(String::from("Warning")),
+            is_system: false
+        }
+    ]
+}
+
 impl FileViewWorkbench {
     pub fn new<T>(data: FileViewData, sender: T) -> Self
         where T: 'static + Send + Clone + Fn(WorkbenchViewMsg)
     {
+        let default_rules = get_default_rules();
+
         let toolbar_msg = sender.clone();
         let toolbar = FileViewToolbar::new(move |msg| {
             toolbar_msg(WorkbenchViewMsg::ToolbarMsg(msg));
         });
 
         let file_tx = sender.clone();
-        let file_view = FileView::new(data, move |msg| {
+        let mut file_view = FileView::new();
+        file_view.start(data, move |msg| {
             file_tx(WorkbenchViewMsg::FileViewMsg(msg));
-        });
+        }, default_rules.clone());
+
         let container = gtk::Box::new(Orientation::Vertical, 0);
         container.add(toolbar.view());
         container.add(file_view.view());
@@ -46,6 +70,7 @@ impl FileViewWorkbench {
             name: Some(String::from("Search")),
             is_system: true
         });
+        rules_view.add_rules(default_rules);
 
         Self {
             container,

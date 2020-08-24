@@ -3,7 +3,7 @@
 use gtk::prelude::*;
 use gio::prelude::*;
 
-use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow, Widget};
+use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow};
 use std::rc::Rc;
 use gio::{SimpleAction};
 
@@ -86,25 +86,6 @@ pub enum FileViewMsg {
     Clear,
 }
 
-pub fn get_default_highlighters() -> Vec<Rule> {
-    vec![
-        Rule {
-            id: Uuid::new_v4(),
-            regex: Some(r".*\s((?i)error|fatal(?-i))\s.*".into()),
-            color: Some(String::from("rgba(191,64,64,1)")),
-            name: Some(String::from("Error")),
-            is_system: false
-        },
-        Rule {
-            id: Uuid::new_v4(),
-            regex: Some(r".*\s((?i)warning(?-i))\s.*".into()),
-            color: Some(String::from("rgba(207,111,57,1)")),
-            name: Some(String::from("Warning")),
-            is_system: false
-        }
-    ]
-}
-
 fn map_model(model: &TreeStore, iter: &TreeIter) -> Option<(String, bool)> {
     let name = model.get_value(iter, 0).get::<String>().unwrap_or(None)?;
     let active = model.get_value(iter, 1).get::<bool>().unwrap_or(None)?;
@@ -127,7 +108,7 @@ fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid) -> (gtk::Box, FileV
 
     let tx = tx.clone();
     close_btn.connect_clicked(move |_| {
-        tx.send(Msg::CloseTab(id));
+        tx.send(Msg::CloseTab(id)).expect("Could not send close tab msg");
     });
 
     tab_header.show_all();
@@ -166,7 +147,7 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
     dlg.add_button("_Cancel", ResponseType::Cancel);
     dlg.add_button("_Open", ResponseType::Accept);
 
-    kube_action.connect_activate(move |a,b| {
+    kube_action.connect_activate(move |_,_| {
         service_model.clear();
         if let Ok(pods) = get_pods() {
             for pod in pods {
@@ -193,7 +174,7 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
                     }
                 }
             }
-            tx.send(Msg::CreateTab(FileViewData::Kube(models)));
+            tx.send(Msg::CreateTab(FileViewData::Kube(models))).expect("Could not send create tab msg");
         }
 
     });
@@ -210,7 +191,7 @@ fn create_open_dlg_action(tx: Sender<Msg>) -> SimpleAction {
         dialog.close();
         if res == ResponseType::Accept {
             if let Some(file_path) = dialog.get_filename() {
-                tx.send(Msg::CreateTab(FileViewData::File(file_path)));
+                tx.send(Msg::CreateTab(FileViewData::File(file_path))).expect("Could not send create tab msg");
             }
         }
     });
@@ -234,13 +215,13 @@ fn main() {
 
         let tx2 = tx.clone();
         app.connect_shutdown(move|_| {
-            tx2.send(Msg::Exit);
+            tx2.send(Msg::Exit).expect("Could not send exit msg");
         });
 
         let exit_action = SimpleAction::new("quit", None); {
             let tx = tx.clone();
             exit_action.connect_activate(move |_a, _b| {
-                tx.send(Msg::Exit);
+                tx.send(Msg::Exit).expect("Could not send exit msg");
             });
             app.add_action(&exit_action);
         }

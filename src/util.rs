@@ -235,7 +235,7 @@ pub fn get_pods() -> Result<Vec<String>, Box<dyn Error>> {
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let mut cmd = cmd
+    let cmd = cmd
         .stdout(Stdio::piped())
         .arg("get")
         .arg("pods")

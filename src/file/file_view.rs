@@ -8,39 +8,37 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
-use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult, CREATE_NO_WINDOW, get_encoding};
+use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
 use crate::{FileViewMsg, SearchResult, FileViewData};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
-use std::process::Stdio;
-use std::io::{Read, Write, BufReader};
-use std::thread::JoinHandle;
 use subprocess::{PopenConfig, Redirection, Popen};
 use uuid::Uuid;
 
 pub struct FileView {
     container: gtk::Box,
-    stop_handle: Arc<(Mutex<bool>, Condvar)>,
     text_view: Rc<sourceview::View>,
-    thread_action_sender: std::sync::mpsc::Sender<FileThreadMsg>,
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<Rule>,
     kube_log_process: Option<Popen>,
     kube_log_path: Option<PathBuf>,
+    stop_handle: Option<Arc<(Mutex<bool>, Condvar)>>,
+    thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
 }
 
 impl FileView {
-    pub fn new<T>(data: FileViewData, sender: T) -> Self
+    pub fn start<T>(&mut self, data: FileViewData, sender: T, default_rules: Vec<Rule>)
         where T : 'static + Send + Clone + Fn(FileViewMsg)
     {
         let (thread_action_sender, thread_action_receiver) =
             std::sync::mpsc::channel::<FileThreadMsg>();
 
+        self.thread_action_sender = Some(thread_action_sender);
+        self.apply_rules(default_rules);
+
         let stop_handle = Arc::new((Mutex::new(false), Condvar::new()));
 
         let file_thread_tx = sender.clone();
-        let mut kube_log_process = None;
-        let mut kube_log_path = None;
         match data {
             FileViewData::File(path) => {
                 let path = path.clone();
@@ -66,9 +64,9 @@ impl FileView {
                     };
 
                     #[cfg(target_family = "windows")]
-                    {
-                        cfg.creation_flags = CREATE_NO_WINDOW;
-                    }
+                        {
+                            cfg.creation_flags = CREATE_NO_WINDOW;
+                        }
 
                     let template = if services.len() == 1 {
                         "{{.Message}}"
@@ -78,16 +76,19 @@ impl FileView {
 
                     let process = subprocess::Popen::create(&["stern", "--since", "12h", "--template", template, &services.join("|")], cfg).unwrap();
 
-                    kube_log_process = Some(process);
+                    self.kube_log_process = Some(process);
                 }
 
                 register_file_watcher_thread(move |msg| {
                     file_thread_tx(msg);
                 }, &tmp_file, stop_handle.clone(), thread_action_receiver);
-                kube_log_path = Some(tmp_file);
+                self.kube_log_path = Some(tmp_file);
             }
         }
 
+        self.stop_handle = Some(stop_handle);
+    }
+    pub fn new() -> Self {
         let tag_table = TextTagTable::new();
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));
         let tv = sourceview::View::new_with_buffer(&text_buffer);
@@ -110,9 +111,11 @@ impl FileView {
             }
         "##;
         let css_provider = gtk::CssProvider::new();
-        css_provider.load_from_data(css.as_bytes());
-        let sc = minimap.get_style_context();
-        sc.add_provider(&css_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        if let Ok(_) = css_provider.load_from_data(css.as_bytes()) {
+            let sc = minimap.get_style_context();
+            sc.add_provider(&css_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        }
+
 
 
         let text_view = Rc::new(tv);
@@ -127,18 +130,14 @@ impl FileView {
 
         Self {
             container,
-            stop_handle,
             text_view,
-            thread_action_sender,
             autoscroll_handler: None,
             rules: vec![],
-            kube_log_process,
-            kube_log_path
+            kube_log_process: None,
+            kube_log_path: None,
+            thread_action_sender: None,
+            stop_handle: None,
         }
-    }
-
-    pub fn set_rules(&mut self, rules: Vec<Rule>) {
-        self.rules = rules;
     }
 
     pub fn update(&mut self, msg: FileViewMsg) {
@@ -215,11 +214,13 @@ impl FileView {
             }
         }
         self.rules = rules;
-        self.thread_action_sender.send(FileThreadMsg::ApplyRules(RuleChanges {
-            add,
-            remove,
-            update
-        })).expect("Could not send apply rules");
+        if let Some(thread_action_sender) = self.thread_action_sender.as_ref() {
+            thread_action_sender.send(FileThreadMsg::ApplyRules(RuleChanges {
+                add,
+                remove,
+                update
+            })).expect("Could not send apply rules");
+        }
     }
 
     pub fn toggle_autoscroll(&mut self, enable: bool) {
@@ -368,10 +369,13 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
 
 impl Drop for FileView {
     fn drop(&mut self) {
-        let &(ref lock, ref cvar) = self.stop_handle.as_ref();
-        let mut stop = lock.lock().unwrap();
-        *stop = true;
-        cvar.notify_one();
+        if let Some(stop_handle) = self.stop_handle.take() {
+            let &(ref lock, ref cvar) = stop_handle.as_ref();
+            let mut stop = lock.lock().unwrap();
+            *stop = true;
+            cvar.notify_one();
+        }
+
         if let Some(mut p) = self.kube_log_process.take() {
             println!("Waiting process to exit");
             match p.kill() {
