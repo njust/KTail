@@ -19,6 +19,13 @@ pub struct FileViewWorkbench {
 pub fn get_default_rules() -> Vec<Rule> {
     vec![
         Rule {
+            id: Uuid::parse_str(SEARCH_ID).unwrap(),
+            regex: None,
+            color: Some(String::from("rgba(229,190,90,1)")),
+            name: Some(String::from("Search")),
+            is_system: true
+        },
+        Rule {
             id: Uuid::new_v4(),
             regex: Some(r".*\s((?i)error|fatal(?-i))\s.*".into()),
             color: Some(String::from("rgba(191,64,64,1)")),
@@ -61,13 +68,6 @@ impl FileViewWorkbench {
             rule_msg(WorkbenchViewMsg::RuleViewMsg(msg));
         });
 
-        &rules_view.add_rule(Rule {
-            id: Uuid::parse_str(SEARCH_ID).unwrap(),
-            regex: None,
-            color: Some(String::from("rgba(229,190,90,1)")),
-            name: Some(String::from("Search")),
-            is_system: true
-        });
         rules_view.add_rules(default_rules);
 
         Self {

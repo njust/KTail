@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 use glib::{SignalHandlerId, Value};
 use std::path::PathBuf;
-use std::io::{BufReader, SeekFrom, Read, Seek};
+use std::io::{BufReader, SeekFrom, Read, Seek, BufRead};
 use std::error::Error;
 use encoding::all::{UTF_8, UTF_16LE, UTF_16BE};
 use encoding::{DecoderTrap};
@@ -60,7 +60,22 @@ pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encod
         reader.seek(SeekFrom::Start(start))?;
     }
 
-    let read_bytes = reader.read_to_end(&mut buffer)?;
+    let mut read_bytes = 0;
+    loop {
+        let mut tmp = vec![];
+        let read = reader.read_until(b'\n', &mut tmp)?;
+
+        if read <= 0 {
+            break;
+        }
+        let last = tmp[tmp.len() -1];
+        if last == b'\n' {
+            buffer.append(&mut tmp);
+            read_bytes += read;
+        }
+
+    }
+    
     let encoding = if let Some(encoding) = encoding {
         encoding
     }else {

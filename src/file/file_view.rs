@@ -23,7 +23,7 @@ pub struct FileView {
     kube_log_process: Option<Popen>,
     kube_log_path: Option<PathBuf>,
     stop_handle: Option<Arc<(Mutex<bool>, Condvar)>>,
-    thread_action_sender: Option<std::sync::mpsc::SyncSender<FileThreadMsg>>,
+    thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
 }
 
 impl FileView {
@@ -31,7 +31,7 @@ impl FileView {
         where T : 'static + Send + Clone + Fn(FileViewMsg)
     {
         let (thread_action_sender, thread_action_receiver) =
-            std::sync::mpsc::sync_channel::<FileThreadMsg>(1);
+            std::sync::mpsc::channel::<FileThreadMsg>();
 
         self.thread_action_sender = Some(thread_action_sender);
         self.apply_rules(default_rules);
@@ -167,6 +167,7 @@ impl FileView {
         let mut remove = vec![];
         let mut update = vec![];
 
+        rules.sort_by_key(|i| i.id);
         let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
         for compare_result in compare_results {
             let text_view = self.text_view.clone();
