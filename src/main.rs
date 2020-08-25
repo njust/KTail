@@ -69,18 +69,20 @@ pub enum RuleViewMsg {
     DeleteRule,
 }
 
+#[derive(Debug)]
 pub struct SearchResultMatch {
     pub line: usize,
     pub start: usize,
     pub end: usize,
 }
 
+#[derive(Debug)]
 pub struct SearchResult {
     tag: String,
-    with_offset: bool,
     matches: Vec<SearchResultMatch>,
 }
 
+#[derive(Debug)]
 pub enum FileViewMsg {
     Data(u64, String, Vec<SearchResult>),
     Clear,

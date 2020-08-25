@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
-use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult};
+use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult, CREATE_NO_WINDOW};
 use crate::{FileViewMsg, SearchResult, FileViewData};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
@@ -23,7 +23,7 @@ pub struct FileView {
     kube_log_process: Option<Popen>,
     kube_log_path: Option<PathBuf>,
     stop_handle: Option<Arc<(Mutex<bool>, Condvar)>>,
-    thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
+    thread_action_sender: Option<std::sync::mpsc::SyncSender<FileThreadMsg>>,
 }
 
 impl FileView {
@@ -31,7 +31,7 @@ impl FileView {
         where T : 'static + Send + Clone + Fn(FileViewMsg)
     {
         let (thread_action_sender, thread_action_receiver) =
-            std::sync::mpsc::channel::<FileThreadMsg>();
+            std::sync::mpsc::sync_channel::<FileThreadMsg>(1);
 
         self.thread_action_sender = Some(thread_action_sender);
         self.apply_rules(default_rules);
@@ -48,13 +48,11 @@ impl FileView {
             }
             FileViewData::Kube(services) => {
                 let tmp_file = std::env::temp_dir().join(Uuid::new_v4().to_string());
-                {
-                    std::fs::File::create(&tmp_file).unwrap();
-                }
-
+                println!("{:?}", tmp_file);
                 if let Ok(file) = std::fs::OpenOptions::new()
                     .write(true)
                     .append(true)
+                    .create(true)
                     .open(&tmp_file) {
 
                     let mut cfg = PopenConfig {
@@ -99,7 +97,7 @@ impl FileView {
         let minimap = sourceview::MapBuilder::new()
             .vexpand_set(true)
             .view(&tv)
-            .width_request(200)
+            .width_request(180)
             .buffer(&text_buffer)
             .highlight_current_line(true)
             .build();
@@ -107,7 +105,7 @@ impl FileView {
         minimap.set_widget_name("minimap");
         let css = r##"
             #minimap {
-                  font: 2.5px "Monospace";
+                  font: 3px "Monospace";
             }
         "##;
         let css_provider = gtk::CssProvider::new();
@@ -115,8 +113,6 @@ impl FileView {
             let sc = minimap.get_style_context();
             sc.add_provider(&css_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
         }
-
-
 
         let text_view = Rc::new(tv);
         let scroll_wnd = ScrolledWindow::new(text_view.get_hadjustment().as_ref(), text_view.get_vadjustment().as_ref());
@@ -145,17 +141,12 @@ impl FileView {
             FileViewMsg::Data(read, data, search_result_list) => {
                 if let Some(buffer) = &self.text_view.get_buffer() {
                     let (_start, mut end) = buffer.get_bounds();
-                    let line_offset = end.get_line();
                     if read > 0 {
                         buffer.insert(&mut end, &data);
                     }
                     for search_result in search_result_list {
                         for search_match in search_result.matches {
-                            let line = if search_result.with_offset {
-                                line_offset + search_match.line as i32
-                            } else {
-                                search_match.line as i32
-                            };
+                            let line = search_match.line as i32;
                             let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
                             let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
                             buffer.apply_tag_by_name(&search_result.tag, &iter_start, &iter_end);
@@ -280,7 +271,7 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                             }
                             active_rules.push(ActiveRule {
                                 rule: new.clone(),
-                                is_new: true,
+                                line_offset: 0,
                             });
                         }
                         for remove in &changes.remove {
@@ -290,16 +281,13 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                         }
 
                         for update in &changes.update {
-                            if let Some((idx, _search)) = active_rules.iter().enumerate().find(|(_, item)| item.rule.id == update.id) {
+                            if let Some((_idx, search)) = active_rules.iter_mut().enumerate().find(|(_, item)| item.rule.id == update.id) {
                                 if update.regex.is_some() {
                                     read_full_file = true;
-                                }
+                                    search.rule.regex = update.regex.clone();
+                                    search.line_offset = 0;
 
-                                active_rules.remove(idx);
-                                active_rules.push(ActiveRule {
-                                    rule: update.clone(),
-                                    is_new: true,
-                                });
+                                }
                             }
                         }
                     }
@@ -311,34 +299,29 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                 if result.encoding.is_some() {
                     encoding = result.encoding;
                 }
-
                 let content = result.data;
                 let read_bytes = result.read_bytes;
                 let read_utf8 = content.as_bytes().len();
+
                 let mut re_list_matches = vec![];
                 for search_data in active_rules.iter_mut() {
-                    let search_content = if search_data.is_new {
-                        &content[0..]
-                    } else {
-                        if read_utf8 > utf8_byte_offset {
-                            &content[utf8_byte_offset..]
-                        } else {
-                            &content[0..]
-                        }
-                    };
+                    let search_content= content.as_str();
 
                     if let Some(regex) = &search_data.rule.regex {
-                        if regex.len() > 0 {
-                            let matches = search(search_content, regex).unwrap_or(vec![]);
-                            if matches.len() > 0 {
-                                re_list_matches.push(SearchResult {
-                                    matches,
-                                    tag: search_data.rule.id.to_string(),
-                                    with_offset: !search_data.is_new,
-                                });
+                        if regex.len() > 0 && search_content.len() > 0 {
+                            if let Ok(search_result) = search(search_content, regex, search_data.line_offset, read_full_file) {
+                                search_data.line_offset += search_result.lines;
+
+                                if search_result.matches.len() > 0 {
+                                    re_list_matches.push(SearchResult {
+                                        matches: search_result.matches,
+                                        tag: search_data.rule.id.to_string(),
+                                    });
+                                }
+
                             }
                         }
-                        search_data.is_new = false;
+
                     }
                 }
 

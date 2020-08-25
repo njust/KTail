@@ -20,16 +20,14 @@ pub fn get_default_rules() -> Vec<Rule> {
     vec![
         Rule {
             id: Uuid::new_v4(),
-            // regex: Some(r".*\s((?i)get(?-i))\s.*".into()),
-            regex: Some(r".*((?i)get(?-i)).*".into()),
+            regex: Some(r".*\s((?i)error|fatal(?-i))\s.*".into()),
             color: Some(String::from("rgba(191,64,64,1)")),
             name: Some(String::from("Error")),
             is_system: false
         },
         Rule {
             id: Uuid::new_v4(),
-            regex: Some(r".*((?i)post(?-i)).*".into()),
-            // regex: Some(r".*\s((?i)warning(?-i))\s.*".into()),
+            regex: Some(r".*\s((?i)warn(?-i))\s.*".into()),
             color: Some(String::from("rgba(207,111,57,1)")),
             name: Some(String::from("Warning")),
             is_system: false

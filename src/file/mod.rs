@@ -5,7 +5,7 @@ use crate::rules::{Rule};
 
 
 struct ActiveRule {
-    is_new: bool,
+    line_offset: usize,
     rule: Rule,
 }
 

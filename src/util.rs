@@ -46,6 +46,11 @@ pub struct ReadResult {
     pub encoding: Option<&'static dyn encoding::types::Encoding>
 }
 
+pub struct SearchResult {
+    pub lines: usize,
+    pub matches: Vec<SearchResultMatch>,
+}
+
 pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encoding::types::Encoding>) -> Result<ReadResult, Box<dyn Error>> {
     let file = std::fs::File::open(path)?;
 
@@ -63,8 +68,6 @@ pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encod
     };
 
     let data = encoding.decode(buffer.as_slice(), DecoderTrap::Replace)?;
-    let data = data.replace("\n\r", "\n");
-    let data = data.replace("\r\n", "\n");
 
     Ok(ReadResult {
         read_bytes: read_bytes as u64,
@@ -73,19 +76,26 @@ pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encod
     })
 }
 
-pub fn search(text: &str, search: &str) -> Result<Vec<SearchResultMatch>, Box<dyn Error>> {
+pub fn search(text: &str, search: &str, line_offset: usize, skip_to_offset: bool) -> Result<SearchResult, Box<dyn Error>> {
     let re = Regex::new(search)?;
     let mut matches = vec![];
-    for (n, line) in text.lines().enumerate() {
+    let mut line_cnt = 0;
+    let skip = if skip_to_offset { line_offset } else { 0 };
+    let lines = text.lines().enumerate().skip(skip);
+    for (n, line) in lines {
+        line_cnt = n;
         for mat in re.find_iter(&line) {
             matches.push(SearchResultMatch {
-                line: n,
+                line: n + line_offset,
                 start: mat.start(),
                 end: mat.end()
             });
         }
     }
-    Ok(matches)
+    Ok(SearchResult {
+        lines: line_cnt +1,
+        matches,
+    })
 }
 
 pub struct SortedListCompare<'a, 'b, T: PartialOrd> {
