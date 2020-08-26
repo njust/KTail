@@ -107,8 +107,13 @@ pub fn search(text: &str, search: &str, line_offset: usize, skip_to_offset: bool
             });
         }
     }
+    let line_offset = if line_cnt > 0 {
+        line_cnt + 1
+    }else {
+        0
+    };
     Ok(SearchResult {
-        lines: line_cnt +1,
+        lines: line_offset,
         matches,
     })
 }
