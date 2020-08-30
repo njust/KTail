@@ -1,6 +1,4 @@
-use gtk::{
-    prelude::*,
-};
+use gtk::{prelude::*, WrapMode};
 
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::time::Duration;
@@ -97,7 +95,7 @@ impl FileView {
         let minimap = sourceview::MapBuilder::new()
             .vexpand_set(true)
             .view(&tv)
-            .width_request(180)
+            .width_request(220)
             .buffer(&text_buffer)
             .highlight_current_line(true)
             .build();
@@ -105,7 +103,8 @@ impl FileView {
         minimap.set_widget_name("minimap");
         let css = r##"
             #minimap {
-                  font: 3px "Monospace";
+                  font: 1px "Monospace";
+                  color: rgba(1,1,1,0.5);
             }
         "##;
         let css_provider = gtk::CssProvider::new();
@@ -253,8 +252,16 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
         let mut active_rules = vec![];
         let mut encoding: Option<&'static dyn encoding::types::Encoding> = None;
         while !*stopped {
+            if !path.exists() {
+                continue;
+            }
+
             if let Ok(metadata) = std::fs::metadata(&path) {
                 let len = metadata.len();
+                if len <= 0 {
+                    continue;
+                }
+
                 if len < file_byte_offset {
                     file_byte_offset = 0;
                     utf8_byte_offset = 0;
@@ -287,7 +294,8 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                                     read_full_file = true;
                                     search.rule.regex = update.regex.clone();
                                     search.line_offset = 0;
-
+                                }else {
+                                    search.rule.regex.take();
                                 }
                             }
                         }

@@ -82,7 +82,10 @@ pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encod
         get_encoding(&buffer)
     };
 
-    let data = encoding.decode(buffer.as_slice(), DecoderTrap::Replace)?;
+    let mut data = encoding.decode(buffer.as_slice(), DecoderTrap::Ignore)?;
+    data = data.replace("\n\r", "\n");
+    data = data.replace("", "");
+
 
     Ok(ReadResult {
         read_bytes: read_bytes as u64,
@@ -107,11 +110,13 @@ pub fn search(text: &str, search: &str, line_offset: usize, skip_to_offset: bool
             });
         }
     }
-    let line_offset = if line_cnt > 0 {
-        line_cnt + 1
+
+    let line_offset = if skip_to_offset && line_offset != 0 {
+        line_cnt
     }else {
-        0
+        line_cnt + 1
     };
+
     Ok(SearchResult {
         lines: line_offset,
         matches,
