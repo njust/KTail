@@ -6,7 +6,6 @@ use std::error::Error;
 use encoding::all::{UTF_8, UTF_16LE, UTF_16BE};
 use encoding::{DecoderTrap};
 use glib::bitflags::_core::cmp::Ordering;
-use regex::Regex;
 use crate::{SearchResultMatch, TaggedSearchResult};
 use serde::Deserialize;
 use std::process::{Command, Stdio};
@@ -52,7 +51,31 @@ pub struct SearchResult {
     pub matches: Vec<SearchResultMatch>,
 }
 
-pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encoding::types::Encoding>) -> Result<ReadResult, Box<dyn Error>> {
+pub fn decode_data(buffer: &[u8], encoding: Option<&'static dyn encoding::types::Encoding>) -> Result<ReadResult, Box<dyn Error>> {
+    let encoding = if let Some(encoding) = encoding {
+        encoding
+    }else {
+        get_encoding(&buffer)
+    };
+
+    let mut data = encoding.decode(buffer, DecoderTrap::Ignore)?;
+    // let re = Regex::new("\n\r|\r\n|\r")?;
+    // data = re.replace_all(&data, "").to_string();
+    data = data.replace("\n\r", "\n");
+    data = data.replace("\r\n", "\n");
+    data = data.replace("\r", "\n");
+    data = data.replace("", "");
+
+
+    let read_bytes = buffer.len() as u64;
+    Ok(ReadResult {
+        read_bytes,
+        data,
+        encoding: if read_bytes > 0 {Some(encoding) } else {None}
+    })
+}
+
+pub fn read_file(path: &PathBuf, start: u64) -> Result<Vec<u8>, Box<dyn Error>> {
     let file = std::fs::File::open(path)?;
 
     let mut reader = BufReader::new(file);
@@ -66,9 +89,10 @@ pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encod
         let mut tmp = vec![];
         let read = reader.read_until(b'\n', &mut tmp)?;
 
-        if read <= 0 {
+        if read <= 0 || read_bytes > (1024 * 500) {
             break;
         }
+
         let last = tmp[tmp.len() -1];
         if last == b'\n' {
             buffer.append(&mut tmp);
@@ -76,62 +100,20 @@ pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encod
         }
 
     }
-    
-    let encoding = if let Some(encoding) = encoding {
-        encoding
-    }else {
-        get_encoding(&buffer)
-    };
 
-    let mut data = encoding.decode(buffer.as_slice(), DecoderTrap::Ignore)?;
-    // let re = Regex::new("\n\r|\r\n|\r")?;
-    // data = re.replace_all(&data, "").to_string();
-    data = data.replace("\n\r", "\n");
-    data = data.replace("\r\n", "\n");
-    data = data.replace("\r", "\n");
-    data = data.replace("", "");
-
-
-    Ok(ReadResult {
-        read_bytes: read_bytes as u64,
-        data,
-        encoding: if read_bytes > 0 {Some(encoding) } else {None}
-    })
+    Ok(buffer)
 }
-
-pub fn search(text: &str, re: &Regex, line_offset: usize, skip_to_offset: bool) -> Result<SearchResult, Box<dyn Error>> {
-    let mut matches = vec![];
-    let mut line_cnt = 0;
-    let skip = if skip_to_offset { line_offset } else { 0 };
-    let lines = text.split("\n");
-    let lines = lines.enumerate().skip(skip);
-    for (n, line) in lines {
-        line_cnt = n;
-        for mat in re.find_iter(&line) {
-            matches.push(SearchResultMatch {
-                line: n + line_offset,
-                start: mat.start(),
-                end: mat.end()
-            });
-        }
-    }
-
-    Ok(SearchResult {
-        lines: line_cnt,
-        matches,
-    })
-}
-
 
 pub struct SearchResultData {
     pub lines: usize,
     pub results: Vec<TaggedSearchResult>,
 }
 
-pub fn search2(text: &str, active_rules: &mut Vec<ActiveRule>) -> Result<SearchResultData, Box<dyn Error>> {
+pub fn search(text: &str, active_rules: &mut Vec<ActiveRule>, line_offset: usize) -> Result<SearchResultData, Box<dyn Error>> {
     let mut re_list_matches = vec![];
     let lines = text.split("\n").enumerate();
     let mut line_cnt = 0;
+
     for (n, line) in lines {
         line_cnt = n;
         for search_data in active_rules.iter_mut() {
@@ -144,7 +126,7 @@ pub fn search2(text: &str, active_rules: &mut Vec<ActiveRule>) -> Result<SearchR
                 if text.len() > 0 {
                     for mat in regex.find_iter(&line) {
                         matches.push(SearchResultMatch {
-                            line: n + search_data.line_offset,
+                            line: n + line_offset,
                             start: mat.start(),
                             end: mat.end()
                         });

@@ -1,4 +1,4 @@
-use gtk::{prelude::*, WrapMode};
+use gtk::{prelude::*};
 
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::time::Duration;
@@ -6,8 +6,8 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
-use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult, CREATE_NO_WINDOW};
-use crate::{FileViewMsg, TaggedSearchResult, FileViewData};
+use crate::util::{enable_auto_scroll, read_file, SortedListCompare, CompareResult, CREATE_NO_WINDOW, search, decode_data};
+use crate::{FileViewMsg, FileViewData};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
 use subprocess::{PopenConfig, Redirection, Popen};
@@ -168,6 +168,7 @@ impl FileView {
         let mut update = vec![];
 
         rules.sort_by_key(|i| i.id);
+        let init = self.rules.len() <= 0;
         let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
         for compare_result in compare_results {
             let text_view = self.text_view.clone();
@@ -205,12 +206,22 @@ impl FileView {
                 }
             }
         }
+        let mut data :Option<String> = None;
+        if !init {
+            let text_view = self.text_view.clone();
+            if let Some(tb) = text_view.get_buffer() {
+                let (start, end) = tb.get_bounds();
+                data = tb.get_text(&start, &end, false).map(|s|s.to_string());
+            }
+        }
+
         self.rules = rules;
         if let Some(thread_action_sender) = self.thread_action_sender.as_ref() {
             thread_action_sender.send(FileThreadMsg::ApplyRules(RuleChanges {
                 add,
                 remove,
-                update
+                update,
+                data,
             })).expect("Could not send apply rules");
         }
     }
@@ -246,7 +257,7 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
     let path = path.clone();
     std::thread::spawn(move || {
         let mut file_byte_offset = 0;
-        let mut utf8_byte_offset = 0;
+        let mut line_offset = 0;
         let (lock, wait_handle) = thread_stop_handle.as_ref();
         let mut stopped = lock.lock().unwrap();
 
@@ -265,18 +276,19 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
 
                 if len < file_byte_offset {
                     file_byte_offset = 0;
-                    utf8_byte_offset = 0;
+                    line_offset = 0;
                     sender(FileViewMsg::Clear);
                 }
             }
 
-            let mut read_full_file = false;
+            let mut full_search_data = None;
             if let Some(msg) = rx.try_iter().peekable().peek() {
                 match msg {
                     FileThreadMsg::ApplyRules(changes) => {
+                        full_search_data = changes.data.clone();
                         for new in &changes.add {
                             let regex = if let Some(regex) = new.regex.as_ref() {
-                                read_full_file = true;
+
                                 Some(Regex::new(regex).unwrap())
                             }else {
                                 None
@@ -298,7 +310,7 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                             let sid = update.id.to_string();
                             if let Some((_idx, search)) = active_rules.iter_mut().enumerate().find(|(_, item)| item.id == sid) {
                                 if let Some(regex) = update.regex.as_ref() {
-                                    read_full_file = true;
+
                                     search.line_offset = 0;
                                     search.regex = Some(Regex::new(regex).unwrap())
                                 }else {
@@ -310,54 +322,24 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                 }
             }
 
-            let tmp_file_offset = if read_full_file { 0 } else { file_byte_offset };
-            if let Ok(result) = read_file(&path, tmp_file_offset, encoding) {
-                if result.encoding.is_some() {
-                    encoding = result.encoding;
+            if let Some(data) = full_search_data {
+                if let Ok(r) = search(&data, &mut active_rules, 0) {
+                    sender(FileViewMsg::Data(0, data, r.results));
                 }
-                let content = result.data;
-                let read_bytes = result.read_bytes;
-                let read_utf8 = content.as_bytes().len();
-
-                let mut re_list_matches = vec![];
-                for search_data in active_rules.iter_mut() {
-                    let search_content= content.as_str();
-
-                    if let Some(regex) = &search_data.regex {
-                        if search_content.len() > 0 {
-                            if let Ok(search_result) = search(search_content, &regex, search_data.line_offset, read_full_file) {
-                                search_data.line_offset += search_result.lines;
-
-                                if search_result.matches.len() > 0 {
-                                    re_list_matches.push(TaggedSearchResult {
-                                        matches: search_result.matches,
-                                        tag: search_data.id.clone(),
-                                    });
-                                }
-
-                            }
+            } else {
+                if let Ok(data) = read_file(&path,  file_byte_offset) {
+                    if let Ok(result) = decode_data(&data, encoding) {
+                        file_byte_offset += result.read_bytes;
+                        if result.encoding.is_some() {
+                            encoding = result.encoding;
                         }
 
+                        if let Ok(r) = search(&result.data, &mut active_rules, line_offset) {
+                            line_offset += r.lines;
+                            sender(FileViewMsg::Data(result.read_bytes, result.data, r.results));
+                        }
                     }
                 }
-
-                let delta_content = if read_full_file {
-                    let res = if read_bytes >= file_byte_offset {
-                        &content[utf8_byte_offset as usize..]
-                    } else {
-                        &content[0..]
-                    };
-
-                    utf8_byte_offset = read_utf8;
-                    file_byte_offset = read_bytes;
-                    res
-                } else {
-                    utf8_byte_offset += read_utf8;
-                    file_byte_offset += read_bytes;
-                    &content[0..]
-                };
-
-                sender(FileViewMsg::Data(read_bytes, String::from(delta_content), re_list_matches));
             }
 
             stopped = wait_handle.wait_timeout(stopped, Duration::from_millis(500)).unwrap().0;
