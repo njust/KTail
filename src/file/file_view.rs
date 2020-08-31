@@ -7,11 +7,12 @@ use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, read_file, search, SortedListCompare, CompareResult, CREATE_NO_WINDOW};
-use crate::{FileViewMsg, SearchResult, FileViewData};
+use crate::{FileViewMsg, TaggedSearchResult, FileViewData};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
 use subprocess::{PopenConfig, Redirection, Popen};
 use uuid::Uuid;
+use regex::Regex;
 
 pub struct FileView {
     container: gtk::Box,
@@ -274,28 +275,34 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                 match msg {
                     FileThreadMsg::ApplyRules(changes) => {
                         for new in &changes.add {
-                            if new.regex.is_some() {
+                            let regex = if let Some(regex) = new.regex.as_ref() {
                                 read_full_file = true;
-                            }
+                                Some(Regex::new(regex).unwrap())
+                            }else {
+                                None
+                            };
+
                             active_rules.push(ActiveRule {
-                                rule: new.clone(),
+                                id: new.id.to_string(),
                                 line_offset: 0,
+                                regex
                             });
                         }
                         for remove in &changes.remove {
-                            if let Some((idx, _item)) = active_rules.iter().enumerate().find(|(_, e)| &e.rule.id.to_string() == remove) {
+                            if let Some((idx, _item)) = active_rules.iter().enumerate().find(|(_, e)| &e.id == remove) {
                                 active_rules.remove(idx);
                             }
                         }
 
                         for update in &changes.update {
-                            if let Some((_idx, search)) = active_rules.iter_mut().enumerate().find(|(_, item)| item.rule.id == update.id) {
-                                if update.regex.is_some() {
+                            let sid = update.id.to_string();
+                            if let Some((_idx, search)) = active_rules.iter_mut().enumerate().find(|(_, item)| item.id == sid) {
+                                if let Some(regex) = update.regex.as_ref() {
                                     read_full_file = true;
-                                    search.rule.regex = update.regex.clone();
                                     search.line_offset = 0;
+                                    search.regex = Some(Regex::new(regex).unwrap())
                                 }else {
-                                    search.rule.regex.take();
+                                    search.regex.take();
                                 }
                             }
                         }
@@ -316,15 +323,15 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                 for search_data in active_rules.iter_mut() {
                     let search_content= content.as_str();
 
-                    if let Some(regex) = &search_data.rule.regex {
-                        if regex.len() > 0 && search_content.len() > 0 {
-                            if let Ok(search_result) = search(search_content, regex, search_data.line_offset, read_full_file) {
+                    if let Some(regex) = &search_data.regex {
+                        if search_content.len() > 0 {
+                            if let Ok(search_result) = search(search_content, &regex, search_data.line_offset, read_full_file) {
                                 search_data.line_offset += search_result.lines;
 
                                 if search_result.matches.len() > 0 {
-                                    re_list_matches.push(SearchResult {
+                                    re_list_matches.push(TaggedSearchResult {
                                         matches: search_result.matches,
-                                        tag: search_data.rule.id.to_string(),
+                                        tag: search_data.id.clone(),
                                     });
                                 }
 

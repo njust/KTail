@@ -7,12 +7,13 @@ use encoding::all::{UTF_8, UTF_16LE, UTF_16BE};
 use encoding::{DecoderTrap};
 use glib::bitflags::_core::cmp::Ordering;
 use regex::Regex;
-use crate::SearchResultMatch;
+use crate::{SearchResultMatch, TaggedSearchResult};
 use serde::Deserialize;
 use std::process::{Command, Stdio};
 use std::collections::HashSet;
 use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore};
 use std::rc::Rc;
+use crate::file::ActiveRule;
 
 pub const CREATE_NO_WINDOW: u32 = 0x08000000;
 
@@ -98,8 +99,7 @@ pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encod
     })
 }
 
-pub fn search(text: &str, search: &str, line_offset: usize, skip_to_offset: bool) -> Result<SearchResult, Box<dyn Error>> {
-    let re = Regex::new(search)?;
+pub fn search(text: &str, re: &Regex, line_offset: usize, skip_to_offset: bool) -> Result<SearchResult, Box<dyn Error>> {
     let mut matches = vec![];
     let mut line_cnt = 0;
     let skip = if skip_to_offset { line_offset } else { 0 };
@@ -122,6 +122,49 @@ pub fn search(text: &str, search: &str, line_offset: usize, skip_to_offset: bool
     })
 }
 
+
+pub struct SearchResultData {
+    pub lines: usize,
+    pub results: Vec<TaggedSearchResult>,
+}
+
+pub fn search2(text: &str, active_rules: &mut Vec<ActiveRule>) -> Result<SearchResultData, Box<dyn Error>> {
+    let mut re_list_matches = vec![];
+    let lines = text.split("\n").enumerate();
+    let mut line_cnt = 0;
+    for (n, line) in lines {
+        line_cnt = n;
+        for search_data in active_rules.iter_mut() {
+            if search_data.line_offset > n {
+                continue;
+            }
+
+            let mut matches = vec![];
+            if let Some(regex) = &search_data.regex {
+                if text.len() > 0 {
+                    for mat in regex.find_iter(&line) {
+                        matches.push(SearchResultMatch {
+                            line: n + search_data.line_offset,
+                            start: mat.start(),
+                            end: mat.end()
+                        });
+                    }
+
+                    re_list_matches.push(TaggedSearchResult {
+                        matches,
+                        tag: search_data.id.clone()
+                    })
+                }
+            }
+
+        }
+    }
+
+    Ok(SearchResultData {
+        lines: line_cnt,
+        results: re_list_matches
+    })
+}
 
 pub struct SortedListCompare<'a, 'b, T: PartialOrd> {
     lh: &'a Vec<T>,

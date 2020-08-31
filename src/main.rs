@@ -77,14 +77,14 @@ pub struct SearchResultMatch {
 }
 
 #[derive(Debug)]
-pub struct SearchResult {
+pub struct TaggedSearchResult {
     tag: String,
     matches: Vec<SearchResultMatch>,
 }
 
 #[derive(Debug)]
 pub enum FileViewMsg {
-    Data(u64, String, Vec<SearchResult>),
+    Data(u64, String, Vec<TaggedSearchResult>),
     Clear,
 }
 
