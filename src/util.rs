@@ -83,7 +83,11 @@ pub fn read_file(path: &PathBuf, start: u64, encoding: Option<&'static dyn encod
     };
 
     let mut data = encoding.decode(buffer.as_slice(), DecoderTrap::Ignore)?;
+    // let re = Regex::new("\n\r|\r\n|\r")?;
+    // data = re.replace_all(&data, "").to_string();
     data = data.replace("\n\r", "\n");
+    data = data.replace("\r\n", "\n");
+    data = data.replace("\r", "\n");
     data = data.replace("", "");
 
 
@@ -99,7 +103,8 @@ pub fn search(text: &str, search: &str, line_offset: usize, skip_to_offset: bool
     let mut matches = vec![];
     let mut line_cnt = 0;
     let skip = if skip_to_offset { line_offset } else { 0 };
-    let lines = text.lines().enumerate().skip(skip);
+    let lines = text.split("\n");
+    let lines = lines.enumerate().skip(skip);
     for (n, line) in lines {
         line_cnt = n;
         for mat in re.find_iter(&line) {
@@ -111,17 +116,12 @@ pub fn search(text: &str, search: &str, line_offset: usize, skip_to_offset: bool
         }
     }
 
-    let line_offset = if skip_to_offset && line_offset != 0 {
-        line_cnt
-    }else {
-        line_cnt + 1
-    };
-
     Ok(SearchResult {
-        lines: line_offset,
+        lines: line_cnt,
         matches,
     })
 }
+
 
 pub struct SortedListCompare<'a, 'b, T: PartialOrd> {
     lh: &'a Vec<T>,
