@@ -1,4 +1,4 @@
-use gtk::{prelude::*};
+use gtk::{prelude::*, TextView};
 
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::time::Duration;
@@ -7,12 +7,13 @@ use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, read_file, SortedListCompare, CompareResult, CREATE_NO_WINDOW, search, decode_data};
-use crate::{FileViewMsg, FileViewData};
+use crate::{FileViewMsg, FileViewData, SearchResultMatch};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
 use subprocess::{PopenConfig, Redirection, Popen};
 use uuid::Uuid;
 use regex::Regex;
+use std::collections::HashMap;
 
 pub struct FileView {
     container: gtk::Box,
@@ -23,7 +24,11 @@ pub struct FileView {
     kube_log_path: Option<PathBuf>,
     stop_handle: Option<Arc<(Mutex<bool>, Condvar)>>,
     thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
+    result_map: HashMap<String, Vec<SearchResultMatch>>,
+    result_cursor: HashMap<String, usize>,
 }
+
+const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
 
 impl FileView {
     pub fn start<T>(&mut self, data: FileViewData, sender: T, default_rules: Vec<Rule>)
@@ -87,6 +92,10 @@ impl FileView {
     }
     pub fn new() -> Self {
         let tag_table = TextTagTable::new();
+        let current_cursor_tag = gtk::TextTag::new(Some(CURRENT_CURSOR_TAG));
+        current_cursor_tag.set_property_background(Some("red"));
+        tag_table.add(&current_cursor_tag);
+
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));
         let tv = sourceview::View::new_with_buffer(&text_buffer);
         tv.set_editable(false);
@@ -124,6 +133,9 @@ impl FileView {
         container.add(&scroll_wnd);
         container.add(&minimap);
 
+        let result_map: HashMap<String, Vec<SearchResultMatch>> = HashMap::new();
+        let result_cursor: HashMap<String, usize> = HashMap::new();
+
         Self {
             container,
             text_view,
@@ -133,6 +145,58 @@ impl FileView {
             kube_log_path: None,
             thread_action_sender: None,
             stop_handle: None,
+            result_map,
+            result_cursor
+        }
+    }
+
+    fn buffer_set_cursor(text_view: &sourceview::View, search_match: &SearchResultMatch) {
+        if let Some(buffer) = text_view.get_buffer() {
+            let (start, end) = buffer.get_bounds();
+            buffer.remove_tag_by_name(CURRENT_CURSOR_TAG, &start, &end);
+            let line = search_match.line as i32;
+            let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
+            let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
+            buffer.apply_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
+        }
+    }
+
+    pub fn select_prev(&mut self, id: &str) {
+        if let Some(current) = self.result_cursor.get_mut(id) {
+            let prev_pos = if *current > 0 { *current -1 }else {0};
+            if let Some(d) = self.result_map.get(id) {
+                if let Some(next) = d.get(prev_pos) {
+                    Self::buffer_set_cursor(&*self.text_view, &next);
+                }
+            }
+            *current = prev_pos;
+        } else {
+            if let Some(d) = self.result_map.get(id) {
+                if let Some(first) = d.get(d.len() - 1) {
+                    Self::buffer_set_cursor(&*self.text_view, &first);
+                    self.result_cursor.insert(id.to_string(), d.len() - 1);
+                }
+            }
+        }
+    }
+
+    pub fn select_next(&mut self, id: &str) {
+        if let Some(current) = self.result_cursor.get_mut(id) {
+            let mut next_pos = 0;
+            if let Some(d) = self.result_map.get(id) {
+                next_pos = if *current < d.len() -1 { *current +1 }else {0};
+                if let Some(next) = d.get(next_pos) {
+                    Self::buffer_set_cursor(&*self.text_view, &next);
+                }
+            }
+            *current = next_pos;
+        }else {
+            if let Some(d) = self.result_map.get(id) {
+                if let Some(first) = d.get(0) {
+                    Self::buffer_set_cursor(&*self.text_view, &first);
+                    self.result_cursor.insert(id.to_string(), 0);
+                }
+            }
         }
     }
 
@@ -144,12 +208,20 @@ impl FileView {
                     if read > 0 {
                         buffer.insert(&mut end, &data);
                     }
-                    for search_result in search_result_list {
-                        for search_match in search_result.matches {
+                    for (tag, matches) in search_result_list {
+                        if !self.result_map.contains_key(&tag) {
+                            self.result_map.insert(tag.clone(), vec![]);
+                        }
+
+                        let result = self.result_map.get_mut(&tag).expect("Could not get result map");
+
+                        for search_match in matches {
                             let line = search_match.line as i32;
                             let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
                             let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
-                            buffer.apply_tag_by_name(&search_result.tag, &iter_start, &iter_end);
+                            buffer.apply_tag_by_name(&tag, &iter_start, &iter_end);
+
+                            result.push(search_match);
                         }
                     }
                 }
@@ -157,6 +229,8 @@ impl FileView {
             FileViewMsg::Clear => {
                 if let Some(buffer) = &self.text_view.get_buffer() {
                     buffer.set_text("");
+                    self.result_cursor.clear();
+                    self.result_map.clear();
                 }
             }
         }
@@ -178,7 +252,7 @@ impl FileView {
                     if let Some(tags) = text_view.get_buffer()
                         .and_then(|buffer| buffer.get_tag_table()) {
                         let tag = TextTag::new(Some(&new.id.to_string()));
-                        tag.set_property_background(new.color.as_ref().map(|c|c.as_str()));
+                        tag.set_property_foreground(new.color.as_ref().map(|c|c.as_str()));
                         tags.add(&tag);
                     }
                 }
@@ -194,7 +268,7 @@ impl FileView {
                     if let Some(tag) = text_view.get_buffer()
                         .and_then(|buffer| buffer.get_tag_table())
                         .and_then(|tag_table| tag_table.lookup(&left.id.to_string())) {
-                        tag.set_property_background(right.color.as_ref().map(|s|s.as_str()));
+                        tag.set_property_foreground(right.color.as_ref().map(|s|s.as_str()));
                     }
                     if left.regex != right.regex {
                         update.push(right.clone());
@@ -324,7 +398,10 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
 
             if let Some(data) = full_search_data {
                 if let Ok(r) = search(&data, &mut active_rules, 0) {
-                    sender(FileViewMsg::Data(0, data, r.results));
+                    if r.results.len() > 0 {
+                        println!("Results: {}", r.results.len());
+                        sender(FileViewMsg::Data(0, data, r.results));
+                    }
                 }
             } else {
                 if let Ok(data) = read_file(&path,  file_byte_offset) {
@@ -336,7 +413,10 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
 
                         if let Ok(r) = search(&result.data, &mut active_rules, line_offset) {
                             line_offset += r.lines;
-                            sender(FileViewMsg::Data(result.read_bytes, result.data, r.results));
+                            if result.read_bytes > 0 {
+                                println!("Results: {}", r.results.len());
+                                sender(FileViewMsg::Data(result.read_bytes, result.data, r.results));
+                            }
                         }
                     }
                 }

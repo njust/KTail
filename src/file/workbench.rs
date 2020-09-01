@@ -3,7 +3,7 @@ use crate::file::toolbar::FileViewToolbar;
 use gtk::{Orientation, WindowPosition, HeaderBar};
 use crate::rules::{RuleListView, SEARCH_ID, Rule};
 use crate::file::file_view::{FileView};
-use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg, FileViewData};
+use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg, FileViewData, FileViewMsg};
 use std::rc::Rc;
 use uuid::Uuid;
 
@@ -12,6 +12,7 @@ pub struct FileViewWorkbench {
     rules_view: RuleListView,
     file_view: FileView,
     search_text: String,
+    toolbar: FileViewToolbar,
     rules_dlg: Option<gtk::Dialog>,
     sender: Rc<dyn Fn(WorkbenchViewMsg)>
 }
@@ -73,6 +74,7 @@ impl FileViewWorkbench {
         Self {
             container,
             rules_view,
+            toolbar,
             file_view,
             search_text: String::new(),
             rules_dlg: None,
@@ -112,6 +114,12 @@ impl FileViewWorkbench {
                     WorkbenchToolbarMsg::ToggleAutoScroll(enable) => {
                         self.file_view.toggle_autoscroll(enable);
                     }
+                    WorkbenchToolbarMsg::SelectNextMatch => {
+                        self.file_view.select_next(SEARCH_ID);
+                    }
+                    WorkbenchToolbarMsg::SelectPrevMatch => {
+                        self.file_view.select_prev(SEARCH_ID);
+                    }
                 }
             }
             WorkbenchViewMsg::ApplyRules => {
@@ -122,6 +130,13 @@ impl FileViewWorkbench {
                 self.rules_view.update(msg);
             }
             WorkbenchViewMsg::FileViewMsg(msg) => {
+                let chk = &msg;
+                match chk {
+                    FileViewMsg::Data(_,_, matches) => {
+                        self.toolbar.update(&matches);
+                    },
+                    _ => ()
+                }
                 self.file_view.update(msg);
             }
         }

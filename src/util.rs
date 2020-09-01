@@ -6,10 +6,10 @@ use std::error::Error;
 use encoding::all::{UTF_8, UTF_16LE, UTF_16BE};
 use encoding::{DecoderTrap};
 use glib::bitflags::_core::cmp::Ordering;
-use crate::{SearchResultMatch, TaggedSearchResult};
+use crate::{SearchResultMatch};
 use serde::Deserialize;
 use std::process::{Command, Stdio};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore};
 use std::rc::Rc;
 use crate::file::ActiveRule;
@@ -106,14 +106,14 @@ pub fn read_file(path: &PathBuf, start: u64) -> Result<Vec<u8>, Box<dyn Error>> 
 
 pub struct SearchResultData {
     pub lines: usize,
-    pub results: Vec<TaggedSearchResult>,
+    pub results: HashMap<String, Vec<SearchResultMatch>>,
 }
 
 pub fn search(text: &str, active_rules: &mut Vec<ActiveRule>, line_offset: usize) -> Result<SearchResultData, Box<dyn Error>> {
-    let mut re_list_matches = vec![];
     let lines = text.split("\n").enumerate();
     let mut line_cnt = 0;
 
+    let mut matches: HashMap<String, Vec<SearchResultMatch>> = HashMap::new();
     for (n, line) in lines {
         line_cnt = n;
         for search_data in active_rules.iter_mut() {
@@ -121,30 +121,32 @@ pub fn search(text: &str, active_rules: &mut Vec<ActiveRule>, line_offset: usize
                 continue;
             }
 
-            let mut matches = vec![];
-            if let Some(regex) = &search_data.regex {
-                if text.len() > 0 {
-                    for mat in regex.find_iter(&line) {
-                        matches.push(SearchResultMatch {
-                            line: n + line_offset,
-                            start: mat.start(),
-                            end: mat.end()
-                        });
-                    }
+            if !matches.contains_key(&search_data.id) {
+                matches.insert(search_data.id.clone(), vec![]);
+            }
 
-                    re_list_matches.push(TaggedSearchResult {
-                        matches,
-                        tag: search_data.id.clone()
-                    })
+            if let Some(matches) = matches.get_mut(&search_data.id) {
+                if let Some(regex) = &search_data.regex {
+                    if text.len() > 0 {
+                        for mat in regex.find_iter(&line) {
+                            matches.push(SearchResultMatch {
+                                line: n + line_offset,
+                                start: mat.start(),
+                                end: mat.end()
+                            });
+                        }
+
+                    }
                 }
             }
 
         }
     }
 
+
     Ok(SearchResultData {
         lines: line_cnt,
-        results: re_list_matches
+        results: matches
     })
 }
 

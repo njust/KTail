@@ -55,6 +55,8 @@ pub enum WorkbenchToolbarMsg {
     ClearSearchPressed,
     ShowRules,
     ToggleAutoScroll(bool),
+    SelectNextMatch,
+    SelectPrevMatch
 }
 
 pub enum RuleListViewMsg {
@@ -77,14 +79,8 @@ pub struct SearchResultMatch {
 }
 
 #[derive(Debug)]
-pub struct TaggedSearchResult {
-    tag: String,
-    matches: Vec<SearchResultMatch>,
-}
-
-#[derive(Debug)]
 pub enum FileViewMsg {
-    Data(u64, String, Vec<TaggedSearchResult>),
+    Data(u64, String, HashMap<String, Vec<SearchResultMatch>>),
     Clear,
 }
 
