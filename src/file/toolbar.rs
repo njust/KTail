@@ -38,6 +38,25 @@ impl FileViewToolbar {
             toolbar.add(&search_btn);
         }
 
+        let prev_btn = gtk::Button::with_label("Prev"); {
+        let tx = tx.clone();
+        prev_btn.connect_clicked(move |_| {
+            tx(WorkbenchToolbarMsg::SelectPrevMatch);
+        });
+        toolbar.add(&prev_btn);
+    }
+
+        let results = gtk::Label::new(None);
+        toolbar.add(&results);
+
+        let next_btn = gtk::Button::with_label("Next"); {
+        let tx = tx.clone();
+        next_btn.connect_clicked(move |_| {
+            tx(WorkbenchToolbarMsg::SelectNextMatch);
+        });
+        toolbar.add(&next_btn);
+    }
+
         let show_rules_btn = Button::with_label("Highlighters"); {
             let tx = tx.clone();
             show_rules_btn.connect_clicked(move |_| {
@@ -54,26 +73,6 @@ impl FileViewToolbar {
 
             toggle_auto_scroll_btn.set_image(Some(&gtk::Image::from_icon_name(Some("go-bottom-symbolic"), IconSize::Menu)));
             toolbar.add(&toggle_auto_scroll_btn);
-        }
-
-
-        let prev_btn = gtk::Button::with_label("Prev"); {
-            let tx = tx.clone();
-            prev_btn.connect_clicked(move |_| {
-                tx(WorkbenchToolbarMsg::SelectPrevMatch);
-            });
-            toolbar.add(&prev_btn);
-        }
-
-        let results = gtk::Label::new(None);
-        toolbar.add(&results);
-
-        let next_btn = gtk::Button::with_label("Next"); {
-            let tx = tx.clone();
-            next_btn.connect_clicked(move |_| {
-                tx(WorkbenchToolbarMsg::SelectNextMatch);
-            });
-            toolbar.add(&next_btn);
         }
 
         Self {

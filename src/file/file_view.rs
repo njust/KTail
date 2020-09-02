@@ -93,8 +93,9 @@ impl FileView {
     pub fn new() -> Self {
         let tag_table = TextTagTable::new();
         let current_cursor_tag = gtk::TextTag::new(Some(CURRENT_CURSOR_TAG));
-        current_cursor_tag.set_property_background(Some("red"));
+        current_cursor_tag.set_property_background(Some("green"));
         tag_table.add(&current_cursor_tag);
+        current_cursor_tag.set_priority(tag_table.get_size() - 1);
 
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));
         let tv = sourceview::View::new_with_buffer(&text_buffer);
@@ -150,14 +151,17 @@ impl FileView {
         }
     }
 
-    fn buffer_set_cursor(text_view: &sourceview::View, search_match: &SearchResultMatch) {
+    fn buffer_set_or_remove_cursor(text_view: &sourceview::View, search_match: &SearchResultMatch, set: bool) {
         if let Some(buffer) = text_view.get_buffer() {
-            let (start, end) = buffer.get_bounds();
-            buffer.remove_tag_by_name(CURRENT_CURSOR_TAG, &start, &end);
             let line = search_match.line as i32;
-            let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
+            let mut iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
             let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
-            buffer.apply_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
+            if set {
+                buffer.apply_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
+                text_view.scroll_to_iter(&mut iter_start, 0.0, true, 0.5, 0.5);
+            }else {
+                buffer.remove_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
+            }
         }
     }
 
@@ -165,15 +169,18 @@ impl FileView {
         if let Some(current) = self.result_cursor.get_mut(id) {
             let prev_pos = if *current > 0 { *current -1 }else {0};
             if let Some(d) = self.result_map.get(id) {
+                if let Some(prev) = d.get(*current) {
+                    Self::buffer_set_or_remove_cursor(&*self.text_view, &prev, false);
+                }
                 if let Some(next) = d.get(prev_pos) {
-                    Self::buffer_set_cursor(&*self.text_view, &next);
+                    Self::buffer_set_or_remove_cursor(&*self.text_view, &next, true);
                 }
             }
             *current = prev_pos;
         } else {
             if let Some(d) = self.result_map.get(id) {
                 if let Some(first) = d.get(d.len() - 1) {
-                    Self::buffer_set_cursor(&*self.text_view, &first);
+                    Self::buffer_set_or_remove_cursor(&*self.text_view, &first, true);
                     self.result_cursor.insert(id.to_string(), d.len() - 1);
                 }
             }
@@ -185,15 +192,18 @@ impl FileView {
             let mut next_pos = 0;
             if let Some(d) = self.result_map.get(id) {
                 next_pos = if *current < d.len() -1 { *current +1 }else {0};
+                if let Some(prev) = d.get(*current) {
+                    Self::buffer_set_or_remove_cursor(&*self.text_view, &prev, false);
+                }
                 if let Some(next) = d.get(next_pos) {
-                    Self::buffer_set_cursor(&*self.text_view, &next);
+                    Self::buffer_set_or_remove_cursor(&*self.text_view, &next, true);
                 }
             }
             *current = next_pos;
         }else {
             if let Some(d) = self.result_map.get(id) {
                 if let Some(first) = d.get(0) {
-                    Self::buffer_set_cursor(&*self.text_view, &first);
+                    Self::buffer_set_or_remove_cursor(&*self.text_view, &first, true);
                     self.result_cursor.insert(id.to_string(), 0);
                 }
             }
@@ -229,11 +239,20 @@ impl FileView {
             FileViewMsg::Clear => {
                 if let Some(buffer) = &self.text_view.get_buffer() {
                     buffer.set_text("");
-                    self.result_cursor.clear();
-                    self.result_map.clear();
+                    self.clear_cursor_data();
                 }
             }
         }
+    }
+
+    fn clear_cursor_data(&mut self) {
+        for (id, pos) in &self.result_cursor {
+            if let Some(d) = self.result_map.get(id).and_then(|m| m.get(*pos)) {
+                Self::buffer_set_or_remove_cursor(&self.text_view, &d, false);
+            }
+        }
+        self.result_cursor.clear();
+        self.result_map.clear();
     }
 
     pub fn apply_rules(&mut self, mut rules: Vec<Rule>) {
@@ -243,6 +262,7 @@ impl FileView {
 
         rules.sort_by_key(|i| i.id);
         let init = self.rules.len() <= 0;
+        let mut clear_cursor = false;
         let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
         for compare_result in compare_results {
             let text_view = self.text_view.clone();
@@ -252,8 +272,14 @@ impl FileView {
                     if let Some(tags) = text_view.get_buffer()
                         .and_then(|buffer| buffer.get_tag_table()) {
                         let tag = TextTag::new(Some(&new.id.to_string()));
-                        tag.set_property_foreground(new.color.as_ref().map(|c|c.as_str()));
+                        tag.set_property_background(new.color.as_ref().map(|c|c.as_str()));
                         tags.add(&tag);
+                        if new.is_system {
+                            tag.set_priority(tags.get_size() - 2);
+                        }else {
+                            tag.set_priority(0);
+                        }
+
                     }
                 }
                 CompareResult::MissesRight(delete) => {
@@ -268,7 +294,7 @@ impl FileView {
                     if let Some(tag) = text_view.get_buffer()
                         .and_then(|buffer| buffer.get_tag_table())
                         .and_then(|tag_table| tag_table.lookup(&left.id.to_string())) {
-                        tag.set_property_foreground(right.color.as_ref().map(|s|s.as_str()));
+                        tag.set_property_background(right.color.as_ref().map(|s|s.as_str()));
                     }
                     if left.regex != right.regex {
                         update.push(right.clone());
@@ -276,10 +302,15 @@ impl FileView {
                             let (start, end) = tb.get_bounds();
                             tb.remove_tag_by_name(&left.id.to_string(), &start, &end);
                         }
+                        clear_cursor = true;
                     }
                 }
             }
         }
+        if clear_cursor {
+            self.clear_cursor_data();
+        }
+
         let mut data :Option<String> = None;
         if !init {
             let text_view = self.text_view.clone();
@@ -356,13 +387,12 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
             }
 
             let mut full_search_data = None;
-            if let Some(msg) = rx.try_iter().peekable().peek() {
+            if let Ok(msg) = rx.try_recv() {
                 match msg {
                     FileThreadMsg::ApplyRules(changes) => {
-                        full_search_data = changes.data.clone();
+                        full_search_data = changes.data;
                         for new in &changes.add {
                             let regex = if let Some(regex) = new.regex.as_ref() {
-
                                 Some(Regex::new(regex).unwrap())
                             }else {
                                 None
@@ -384,10 +414,9 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                             let sid = update.id.to_string();
                             if let Some((_idx, search)) = active_rules.iter_mut().enumerate().find(|(_, item)| item.id == sid) {
                                 if let Some(regex) = update.regex.as_ref() {
-
                                     search.line_offset = 0;
                                     search.regex = Some(Regex::new(regex).unwrap())
-                                }else {
+                                } else {
                                     search.regex.take();
                                 }
                             }
