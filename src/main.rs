@@ -71,7 +71,7 @@ pub enum RuleViewMsg {
     DeleteRule,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SearchResultMatch {
     pub line: usize,
     pub start: usize,
@@ -82,6 +82,7 @@ pub struct SearchResultMatch {
 pub enum FileViewMsg {
     Data(u64, String, HashMap<String, Vec<SearchResultMatch>>),
     Clear,
+    CursorChanged,
 }
 
 fn map_model(model: &TreeStore, iter: &TreeIter) -> Option<(String, bool)> {

@@ -1,4 +1,4 @@
-use gtk::{prelude::*, TextView};
+use gtk::{prelude::*, TextIter, TextBuffer};
 
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::time::Duration;
@@ -14,6 +14,7 @@ use subprocess::{PopenConfig, Redirection, Popen};
 use uuid::Uuid;
 use regex::Regex;
 use std::collections::HashMap;
+use crate::rules::SEARCH_ID;
 
 pub struct FileView {
     container: gtk::Box,
@@ -26,6 +27,7 @@ pub struct FileView {
     thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
     result_map: HashMap<String, Vec<SearchResultMatch>>,
     result_cursor: HashMap<String, usize>,
+    match_higlighters_to_clear: Vec<SearchResultMatch>,
 }
 
 const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
@@ -39,6 +41,21 @@ impl FileView {
 
         self.thread_action_sender = Some(thread_action_sender);
         self.apply_rules(default_rules);
+
+        {
+            let tx = sender.clone();
+            self.text_view.connect_button_press_event(move |_,_|{
+                tx(FileViewMsg::CursorChanged);
+                gtk::Inhibit(false)
+            });
+        }
+
+        {
+            let tx = sender.clone();
+            self.text_view.connect_move_cursor(move |_,_,_,_| {
+                tx(FileViewMsg::CursorChanged);
+            });
+        }
 
         let stop_handle = Arc::new((Mutex::new(false), Condvar::new()));
 
@@ -147,15 +164,31 @@ impl FileView {
             thread_action_sender: None,
             stop_handle: None,
             result_map,
-            result_cursor
+            result_cursor,
+            match_higlighters_to_clear: vec![],
+        }
+    }
+
+    fn get_bounds_for_match(buffer: &TextBuffer, result: &SearchResultMatch) -> (TextIter, TextIter) {
+        let line = result.line as i32;
+        let iter_start = buffer.get_iter_at_line_index(line, result.start as i32);
+        let iter_end = buffer.get_iter_at_line_index(line, result.end as i32);
+        (iter_start, iter_end)
+    }
+
+    fn clear_old_highlighters(&mut self) {
+        if let Some(buffer) = self.text_view.get_buffer() {
+            for cursor in &self.match_higlighters_to_clear {
+                let (iter_start, iter_end) = Self::get_bounds_for_match(&buffer, &cursor);
+                buffer.remove_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
+            }
+            self.match_higlighters_to_clear.clear();
         }
     }
 
     fn buffer_set_or_remove_cursor(text_view: &sourceview::View, search_match: &SearchResultMatch, set: bool) {
         if let Some(buffer) = text_view.get_buffer() {
-            let line = search_match.line as i32;
-            let mut iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
-            let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
+            let (mut iter_start, iter_end) = Self::get_bounds_for_match(&buffer, &search_match);
             if set {
                 buffer.apply_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
                 text_view.scroll_to_iter(&mut iter_start, 0.0, true, 0.5, 0.5);
@@ -166,6 +199,7 @@ impl FileView {
     }
 
     pub fn select_prev(&mut self, id: &str) {
+        self.clear_old_highlighters();
         if let Some(current) = self.result_cursor.get_mut(id) {
             let prev_pos = if *current > 0 { *current -1 }else {0};
             if let Some(d) = self.result_map.get(id) {
@@ -188,6 +222,7 @@ impl FileView {
     }
 
     pub fn select_next(&mut self, id: &str) {
+        self.clear_old_highlighters();
         if let Some(current) = self.result_cursor.get_mut(id) {
             let mut next_pos = 0;
             if let Some(d) = self.result_map.get(id) {
@@ -232,6 +267,34 @@ impl FileView {
                             buffer.apply_tag_by_name(&tag, &iter_start, &iter_end);
 
                             result.push(search_match);
+                        }
+                    }
+                }
+            }
+            FileViewMsg::CursorChanged => {
+                if let Some(buffer) = self.text_view.get_buffer() {
+                    let cursor_pos = buffer.get_property_cursor_position();
+                    let cursor_pos = buffer.get_iter_at_offset(cursor_pos);
+
+                    if let Some(search_results) = self.result_map.get(SEARCH_ID) {
+                        let next = search_results.iter().enumerate().find(|(_, m)|{
+                            let search_match_pos = buffer.get_iter_at_line_index(m.line as i32, m.start as i32);
+                            search_match_pos > cursor_pos
+                        }).map(|(idx,_)| idx).or_else(|| {
+                            search_results.iter().enumerate().last().map(|(idx, _)| idx)
+                        });
+
+                        if let Some(next) = next {
+                            let next = if next > 0 {next -1}else{0};
+                            if let Some(cpos) = self.result_cursor.get_mut(SEARCH_ID) {
+                                if let Some(current) = search_results.get(*cpos) {
+                                    self.match_higlighters_to_clear.push(current.clone());
+                                }
+
+                                *cpos = next;
+                            }else {
+                                self.result_cursor.insert(SEARCH_ID.to_string(), next);
+                            }
                         }
                     }
                 }
