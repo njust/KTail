@@ -6,7 +6,6 @@ use crate::rules::SEARCH_ID;
 
 pub struct FileViewToolbar {
     container: gtk::Box,
-    label: gtk::Label,
 }
 
 impl FileViewToolbar {
@@ -39,23 +38,20 @@ impl FileViewToolbar {
         }
 
         let prev_btn = gtk::Button::with_label("Prev"); {
-        let tx = tx.clone();
-        prev_btn.connect_clicked(move |_| {
-            tx(WorkbenchToolbarMsg::SelectPrevMatch);
-        });
-        toolbar.add(&prev_btn);
-    }
-
-        let results = gtk::Label::new(None);
-        toolbar.add(&results);
+            let tx = tx.clone();
+            prev_btn.connect_clicked(move |_| {
+                tx(WorkbenchToolbarMsg::SelectPrevMatch);
+            });
+            toolbar.add(&prev_btn);
+        }
 
         let next_btn = gtk::Button::with_label("Next"); {
-        let tx = tx.clone();
-        next_btn.connect_clicked(move |_| {
-            tx(WorkbenchToolbarMsg::SelectNextMatch);
-        });
-        toolbar.add(&next_btn);
-    }
+            let tx = tx.clone();
+            next_btn.connect_clicked(move |_| {
+                tx(WorkbenchToolbarMsg::SelectNextMatch);
+            });
+            toolbar.add(&next_btn);
+        }
 
         let show_rules_btn = Button::with_label("Highlighters"); {
             let tx = tx.clone();
@@ -77,14 +73,6 @@ impl FileViewToolbar {
 
         Self {
             container: toolbar,
-            label: results
-        }
-    }
-
-    pub fn update(&mut self, data: &HashMap<String, Vec<SearchResultMatch>>) {
-        if let Some(search_results) = data.get(SEARCH_ID) {
-            let text = format!("Matches: {}", search_results.len());
-            self.label.set_text(&text);
         }
     }
 

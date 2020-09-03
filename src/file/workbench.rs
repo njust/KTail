@@ -130,13 +130,6 @@ impl FileViewWorkbench {
                 self.rules_view.update(msg);
             }
             WorkbenchViewMsg::FileViewMsg(msg) => {
-                let chk = &msg;
-                match chk {
-                    FileViewMsg::Data(_,_, matches) => {
-                        self.toolbar.update(&matches);
-                    },
-                    _ => ()
-                }
                 self.file_view.update(msg);
             }
         }
