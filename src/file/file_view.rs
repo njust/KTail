@@ -213,9 +213,10 @@ impl FileView {
             *current = prev_pos;
         } else {
             if let Some(d) = self.result_map.get(id) {
-                if let Some(first) = d.get(d.len() - 1) {
+                let prev = if d.len() > 0 { d.len() - 1} else {0};
+                if let Some(first) = d.get(prev) {
                     Self::buffer_set_or_remove_cursor(&*self.text_view, &first, true);
-                    self.result_cursor.insert(id.to_string(), d.len() - 1);
+                    self.result_cursor.insert(id.to_string(), prev);
                 }
             }
         }
@@ -491,7 +492,6 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
             if let Some(data) = full_search_data {
                 if let Ok(r) = search(&data, &mut active_rules, 0) {
                     if r.results.len() > 0 {
-                        println!("Results: {}", r.results.len());
                         sender(FileViewMsg::Data(0, data, r.results));
                     }
                 }
@@ -506,7 +506,6 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                         if let Ok(r) = search(&result.data, &mut active_rules, line_offset) {
                             line_offset += r.lines;
                             if result.read_bytes > 0 {
-                                println!("Results: {}", r.results.len());
                                 sender(FileViewMsg::Data(result.read_bytes, result.data, r.results));
                             }
                         }

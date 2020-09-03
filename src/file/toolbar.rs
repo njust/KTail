@@ -1,30 +1,39 @@
 use gtk::prelude::*;
-use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button};
-use crate::{WorkbenchToolbarMsg, SearchResultMatch};
-use std::collections::HashMap;
-use crate::rules::SEARCH_ID;
+use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, AccelFlags, AccelGroup};
+use crate::{WorkbenchToolbarMsg};
 
 pub struct FileViewToolbar {
     container: gtk::Box,
 }
 
 impl FileViewToolbar {
-    pub fn new<T>(tx: T) -> Self
+    pub fn new<T>(tx: T, accelerators: &AccelGroup) -> Self
         where T: 'static + Clone + Fn(WorkbenchToolbarMsg)
     {
         let toolbar = gtk::Box::new(Orientation::Horizontal, 4);
         toolbar.set_property_margin(4);
 
-        let search_txt = SearchEntry::new(); {
-            search_txt.set_width_chars(40);
-            let tx2 = tx.clone();
+        let search_txt = SearchEntry::new();
+        let (key, modifier) = gtk::accelerator_parse("<Primary>F");
+        search_txt.add_accelerator("grab-focus", accelerators, key, modifier, AccelFlags::VISIBLE);
+        search_txt.set_width_chars(40);
+        {
+            let tx = tx.clone();
             search_txt.connect_changed(move |e| {
                 let text = e.get_text().to_string();
-                tx2(WorkbenchToolbarMsg::TextChange(text));
+                tx(WorkbenchToolbarMsg::TextChange(text));
             });
+        }
+        {
             let tx = tx.clone();
-            search_txt.connect_icon_release(move |_,_,_| {
+            search_txt.connect_icon_release(move |_, _, _| {
                 tx(WorkbenchToolbarMsg::ClearSearchPressed);
+            });
+        }
+        {
+            let tx = tx.clone();
+            search_txt.connect_activate(move |_| {
+                tx(WorkbenchToolbarMsg::SearchPressed);
             });
             toolbar.add(&search_txt);
         }
@@ -37,15 +46,19 @@ impl FileViewToolbar {
             toolbar.add(&search_btn);
         }
 
-        let prev_btn = gtk::Button::with_label("Prev"); {
+        let prev_btn = gtk::Button::with_mnemonic("_Prev"); {
             let tx = tx.clone();
+            let (key, modifier) = gtk::accelerator_parse("<Primary>P");
+            prev_btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
             prev_btn.connect_clicked(move |_| {
                 tx(WorkbenchToolbarMsg::SelectPrevMatch);
             });
             toolbar.add(&prev_btn);
         }
 
-        let next_btn = gtk::Button::with_label("Next"); {
+        let next_btn = gtk::Button::with_mnemonic("_Next"); {
+            let (key, modifier) = gtk::accelerator_parse("<Primary>N");
+            next_btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
             let tx = tx.clone();
             next_btn.connect_clicked(move |_| {
                 tx(WorkbenchToolbarMsg::SelectNextMatch);

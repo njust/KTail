@@ -3,7 +3,7 @@
 use gtk::prelude::*;
 use gio::prelude::*;
 
-use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow};
+use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow, AccelGroup};
 use std::rc::Rc;
 use gio::{SimpleAction};
 
@@ -91,12 +91,12 @@ fn map_model(model: &TreeStore, iter: &TreeIter) -> Option<(String, bool)> {
     Some((name, active))
 }
 
-fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid) -> (gtk::Box, FileViewWorkbench) {
+fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid, accelerators: &AccelGroup) -> (gtk::Box, FileViewWorkbench) {
     let tx2 = tx.clone();
     let tab_name = data.get_name();
     let file_view = FileViewWorkbench::new(data, move |msg| {
         tx2.send(Msg::WorkbenchMsg(id, msg)).expect("Could not send msg");
-    });
+    }, accelerators);
 
     let close_btn = Button::from_icon_name(Some("window-close-symbolic"), IconSize::Menu);
     close_btn.set_relief(ReliefStyle::None);
@@ -227,6 +227,8 @@ fn main() {
 
         let mut file_views = HashMap::<Uuid, FileViewWorkbench>::new();
         let window = ApplicationWindow::new(app);
+        let ag = AccelGroup::new();
+        window.add_accel_group(&ag);
 
         notebook.set_hexpand(true);
         notebook.set_vexpand(true);
@@ -257,7 +259,7 @@ fn main() {
                 }
                 Msg::CreateTab(tab) => {
                     let id = Uuid::new_v4();
-                    let (tab_header, file_view) = create_tab(tab, tx.clone(), id);
+                    let (tab_header, file_view) = create_tab(tab, tx.clone(), id, &ag);
                     notebook.append_page(file_view.view(), Some(&tab_header));
                     file_views.insert(id, file_view);
                     notebook.show_all();
@@ -271,6 +273,8 @@ fn main() {
         window.set_default_size(800, 600);
 
         let menu_model = gio::Menu::new();
+        app.set_accels_for_action("app.open", &["<Primary>O"]);
+        app.set_accels_for_action("app.kube", &["<Primary>K"]);
         menu_model.append_item(&gio::MenuItem::new(Some("Open"), Some("app.open")));
         menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));
         menu_model.append_item(&gio::MenuItem::new(Some("Quit"), Some("app.quit")));

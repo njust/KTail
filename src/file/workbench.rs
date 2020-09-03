@@ -1,9 +1,9 @@
 use gtk::prelude::*;
 use crate::file::toolbar::FileViewToolbar;
-use gtk::{Orientation, WindowPosition, HeaderBar};
+use gtk::{Orientation, WindowPosition, HeaderBar, AccelGroup};
 use crate::rules::{RuleListView, SEARCH_ID, Rule};
 use crate::file::file_view::{FileView};
-use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg, FileViewData, FileViewMsg};
+use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg, FileViewData};
 use std::rc::Rc;
 use uuid::Uuid;
 
@@ -12,7 +12,6 @@ pub struct FileViewWorkbench {
     rules_view: RuleListView,
     file_view: FileView,
     search_text: String,
-    toolbar: FileViewToolbar,
     rules_dlg: Option<gtk::Dialog>,
     sender: Rc<dyn Fn(WorkbenchViewMsg)>
 }
@@ -44,7 +43,7 @@ pub fn get_default_rules() -> Vec<Rule> {
 }
 
 impl FileViewWorkbench {
-    pub fn new<T>(data: FileViewData, sender: T) -> Self
+    pub fn new<T>(data: FileViewData, sender: T, accelerators: &AccelGroup) -> Self
         where T: 'static + Send + Clone + Fn(WorkbenchViewMsg)
     {
         let default_rules = get_default_rules();
@@ -52,7 +51,7 @@ impl FileViewWorkbench {
         let toolbar_msg = sender.clone();
         let toolbar = FileViewToolbar::new(move |msg| {
             toolbar_msg(WorkbenchViewMsg::ToolbarMsg(msg));
-        });
+        }, accelerators);
 
         let file_tx = sender.clone();
         let mut file_view = FileView::new();
@@ -74,7 +73,6 @@ impl FileViewWorkbench {
         Self {
             container,
             rules_view,
-            toolbar,
             file_view,
             search_text: String::new(),
             rules_dlg: None,
