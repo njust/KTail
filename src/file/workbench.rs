@@ -113,10 +113,10 @@ impl FileViewWorkbench {
                         self.file_view.toggle_autoscroll(enable);
                     }
                     WorkbenchToolbarMsg::SelectNextMatch => {
-                        self.file_view.select_next(SEARCH_ID);
+                        self.file_view.select_next_match(SEARCH_ID);
                     }
                     WorkbenchToolbarMsg::SelectPrevMatch => {
-                        self.file_view.select_prev(SEARCH_ID);
+                        self.file_view.select_prev_match(SEARCH_ID);
                     }
                 }
             }

@@ -26,8 +26,8 @@ pub struct FileView {
     stop_handle: Option<Arc<(Mutex<bool>, Condvar)>>,
     thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
     result_map: HashMap<String, Vec<SearchResultMatch>>,
-    result_cursor: HashMap<String, usize>,
-    match_highlighters_to_clear: Vec<SearchResultMatch>,
+    current_result_selection: HashMap<String, usize>,
+    result_match_cursor_pos: Option<usize>,
 }
 
 const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
@@ -152,7 +152,7 @@ impl FileView {
         container.add(&minimap);
 
         let result_map: HashMap<String, Vec<SearchResultMatch>> = HashMap::new();
-        let result_cursor: HashMap<String, usize> = HashMap::new();
+        let current_result_selection: HashMap<String, usize> = HashMap::new();
 
         Self {
             container,
@@ -164,8 +164,8 @@ impl FileView {
             thread_action_sender: None,
             stop_handle: None,
             result_map,
-            result_cursor,
-            match_highlighters_to_clear: vec![],
+            current_result_selection,
+            result_match_cursor_pos: None,
         }
     }
 
@@ -176,17 +176,7 @@ impl FileView {
         (iter_start, iter_end)
     }
 
-    fn clear_old_highlighters(&mut self) {
-        if let Some(buffer) = self.text_view.get_buffer() {
-            for cursor in &self.match_highlighters_to_clear {
-                let (iter_start, iter_end) = Self::get_bounds_for_match(&buffer, &cursor);
-                buffer.remove_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
-            }
-            self.match_highlighters_to_clear.clear();
-        }
-    }
-
-    fn buffer_set_or_remove_cursor(text_view: &sourceview::View, search_match: &SearchResultMatch, set: bool) {
+    fn set_or_remove_selected_match(text_view: &sourceview::View, search_match: &SearchResultMatch, set: bool) {
         if let Some(buffer) = text_view.get_buffer() {
             let (mut iter_start, iter_end) = Self::get_bounds_for_match(&buffer, &search_match);
             if set {
@@ -198,39 +188,46 @@ impl FileView {
         }
     }
 
-    pub fn select_prev(&mut self, id: &str) {
-        self.select_cursor(id, false);
+    pub fn select_prev_match(&mut self, id: &str) {
+        self.select_match(id, false);
     }
 
-    pub fn select_next(&mut self, id: &str) {
-        self.select_cursor(id, true);
+    pub fn select_next_match(&mut self, id: &str) {
+        self.select_match(id, true);
     }
 
-    pub fn select_cursor(&mut self, id: &str, forward: bool) {
-        self.clear_old_highlighters();
+    pub fn select_match(&mut self, id: &str, forward: bool) {
         if let Some(matches) = self.result_map.get(id) {
-            if let Some(current) = self.result_cursor.get_mut(id) {
-                let next = if forward {
-                  if *current < matches.len() -1 { *current +1 } else { 0 }
-                } else {
-                    if *current > 0 { *current -1 } else { 0 }
+            if let Some(current) = self.current_result_selection.get_mut(id) {
+                let next = if let Some(next) = self.result_match_cursor_pos.take() {
+                    next
+                }else {
+                    if forward {
+                        if *current < matches.len() -1 { *current +1 } else { 0 }
+                    } else {
+                        if *current > 0 { *current -1 } else { 0 }
+                    }
                 };
                 if let Some(prev) = matches.get(*current) {
-                    Self::buffer_set_or_remove_cursor(&*self.text_view, &prev, false);
+                    Self::set_or_remove_selected_match(&*self.text_view, &prev, false);
                 }
                 if let Some(next) = matches.get(next) {
-                    Self::buffer_set_or_remove_cursor(&*self.text_view, &next, true);
+                    Self::set_or_remove_selected_match(&*self.text_view, &next, true);
                 }
                 *current = next;
             }else {
-                let start = if forward {
-                    0
+                let start = if let Some(start) = self.result_match_cursor_pos.take() {
+                    start
                 }else {
-                    if matches.len() > 0 { matches.len() -1 } else { 0 }
+                    if forward {
+                        0
+                    }else {
+                        if matches.len() > 0 { matches.len() -1 } else { 0 }
+                    }
                 };
                 if let Some(first_match) = matches.get(start) {
-                    Self::buffer_set_or_remove_cursor(&*self.text_view, &first_match, true);
-                    self.result_cursor.insert(id.to_string(), start);
+                    Self::set_or_remove_selected_match(&*self.text_view, &first_match, true);
+                    self.current_result_selection.insert(id.to_string(), start);
                 }
             }
         }
@@ -276,16 +273,8 @@ impl FileView {
                         });
 
                         if let Some(next) = next {
-                            let next = if next > 0 {next -1}else{0};
-                            if let Some(cpos) = self.result_cursor.get_mut(SEARCH_ID) {
-                                if let Some(current) = search_results.get(*cpos) {
-                                    self.match_highlighters_to_clear.push(current.clone());
-                                }
-
-                                *cpos = next;
-                            }else {
-                                self.result_cursor.insert(SEARCH_ID.to_string(), next);
-                            }
+                            let next = if next > 0 {next}else{0};
+                            self.result_match_cursor_pos = Some(next);
                         }
                     }
                 }
@@ -293,21 +282,20 @@ impl FileView {
             FileViewMsg::Clear => {
                 if let Some(buffer) = &self.text_view.get_buffer() {
                     buffer.set_text("");
-                    self.clear_cursor_data();
+                    self.clear_result_selection_data();
                 }
             }
         }
     }
 
-    fn clear_cursor_data(&mut self) {
-        for (id, pos) in &self.result_cursor {
+    fn clear_result_selection_data(&mut self) {
+        for (id, pos) in &self.current_result_selection {
             if let Some(d) = self.result_map.get(id).and_then(|m| m.get(*pos)) {
-                Self::buffer_set_or_remove_cursor(&self.text_view, &d, false);
+                Self::set_or_remove_selected_match(&self.text_view, &d, false);
             }
         }
-        self.result_cursor.clear();
+        self.current_result_selection.clear();
         self.result_map.clear();
-        self.clear_old_highlighters();
     }
 
     pub fn apply_rules(&mut self, mut rules: Vec<Rule>) {
@@ -363,7 +351,7 @@ impl FileView {
             }
         }
         if clear_cursor {
-            self.clear_cursor_data();
+            self.clear_result_selection_data();
         }
 
         let mut data :Option<String> = None;
