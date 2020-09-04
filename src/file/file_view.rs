@@ -317,6 +317,7 @@ impl FileView {
         }
         self.result_cursor.clear();
         self.result_map.clear();
+        self.clear_old_highlighters();
     }
 
     pub fn apply_rules(&mut self, mut rules: Vec<Rule>) {
