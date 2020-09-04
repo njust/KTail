@@ -199,48 +199,38 @@ impl FileView {
     }
 
     pub fn select_prev(&mut self, id: &str) {
-        self.clear_old_highlighters();
-        if let Some(current) = self.result_cursor.get_mut(id) {
-            let prev_pos = if *current > 0 { *current -1 }else {0};
-            if let Some(d) = self.result_map.get(id) {
-                if let Some(prev) = d.get(*current) {
-                    Self::buffer_set_or_remove_cursor(&*self.text_view, &prev, false);
-                }
-                if let Some(next) = d.get(prev_pos) {
-                    Self::buffer_set_or_remove_cursor(&*self.text_view, &next, true);
-                }
-            }
-            *current = prev_pos;
-        } else {
-            if let Some(d) = self.result_map.get(id) {
-                let prev = if d.len() > 0 { d.len() - 1} else {0};
-                if let Some(first) = d.get(prev) {
-                    Self::buffer_set_or_remove_cursor(&*self.text_view, &first, true);
-                    self.result_cursor.insert(id.to_string(), prev);
-                }
-            }
-        }
+        self.select_cursor(id, false);
     }
 
     pub fn select_next(&mut self, id: &str) {
+        self.select_cursor(id, true);
+    }
+
+    pub fn select_cursor(&mut self, id: &str, forward: bool) {
         self.clear_old_highlighters();
-        if let Some(current) = self.result_cursor.get_mut(id) {
-            let mut next_pos = 0;
-            if let Some(d) = self.result_map.get(id) {
-                next_pos = if *current < d.len() -1 { *current +1 }else {0};
-                if let Some(prev) = d.get(*current) {
+        if let Some(matches) = self.result_map.get(id) {
+            if let Some(current) = self.result_cursor.get_mut(id) {
+                let next = if forward {
+                  if *current < matches.len() -1 { *current +1 } else { 0 }
+                } else {
+                    if *current > 0 { *current -1 } else { 0 }
+                };
+                if let Some(prev) = matches.get(*current) {
                     Self::buffer_set_or_remove_cursor(&*self.text_view, &prev, false);
                 }
-                if let Some(next) = d.get(next_pos) {
+                if let Some(next) = matches.get(next) {
                     Self::buffer_set_or_remove_cursor(&*self.text_view, &next, true);
                 }
-            }
-            *current = next_pos;
-        }else {
-            if let Some(d) = self.result_map.get(id) {
-                if let Some(first) = d.get(0) {
-                    Self::buffer_set_or_remove_cursor(&*self.text_view, &first, true);
-                    self.result_cursor.insert(id.to_string(), 0);
+                *current = next;
+            }else {
+                let start = if forward {
+                    0
+                }else {
+                    if matches.len() > 0 { matches.len() -1 } else { 0 }
+                };
+                if let Some(first_match) = matches.get(start) {
+                    Self::buffer_set_or_remove_cursor(&*self.text_view, &first_match, true);
+                    self.result_cursor.insert(id.to_string(), start);
                 }
             }
         }
