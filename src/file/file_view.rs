@@ -27,7 +27,7 @@ pub struct FileView {
     thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
     result_map: HashMap<String, Vec<SearchResultMatch>>,
     result_cursor: HashMap<String, usize>,
-    match_higlighters_to_clear: Vec<SearchResultMatch>,
+    match_highlighters_to_clear: Vec<SearchResultMatch>,
 }
 
 const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
@@ -165,7 +165,7 @@ impl FileView {
             stop_handle: None,
             result_map,
             result_cursor,
-            match_higlighters_to_clear: vec![],
+            match_highlighters_to_clear: vec![],
         }
     }
 
@@ -178,11 +178,11 @@ impl FileView {
 
     fn clear_old_highlighters(&mut self) {
         if let Some(buffer) = self.text_view.get_buffer() {
-            for cursor in &self.match_higlighters_to_clear {
+            for cursor in &self.match_highlighters_to_clear {
                 let (iter_start, iter_end) = Self::get_bounds_for_match(&buffer, &cursor);
                 buffer.remove_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
             }
-            self.match_higlighters_to_clear.clear();
+            self.match_highlighters_to_clear.clear();
         }
     }
 
@@ -289,7 +289,7 @@ impl FileView {
                             let next = if next > 0 {next -1}else{0};
                             if let Some(cpos) = self.result_cursor.get_mut(SEARCH_ID) {
                                 if let Some(current) = search_results.get(*cpos) {
-                                    self.match_higlighters_to_clear.push(current.clone());
+                                    self.match_highlighters_to_clear.push(current.clone());
                                 }
 
                                 *cpos = next;
@@ -433,14 +433,15 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
         let mut active_rules = vec![];
         let mut encoding: Option<&'static dyn encoding::types::Encoding> = None;
         while !*stopped {
+            let mut check_changes = true;
             if !path.exists() {
-                continue;
+                check_changes = false;
             }
 
             if let Ok(metadata) = std::fs::metadata(&path) {
                 let len = metadata.len();
                 if len <= 0 {
-                    continue;
+                    check_changes = false;
                 }
 
                 if len < file_byte_offset {
@@ -450,63 +451,65 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                 }
             }
 
-            let mut full_search_data = None;
-            if let Ok(msg) = rx.try_recv() {
-                match msg {
-                    FileThreadMsg::ApplyRules(changes) => {
-                        full_search_data = changes.data;
-                        for new in &changes.add {
-                            let regex = if let Some(regex) = new.regex.as_ref() {
-                                Some(Regex::new(regex).unwrap())
-                            }else {
-                                None
-                            };
-
-                            active_rules.push(ActiveRule {
-                                id: new.id.to_string(),
-                                line_offset: 0,
-                                regex
-                            });
-                        }
-                        for remove in &changes.remove {
-                            if let Some((idx, _item)) = active_rules.iter().enumerate().find(|(_, e)| &e.id == remove) {
-                                active_rules.remove(idx);
-                            }
-                        }
-
-                        for update in &changes.update {
-                            let sid = update.id.to_string();
-                            if let Some((_idx, search)) = active_rules.iter_mut().enumerate().find(|(_, item)| item.id == sid) {
-                                if let Some(regex) = update.regex.as_ref() {
-                                    search.line_offset = 0;
-                                    search.regex = Some(Regex::new(regex).unwrap())
+            if check_changes {
+                let mut full_search_data = None;
+                if let Ok(msg) = rx.try_recv() {
+                    match msg {
+                        FileThreadMsg::ApplyRules(changes) => {
+                            full_search_data = changes.data;
+                            for new in &changes.add {
+                                let regex = if let Some(regex) = new.regex.as_ref() {
+                                    Some(Regex::new(regex).unwrap())
                                 } else {
-                                    search.regex.take();
+                                    None
+                                };
+
+                                active_rules.push(ActiveRule {
+                                    id: new.id.to_string(),
+                                    line_offset: 0,
+                                    regex
+                                });
+                            }
+                            for remove in &changes.remove {
+                                if let Some((idx, _item)) = active_rules.iter().enumerate().find(|(_, e)| &e.id == remove) {
+                                    active_rules.remove(idx);
+                                }
+                            }
+
+                            for update in &changes.update {
+                                let sid = update.id.to_string();
+                                if let Some((_idx, search)) = active_rules.iter_mut().enumerate().find(|(_, item)| item.id == sid) {
+                                    if let Some(regex) = update.regex.as_ref() {
+                                        search.line_offset = 0;
+                                        search.regex = Some(Regex::new(regex).unwrap())
+                                    } else {
+                                        search.regex.take();
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            if let Some(data) = full_search_data {
-                if let Ok(r) = search(&data, &mut active_rules, 0) {
-                    if r.results.len() > 0 {
-                        sender(FileViewMsg::Data(0, data, r.results));
-                    }
-                }
-            } else {
-                if let Ok(data) = read_file(&path,  file_byte_offset) {
-                    if let Ok(result) = decode_data(&data, encoding) {
-                        file_byte_offset += result.read_bytes;
-                        if result.encoding.is_some() {
-                            encoding = result.encoding;
+                if let Some(data) = full_search_data {
+                    if let Ok(r) = search(&data, &mut active_rules, 0) {
+                        if r.results.len() > 0 {
+                            sender(FileViewMsg::Data(0, data, r.results));
                         }
+                    }
+                } else {
+                    if let Ok(data) = read_file(&path, file_byte_offset) {
+                        if let Ok(result) = decode_data(&data, encoding) {
+                            file_byte_offset += result.read_bytes;
+                            if result.encoding.is_some() {
+                                encoding = result.encoding;
+                            }
 
-                        if let Ok(r) = search(&result.data, &mut active_rules, line_offset) {
-                            line_offset += r.lines;
-                            if result.read_bytes > 0 {
-                                sender(FileViewMsg::Data(result.read_bytes, result.data, r.results));
+                            if let Ok(r) = search(&result.data, &mut active_rules, line_offset) {
+                                line_offset += r.lines;
+                                if result.read_bytes > 0 {
+                                    sender(FileViewMsg::Data(result.read_bytes, result.data, r.results));
+                                }
                             }
                         }
                     }
