@@ -21,16 +21,21 @@ use std::collections::HashMap;
 
 pub const SEARCH_TAG: &'static str = "SEARCH";
 
+pub struct CreateKubeLogData {
+    services: Vec<String>,
+    since: i32
+}
+
 pub enum FileViewData {
     File(PathBuf),
-    Kube(Vec<String>)
+    Kube(CreateKubeLogData)
 }
 
 impl FileViewData {
     fn get_name(&self) -> String {
         match self {
             FileViewData::File(file_path) => file_path.file_name().unwrap().to_str().unwrap().to_string(),
-            FileViewData::Kube(services) => services.join(",")
+            FileViewData::Kube(data) => data.services.join(",")
         }
     }
 }
@@ -138,6 +143,17 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
     scroll_wnd.add(&list);
     content.add(&scroll_wnd);
 
+    let since_row = gtk::Box::new(Orientation::Horizontal, 0);
+    since_row.set_spacing(4);
+    let adjustment = gtk::Adjustment::new(4.0, 1.0, 49.0, 1.0, 1.0, 1.0);
+    let since_val = gtk::SpinButton::new(Some(&adjustment), 1.0, 0);
+    since_val.set_value(4.0);
+    since_row.add(&gtk::Label::new(Some("Since hours:")));
+    since_row.add(&since_val);
+    since_row.set_margin_top(8);
+
+    content.add(&since_row);
+
     dlg.connect_delete_event(move |dlg, _| {
         dlg.hide();
         gtk::Inhibit(true)
@@ -157,6 +173,9 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
 
         let res = dlg.run();
         dlg.close();
+        let since = since_val.get_text().to_string();
+        let since = since.parse::<i32>().unwrap_or(4);
+
         if res == ResponseType::Accept {
             let mut models = vec![];
             if let Some(iter)  = service_model.get_iter_first() {
@@ -173,7 +192,10 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
                     }
                 }
             }
-            tx.send(Msg::CreateTab(FileViewData::Kube(models))).expect("Could not send create tab msg");
+            tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
+                services: models,
+                since,
+            }))).expect("Could not send create tab msg");
         }
 
     });

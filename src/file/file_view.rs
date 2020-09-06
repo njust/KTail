@@ -67,7 +67,7 @@ impl FileView {
                     file_thread_tx(msg);
                 }, &path,  stop_handle.clone(), thread_action_receiver);
             }
-            FileViewData::Kube(services) => {
+            FileViewData::Kube(data) => {
                 let tmp_file = std::env::temp_dir().join(Uuid::new_v4().to_string());
                 println!("{:?}", tmp_file);
                 if let Ok(file) = std::fs::OpenOptions::new()
@@ -83,17 +83,19 @@ impl FileView {
                     };
 
                     #[cfg(target_family = "windows")]
-                        {
-                            cfg.creation_flags = CREATE_NO_WINDOW;
-                        }
+                    {
+                        cfg.creation_flags = CREATE_NO_WINDOW;
+                    }
 
+                    let services = data.services;
                     let template = if services.len() == 1 {
                         "{{.Message}}"
                     }else {
                         "{{.ContainerName}} {{.Message}}"
                     };
 
-                    let process = subprocess::Popen::create(&["stern", "--since", "12h", "--template", template, &services.join("|")], cfg).unwrap();
+                    let since = format!("{}h", data.since);
+                    let process = subprocess::Popen::create(&["stern", "--since", &since, "--template", template, &services.join("|")], cfg).unwrap();
 
                     self.kube_log_process = Some(process);
                 }
