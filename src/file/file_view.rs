@@ -6,7 +6,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
-use crate::util::{enable_auto_scroll, read_file, SortedListCompare, CompareResult, CREATE_NO_WINDOW, search, decode_data};
+use crate::util::{enable_auto_scroll, read_file, SortedListCompare, CompareResult, CREATE_NO_WINDOW, search, decode_data, read};
 use crate::{FileViewMsg, FileViewData, SearchResultMatch};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
@@ -15,6 +15,8 @@ use uuid::Uuid;
 use regex::Regex;
 use std::collections::HashMap;
 use crate::rules::SEARCH_ID;
+use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::error::Error;
 
 pub struct FileView {
     container: gtk::Box,
@@ -28,6 +30,64 @@ pub struct FileView {
     result_map: HashMap<String, Vec<SearchResultMatch>>,
     current_result_selection: HashMap<String, usize>,
     result_match_cursor_pos: Option<usize>,
+}
+
+pub trait LogReader : std::marker::Send {
+    fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>>;
+    fn check_changes(&mut self) -> LogState;
+}
+
+pub struct FileReader {
+    path: PathBuf,
+    file: std::fs::File,
+    offset: u64,
+}
+
+impl FileReader {
+    pub fn new(path: PathBuf) -> Result<Self, std::io::Error> {
+        let file = std::fs::File::open(&path)?;
+        Ok(Self {
+            path,
+            file,
+            offset: 0
+        })
+    }
+}
+
+pub enum LogState {
+    Ok,
+    Skip,
+    Reload
+}
+
+impl LogReader for FileReader {
+    fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
+        if self.offset > 0 {
+            self.file.seek(SeekFrom::Start(self.offset))?;
+        }
+        let read = read(&mut self.file)?;
+        self.offset += read.len() as u64;
+        Ok(read)
+    }
+
+    fn check_changes(&mut self) -> LogState {
+        if !self.path.exists() {
+            return LogState::Skip;
+        }
+
+        if let Ok(metadata) = std::fs::metadata(&self.path) {
+            let len = metadata.len();
+            if len <= 0 {
+                return LogState::Skip;
+            }
+            if len < self.offset {
+                self.offset = 0;
+                return LogState::Reload;
+            }
+        }
+
+        return LogState::Ok;
+    }
 }
 
 const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
@@ -62,10 +122,10 @@ impl FileView {
         let file_thread_tx = sender.clone();
         match data {
             FileViewData::File(path) => {
-                let path = path.clone();
+                let reader = FileReader::new(path).unwrap();
                 register_file_watcher_thread(move |msg| {
                     file_thread_tx(msg);
-                }, &path,  stop_handle.clone(), thread_action_receiver);
+                }, Box::new(reader),  stop_handle.clone(), thread_action_receiver);
             }
             FileViewData::Kube(data) => {
                 let tmp_file = std::env::temp_dir().join(Uuid::new_v4().to_string());
@@ -100,9 +160,10 @@ impl FileView {
                     self.kube_log_process = Some(process);
                 }
 
+                let reader = FileReader::new(tmp_file.clone()).unwrap();
                 register_file_watcher_thread(move |msg| {
                     file_thread_tx(msg);
-                }, &tmp_file, stop_handle.clone(), thread_action_receiver);
+                }, Box::new(reader), stop_handle.clone(), thread_action_receiver);
                 self.kube_log_path = Some(tmp_file);
             }
         }
@@ -401,10 +462,9 @@ impl FileView {
     }
 }
 
-fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>)
+fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>)
     where T : 'static + Send + Clone + Fn(FileViewMsg)
 {
-    let path = path.clone();
     std::thread::spawn(move || {
         let mut file_byte_offset = 0;
         let mut line_offset = 0;
@@ -414,23 +474,15 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
         let mut active_rules = vec![];
         let mut encoding: Option<&'static dyn encoding::types::Encoding> = None;
         while !*stopped {
-            let mut check_changes = true;
-            if !path.exists() {
-                check_changes = false;
-            }
-
-            if let Ok(metadata) = std::fs::metadata(&path) {
-                let len = metadata.len();
-                if len <= 0 {
-                    check_changes = false;
-                }
-
-                if len < file_byte_offset {
-                    file_byte_offset = 0;
+            let check_changes = match log_reader.check_changes() {
+                LogState::Skip => false,
+                LogState::Ok => true,
+                LogState::Reload => {
                     line_offset = 0;
                     sender(FileViewMsg::Clear);
+                    false
                 }
-            }
+            };
 
             if check_changes {
                 let mut full_search_data = None;
@@ -479,7 +531,7 @@ fn register_file_watcher_thread<T>(sender: T, path: &PathBuf, thread_stop_handle
                         }
                     }
                 } else {
-                    if let Ok(data) = read_file(&path, file_byte_offset) {
+                    if let Ok(data) = log_reader.read() {
                         if let Ok(result) = decode_data(&data, encoding) {
                             file_byte_offset += result.read_bytes;
                             if result.encoding.is_some() {

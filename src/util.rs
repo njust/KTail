@@ -76,14 +76,16 @@ pub fn decode_data(buffer: &[u8], encoding: Option<&'static dyn encoding::types:
 }
 
 pub fn read_file(path: &PathBuf, start: u64) -> Result<Vec<u8>, Box<dyn Error>> {
-    let file = std::fs::File::open(path)?;
-
-    let mut reader = BufReader::new(file);
-    let mut buffer = vec![];
+    let mut file = std::fs::File::open(path)?;
     if start > 0 {
-        reader.seek(SeekFrom::Start(start))?;
+        file.seek(SeekFrom::Start(start))?;
     }
+    read(&mut file)
+}
 
+pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut reader = BufReader::new(stream);
+    let mut buffer = vec![];
     let mut read_bytes = 0;
     loop {
         let mut tmp = vec![];
