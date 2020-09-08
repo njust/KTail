@@ -13,9 +13,9 @@ use sourceview::{ViewExt};
 use regex::Regex;
 use std::collections::HashMap;
 use crate::rules::SEARCH_ID;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Seek, SeekFrom, BufReader, BufRead};
 use std::error::Error;
-use std::process::{Stdio, ChildStdout, Child};
+use std::process::{Stdio, Child};
 
 pub struct FileView {
     container: gtk::Box,
@@ -89,35 +89,68 @@ impl LogReader for LogFileReader {
 }
 
 struct StdoutReader {
-    stdout: Option<ChildStdout>,
     child: Option<std::process::Child>,
+    rx: std::sync::mpsc::Receiver<Vec<u8>>,
 }
 
 impl StdoutReader {
     fn new(program: &str, args: &[&str]) -> Result<Self, Box<dyn Error>> {
-        let mut child = std::process::Command::new(program)
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        let mut cmd = std::process::Command::new(program);
+        #[cfg(target_family = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let mut child = cmd
             .stdout(Stdio::piped())
             .args(args)
             .spawn()?;
 
+        let mut stdout = child.stdout.take();
+        std::thread::spawn(move || {
+            if let Some(stdout) = stdout.as_mut() {
+                let mut reader = BufReader::new(stdout);
+                loop {
+                    let mut buffer = vec![];
+                    match reader.read_until(b'\n', &mut buffer) {
+                        Ok(read) => {
+                            if read <= 0 {
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            println!("Error reading: {:?}", e);
+                            break;
+                        }
+                    }
+                    tx.send(buffer).expect("Could not send stdout data");
+                }
+            }
+        });
+
         Ok(Self {
-            stdout: child.stdout.take(),
             child: Some(child),
+            rx
         })
     }
 }
 
 impl LogReader for StdoutReader {
     fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
-        if let Some(stdout) = self.stdout.as_mut() {
-            let mut buffer = [0;1024*1024];
-            let read = stdout.read(&mut buffer)?;
-            let read_slice = &buffer[0..read].to_vec();
-            println!("Read: {}", read);
-            return Ok(read_slice.to_vec());
-
+        let mut buffer = vec![];
+        let mut read_bytes = 0;
+        while let Ok(mut b) = self.rx.try_recv() {
+            let read = b.len();
+            read_bytes += read;
+            buffer.append(&mut b);
+            if read <= 0 || read_bytes > (1024 * 500) {
+                break;
+            }
         }
-        Err("Cannot read from stdout".into())
+
+        Ok(buffer)
     }
 
     fn check_changes(&mut self) -> LogState {

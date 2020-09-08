@@ -87,7 +87,6 @@ pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>, Box<dyn Error>> {
     loop {
         let mut tmp = vec![];
         let read = reader.read_until(b'\n', &mut tmp)?;
-
         if read <= 0 || read_bytes > (1024 * 500) {
             break;
         }
