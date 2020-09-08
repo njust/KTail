@@ -6,30 +6,28 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
-use crate::util::{enable_auto_scroll, read_file, SortedListCompare, CompareResult, CREATE_NO_WINDOW, search, decode_data, read};
+use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, CREATE_NO_WINDOW, search, decode_data, read};
 use crate::{FileViewMsg, FileViewData, SearchResultMatch};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
-use subprocess::{PopenConfig, Redirection, Popen};
-use uuid::Uuid;
 use regex::Regex;
 use std::collections::HashMap;
 use crate::rules::SEARCH_ID;
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::error::Error;
+use std::process::{Stdio, ChildStdout, Child};
 
 pub struct FileView {
     container: gtk::Box,
     text_view: Rc<sourceview::View>,
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<Rule>,
-    kube_log_process: Option<Popen>,
-    kube_log_path: Option<PathBuf>,
     stop_handle: Option<Arc<(Mutex<bool>, Condvar)>>,
     thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
     result_map: HashMap<String, Vec<SearchResultMatch>>,
     current_result_selection: HashMap<String, usize>,
     result_match_cursor_pos: Option<usize>,
+    child_process: Option<Child>,
 }
 
 pub trait LogReader : std::marker::Send {
@@ -37,13 +35,13 @@ pub trait LogReader : std::marker::Send {
     fn check_changes(&mut self) -> LogState;
 }
 
-pub struct FileReader {
+pub struct LogFileReader {
     path: PathBuf,
     file: std::fs::File,
     offset: u64,
 }
 
-impl FileReader {
+impl LogFileReader {
     pub fn new(path: PathBuf) -> Result<Self, std::io::Error> {
         let file = std::fs::File::open(&path)?;
         Ok(Self {
@@ -60,7 +58,7 @@ pub enum LogState {
     Reload
 }
 
-impl LogReader for FileReader {
+impl LogReader for LogFileReader {
     fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
         if self.offset > 0 {
             self.file.seek(SeekFrom::Start(self.offset))?;
@@ -87,6 +85,43 @@ impl LogReader for FileReader {
         }
 
         return LogState::Ok;
+    }
+}
+
+struct StdoutReader {
+    stdout: Option<ChildStdout>,
+    child: Option<std::process::Child>,
+}
+
+impl StdoutReader {
+    fn new(program: &str, args: &[&str]) -> Result<Self, Box<dyn Error>> {
+        let mut child = std::process::Command::new(program)
+            .stdout(Stdio::piped())
+            .args(args)
+            .spawn()?;
+
+        Ok(Self {
+            stdout: child.stdout.take(),
+            child: Some(child),
+        })
+    }
+}
+
+impl LogReader for StdoutReader {
+    fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
+        if let Some(stdout) = self.stdout.as_mut() {
+            let mut buffer = [0;1024*1024];
+            let read = stdout.read(&mut buffer)?;
+            let read_slice = &buffer[0..read].to_vec();
+            println!("Read: {}", read);
+            return Ok(read_slice.to_vec());
+
+        }
+        Err("Cannot read from stdout".into())
+    }
+
+    fn check_changes(&mut self) -> LogState {
+        LogState::Ok
     }
 }
 
@@ -122,49 +157,28 @@ impl FileView {
         let file_thread_tx = sender.clone();
         match data {
             FileViewData::File(path) => {
-                let reader = FileReader::new(path).unwrap();
+                let reader = LogFileReader::new(path).unwrap();
                 register_file_watcher_thread(move |msg| {
                     file_thread_tx(msg);
                 }, Box::new(reader),  stop_handle.clone(), thread_action_receiver);
             }
             FileViewData::Kube(data) => {
-                let tmp_file = std::env::temp_dir().join(Uuid::new_v4().to_string());
-                println!("{:?}", tmp_file);
-                if let Ok(file) = std::fs::OpenOptions::new()
-                    .write(true)
-                    .append(true)
-                    .create(true)
-                    .open(&tmp_file) {
+                let services = data.services;
+                let template = if services.len() == 1 {
+                    "{{.Message}}"
+                }else {
+                    "{{.ContainerName}} {{.Message}}"
+                };
 
-                    let mut cfg = PopenConfig {
-                        stdout: Redirection::File(file),
-                        detached: true,
-                        ..Default::default()
-                    };
+                let since = format!("{}h", data.since);
+                let args = ["--since", &since, "--template", template, &services.join("|")];
+                let mut reader = StdoutReader::new("stern", &args).unwrap();
+                self.child_process = reader.child.take();
 
-                    #[cfg(target_family = "windows")]
-                    {
-                        cfg.creation_flags = CREATE_NO_WINDOW;
-                    }
 
-                    let services = data.services;
-                    let template = if services.len() == 1 {
-                        "{{.Message}}"
-                    }else {
-                        "{{.ContainerName}} {{.Message}}"
-                    };
-
-                    let since = format!("{}h", data.since);
-                    let process = subprocess::Popen::create(&["stern", "--since", &since, "--template", template, &services.join("|")], cfg).unwrap();
-
-                    self.kube_log_process = Some(process);
-                }
-
-                let reader = FileReader::new(tmp_file.clone()).unwrap();
                 register_file_watcher_thread(move |msg| {
                     file_thread_tx(msg);
                 }, Box::new(reader), stop_handle.clone(), thread_action_receiver);
-                self.kube_log_path = Some(tmp_file);
             }
         }
 
@@ -222,13 +236,12 @@ impl FileView {
             text_view,
             autoscroll_handler: None,
             rules: vec![],
-            kube_log_process: None,
-            kube_log_path: None,
             thread_action_sender: None,
             stop_handle: None,
             result_map,
             current_result_selection,
             result_match_cursor_pos: None,
+            child_process: None,
         }
     }
 
@@ -466,7 +479,6 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
     where T : 'static + Send + Clone + Fn(FileViewMsg)
 {
     std::thread::spawn(move || {
-        let mut file_byte_offset = 0;
         let mut line_offset = 0;
         let (lock, wait_handle) = thread_stop_handle.as_ref();
         let mut stopped = lock.lock().unwrap();
@@ -532,16 +544,16 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                     }
                 } else {
                     if let Ok(data) = log_reader.read() {
+                        let read_bytes = data.len();
                         if let Ok(result) = decode_data(&data, encoding) {
-                            file_byte_offset += result.read_bytes;
                             if result.encoding.is_some() {
                                 encoding = result.encoding;
                             }
 
                             if let Ok(r) = search(&result.data, &mut active_rules, line_offset) {
                                 line_offset += r.lines;
-                                if result.read_bytes > 0 {
-                                    sender(FileViewMsg::Data(result.read_bytes, result.data, r.results));
+                                if read_bytes > 0 {
+                                    sender(FileViewMsg::Data(read_bytes as u64, result.data, r.results));
                                 }
                             }
                         }
@@ -557,25 +569,20 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
 
 impl Drop for FileView {
     fn drop(&mut self) {
+        if let Some(mut child) = self.child_process.take() {
+            if let Err(e) = child.kill() {
+                eprintln!("Could not kill stern child process: {:?}", e);
+            }
+            if let Err(e) = child.wait() {
+                eprintln!("Could not wait for stern child process: {:?}", e);
+            }
+        }
+
         if let Some(stop_handle) = self.stop_handle.take() {
             let &(ref lock, ref cvar) = stop_handle.as_ref();
             let mut stop = lock.lock().unwrap();
             *stop = true;
             cvar.notify_one();
-        }
-
-        if let Some(mut p) = self.kube_log_process.take() {
-            println!("Waiting process to exit");
-            match p.kill() {
-                Ok(_) => println!("Killed subprocess"),
-                Err(e) => eprintln!("Failed to kill subprocess: {}", e),
-            }
-            println!("OK!");
-        }
-        if let Some(tmp_file) = self.kube_log_path.take() {
-            if let Err(e) = std::fs::remove_file(&tmp_file) {
-                eprintln!("Could not delete tmp file: {:?} error was: {}", tmp_file, e);
-            }
         }
     }
 }

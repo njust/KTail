@@ -41,7 +41,6 @@ pub fn get_encoding(bytes: &[u8]) -> &'static dyn encoding::types::Encoding {
 }
 
 pub struct ReadResult {
-    pub read_bytes: u64,
     pub data: String,
     pub encoding: Option<&'static dyn encoding::types::Encoding>
 }
@@ -67,11 +66,9 @@ pub fn decode_data(buffer: &[u8], encoding: Option<&'static dyn encoding::types:
     data = data.replace("", "");
 
 
-    let read_bytes = buffer.len() as u64;
     Ok(ReadResult {
-        read_bytes,
         data,
-        encoding: if read_bytes > 0 {Some(encoding) } else {None}
+        encoding: Some(encoding)
     })
 }
 
