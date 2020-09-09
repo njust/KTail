@@ -16,6 +16,7 @@ use crate::rules::SEARCH_ID;
 use std::io::{Seek, SeekFrom, BufReader, BufRead};
 use std::error::Error;
 use std::process::{Stdio, Child};
+use log::{info, error};
 
 pub struct FileView {
     container: gtk::Box,
@@ -93,23 +94,38 @@ struct StdoutReader {
     rx: std::sync::mpsc::Receiver<Vec<u8>>,
 }
 
+pub fn init_cmd(program: &str) -> std::process::Command {
+    let mut cmd = std::process::Command::new(program);
+    #[cfg(target_family = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
 impl StdoutReader {
     fn new(program: &str, args: &[&str]) -> Result<Self, Box<dyn Error>> {
+        info!("New StdoutReader with args: {:?}", args);
         let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
-        let mut cmd = std::process::Command::new(program);
-        #[cfg(target_family = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
-        let mut child = cmd
+        let mut cmd = init_cmd(program);
+        let child = cmd
             .stdout(Stdio::piped())
             .args(args)
-            .spawn()?;
+            .spawn();
+
+        let mut child = match child {
+            Ok(child) => child,
+            Err(e) => {
+                error!("Could spawn process: {:?}", e);
+                return Err(e.into());
+            }
+        };
 
         let mut stdout = child.stdout.take();
         std::thread::spawn(move || {
+            info!("Spawned stdout reader thread");
+
             if let Some(stdout) = stdout.as_mut() {
                 let mut reader = BufReader::new(stdout);
                 loop {
@@ -117,11 +133,12 @@ impl StdoutReader {
                     match reader.read_until(b'\n', &mut buffer) {
                         Ok(read) => {
                             if read <= 0 {
+                                info!("Exit stdout reader thread");
                                 break;
                             }
                         }
                         Err(e) => {
-                            println!("Error reading: {:?}", e);
+                            error!("Exit stdout reader thread with error: {:?}", e);
                             break;
                         }
                     }
@@ -197,21 +214,26 @@ impl FileView {
             }
             FileViewData::Kube(data) => {
                 let services = data.services;
-                let template = if services.len() == 1 {
-                    "{{.Message}}"
-                }else {
-                    "{{.ContainerName}} {{.Message}}"
-                };
-
                 let since = format!("{}h", data.since);
-                let args = ["--since", &since, "--template", template, &services.join("|")];
-                let mut reader = StdoutReader::new("stern", &args).unwrap();
-                self.child_process = reader.child.take();
 
+                // let template = if services.len() == 1 {
+                //     "{{.Message}}"
+                // }else {
+                //     "{{.ContainerName}} {{.Message}}"
+                // };
+                // let args = ["--since", &since, "--template", template, &services.join("|")];
+                // let mut reader = StdoutReader::new("stern", &args).unwrap();
 
-                register_file_watcher_thread(move |msg| {
-                    file_thread_tx(msg);
-                }, Box::new(reader), stop_handle.clone(), thread_action_receiver);
+                if let Some(svc) = services.first() {
+                    let args = ["logs", "-f", "--since", &since, &format!("deployment/{}", svc)];
+                    let mut reader = StdoutReader::new("kubectl", &args).unwrap();
+
+                    self.child_process = reader.child.take();
+
+                    register_file_watcher_thread(move |msg| {
+                        file_thread_tx(msg);
+                    }, Box::new(reader), stop_handle.clone(), thread_action_receiver);
+                }
             }
         }
 

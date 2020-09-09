@@ -1,4 +1,4 @@
-// #![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 use gtk::prelude::*;
 use gio::prelude::*;
@@ -6,6 +6,7 @@ use gio::prelude::*;
 use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow, AccelGroup};
 use std::rc::Rc;
 use gio::{SimpleAction};
+use log::{error, info};
 
 mod file;
 pub mod rules;
@@ -221,6 +222,11 @@ fn create_open_dlg_action(tx: Sender<Msg>) -> SimpleAction {
 
 
 fn main() {
+    if let Err(e) = log4rs::init_file("config/log4rs.yaml", Default::default()) {
+        error!("Could not init log with log4rs config: {:?}", e);
+    }
+    info!("Logger initialized");
+
     let application = Application::new(
         Some("de.njust.ktail"),
         Default::default(),
