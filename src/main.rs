@@ -15,7 +15,7 @@ pub mod util;
 use crate::file::workbench::FileViewWorkbench;
 use uuid::Uuid;
 use crate::rules::Rule;
-use crate::util::{get_pods, create_col, ColumnType};
+use crate::util::{create_col, ColumnType};
 use std::path::PathBuf;
 use glib::Sender;
 use std::collections::HashMap;
@@ -23,8 +23,8 @@ use std::collections::HashMap;
 pub const SEARCH_TAG: &'static str = "SEARCH";
 
 pub struct CreateKubeLogData {
-    services: Vec<String>,
-    since: i32
+    pod: String,
+    since: u32
 }
 
 pub enum FileViewData {
@@ -36,7 +36,7 @@ impl FileViewData {
     fn get_name(&self) -> String {
         match self {
             FileViewData::File(file_path) => file_path.file_name().unwrap().to_str().unwrap().to_string(),
-            FileViewData::Kube(data) => data.services.join(",")
+            FileViewData::Kube(data) => data.pod.clone()
         }
     }
 }
@@ -120,6 +120,11 @@ fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid, accelerators: &Acce
     (tab_header, file_view)
 }
 
+use k8s_client::{
+    KubeClient,
+};
+
+
 fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
     let kube_action = SimpleAction::new("kube", None);
     let dlg = gtk::Dialog::new();
@@ -131,7 +136,7 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
     list.append_column(&create_col(Some("Service"), 0, ColumnType::String, service_model.clone()));
 
     dlg.set_position(WindowPosition::CenterOnParent);
-    dlg.set_default_size(300, 400);
+    dlg.set_default_size(450, 400);
     let header_bar = HeaderBar::new();
     header_bar.set_show_close_button(true);
     header_bar.set_title(Some("Services"));
@@ -146,7 +151,7 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
 
     let since_row = gtk::Box::new(Orientation::Horizontal, 0);
     since_row.set_spacing(4);
-    let adjustment = gtk::Adjustment::new(4.0, 1.0, 49.0, 1.0, 1.0, 1.0);
+    let adjustment = gtk::Adjustment::new(4.0, 1.0, 721.0, 1.0, 1.0, 1.0);
     let since_val = gtk::SpinButton::new(Some(&adjustment), 1.0, 0);
     since_val.set_value(4.0);
     since_row.add(&gtk::Label::new(Some("Since hours:")));
@@ -164,10 +169,17 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
     dlg.add_button("_Open", ResponseType::Accept);
 
     kube_action.connect_activate(move |_,_| {
+        let pods = glib::MainContext::default().block_on(async move  {
+            let c = KubeClient::load_conf(None).unwrap();
+            let pods = c.pods().await.unwrap();
+            pods
+        });
+
+
         service_model.clear();
-        if let Ok(pods) = get_pods() {
-            for pod in pods {
-                service_model.insert_with_values(None, None, &[0, 1], &[&pod, &false]);
+        for pod in pods {
+            if let Some(name) = pod.metadata.name {
+                service_model.insert_with_values(None, None, &[0, 1], &[&name, &false]);
             }
         }
         dlg.show_all();
@@ -175,7 +187,7 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
         let res = dlg.run();
         dlg.close();
         let since = since_val.get_text().to_string();
-        let since = since.parse::<i32>().unwrap_or(4);
+        let since = since.parse::<u32>().unwrap_or(4);
 
         if res == ResponseType::Accept {
             let mut models = vec![];
@@ -193,10 +205,12 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
                     }
                 }
             }
-            tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
-                services: models,
-                since,
-            }))).expect("Could not send create tab msg");
+            for model in models {
+                tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
+                    pod: model,
+                    since,
+                }))).expect("Could not send create tab msg");
+            }
         }
 
     });
@@ -221,7 +235,8 @@ fn create_open_dlg_action(tx: Sender<Msg>) -> SimpleAction {
 }
 
 
-fn main() {
+#[tokio::main]
+async fn main() {
     if let Err(e) = log4rs::init_file("config/log4rs.yaml", Default::default()) {
         error!("Could not init log with log4rs config: {:?}", e);
     }
@@ -237,6 +252,8 @@ fn main() {
         let notebook = Notebook::new();
         let open_action = create_open_dlg_action(tx.clone());
         app.add_action(&open_action);
+
+
         let kube_action = create_open_kube_action(tx.clone());
         app.add_action(&kube_action);
 
@@ -272,6 +289,7 @@ fn main() {
                 }
                 Msg::CloseTab(id) => {
                     if let Some(tab) = file_views.get_mut(&id) {
+                        tab.close();
                         notebook.detach_tab(tab.view());
                         file_views.remove(&id);
                     }

@@ -1,9 +1,7 @@
 use gtk::{prelude::*, TextIter, TextBuffer};
 
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
-use std::time::Duration;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex, Condvar};
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, CREATE_NO_WINDOW, search, decode_data, read};
@@ -13,17 +11,18 @@ use sourceview::{ViewExt};
 use regex::Regex;
 use std::collections::HashMap;
 use crate::rules::SEARCH_ID;
-use std::io::{Seek, SeekFrom, BufReader, BufRead};
+use std::io::{Seek, SeekFrom};
 use std::error::Error;
-use std::process::{Stdio, Child};
-use log::{info, error};
+use std::process::{Child};
+use k8s_client::{KubeClient, LogOptions};
+use async_trait::async_trait;
+use tokio::sync::mpsc::Receiver;
 
 pub struct FileView {
     container: gtk::Box,
     text_view: Rc<sourceview::View>,
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<Rule>,
-    stop_handle: Option<Arc<(Mutex<bool>, Condvar)>>,
     thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
     result_map: HashMap<String, Vec<SearchResultMatch>>,
     current_result_selection: HashMap<String, usize>,
@@ -31,8 +30,9 @@ pub struct FileView {
     child_process: Option<Child>,
 }
 
+#[async_trait]
 pub trait LogReader : std::marker::Send {
-    fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>>;
+    async fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>>;
     fn check_changes(&mut self) -> LogState;
 }
 
@@ -59,8 +59,9 @@ pub enum LogState {
     Reload
 }
 
+#[async_trait]
 impl LogReader for LogFileReader {
-    fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
+    async fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
         if self.offset > 0 {
             self.file.seek(SeekFrom::Start(self.offset))?;
         }
@@ -89,89 +90,55 @@ impl LogReader for LogFileReader {
     }
 }
 
-struct StdoutReader {
-    child: Option<std::process::Child>,
-    rx: std::sync::mpsc::Receiver<Vec<u8>>,
+pub struct KubernetesLogReader {
+    data_rx: Receiver<Vec<u8>>,
 }
 
-pub fn init_cmd(program: &str) -> std::process::Command {
-    let mut cmd = std::process::Command::new(program);
-    #[cfg(target_family = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    cmd
-}
-
-impl StdoutReader {
-    fn new(program: &str, args: &[&str]) -> Result<Self, Box<dyn Error>> {
-        info!("New StdoutReader with args: {:?}", args);
-        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
-        let mut cmd = init_cmd(program);
-        let child = cmd
-            .stdout(Stdio::piped())
-            .args(args)
-            .spawn();
-
-        let mut child = match child {
-            Ok(child) => child,
-            Err(e) => {
-                error!("Could spawn process: {:?}", e);
-                return Err(e.into());
-            }
-        };
-
-        let mut stdout = child.stdout.take();
-        std::thread::spawn(move || {
-            info!("Spawned stdout reader thread");
-
-            if let Some(stdout) = stdout.as_mut() {
-                let mut reader = BufReader::new(stdout);
-                loop {
-                    let mut buffer = vec![];
-                    match reader.read_until(b'\n', &mut buffer) {
-                        Ok(read) => {
-                            if read <= 0 {
-                                info!("Exit stdout reader thread");
-                                break;
-                            }
-                        }
-                        Err(e) => {
-                            error!("Exit stdout reader thread with error: {:?}", e);
-                            break;
-                        }
-                    }
-                    tx.send(buffer).expect("Could not send stdout data");
+#[async_trait]
+impl LogReader for KubernetesLogReader {
+    async fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut r = vec![];
+        loop {
+            if let Ok(mut rc) = self.data_rx.try_recv() {
+                if rc.len() > 0 {
+                    r.append(&mut rc)
+                }else {
+                    break;
                 }
-            }
-        });
-
-        Ok(Self {
-            child: Some(child),
-            rx
-        })
-    }
-}
-
-impl LogReader for StdoutReader {
-    fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
-        let mut buffer = vec![];
-        let mut read_bytes = 0;
-        while let Ok(mut b) = self.rx.try_recv() {
-            let read = b.len();
-            read_bytes += read;
-            buffer.append(&mut b);
-            if read <= 0 || read_bytes > (1024 * 500) {
+            }else {
                 break;
             }
         }
-
-        Ok(buffer)
+        Ok(r)
     }
 
     fn check_changes(&mut self) -> LogState {
         LogState::Ok
+    }
+}
+
+impl KubernetesLogReader {
+    pub fn new(name: String, since: u32) -> Self {
+        use tokio::stream::StreamExt;
+        let (mut data_tx, data_rx) = tokio::sync::mpsc::channel(1000);
+        glib::MainContext::new().block_on(async move {
+            let c = KubeClient::load_conf(None).unwrap();
+            if let Ok(mut log_stream) = c.logs(&name, Some(
+                LogOptions {
+                    follow: Some(true),
+                    since_seconds: Some(3600 * since),
+                }
+            )).await {
+                tokio::spawn(async move {
+                    while let Some(Ok(res)) = log_stream.next().await {
+                        data_tx.send(res.to_vec()).await.expect("Could not send data msg!");
+                    }
+                });
+            }
+        });
+        Self {
+            data_rx,
+        }
     }
 }
 
@@ -202,42 +169,21 @@ impl FileView {
             });
         }
 
-        let stop_handle = Arc::new((Mutex::new(false), Condvar::new()));
-
         let file_thread_tx = sender.clone();
         match data {
             FileViewData::File(path) => {
                 let reader = LogFileReader::new(path).unwrap();
                 register_file_watcher_thread(move |msg| {
                     file_thread_tx(msg);
-                }, Box::new(reader),  stop_handle.clone(), thread_action_receiver);
+                }, Box::new(reader),  thread_action_receiver);
             }
             FileViewData::Kube(data) => {
-                let services = data.services;
-                let since = format!("{}h", data.since);
-
-                // let template = if services.len() == 1 {
-                //     "{{.Message}}"
-                // }else {
-                //     "{{.ContainerName}} {{.Message}}"
-                // };
-                // let args = ["--since", &since, "--template", template, &services.join("|")];
-                // let mut reader = StdoutReader::new("stern", &args).unwrap();
-
-                if let Some(svc) = services.first() {
-                    let args = ["logs", "-f", "--since", &since, &format!("deployment/{}", svc)];
-                    let mut reader = StdoutReader::new("kubectl", &args).unwrap();
-
-                    self.child_process = reader.child.take();
-
-                    register_file_watcher_thread(move |msg| {
-                        file_thread_tx(msg);
-                    }, Box::new(reader), stop_handle.clone(), thread_action_receiver);
-                }
+                let reader = KubernetesLogReader::new(data.pod, data.since);
+                register_file_watcher_thread(move |msg| {
+                    file_thread_tx(msg);
+                }, Box::new(reader),  thread_action_receiver);
             }
         }
-
-        self.stop_handle = Some(stop_handle);
     }
     pub fn new() -> Self {
         let tag_table = TextTagTable::new();
@@ -292,7 +238,6 @@ impl FileView {
             autoscroll_handler: None,
             rules: vec![],
             thread_action_sender: None,
-            stop_handle: None,
             result_map,
             current_result_selection,
             result_match_cursor_pos: None,
@@ -513,6 +458,12 @@ impl FileView {
         }
     }
 
+    pub fn close(&mut self) {
+        if let Some(sender) = self.thread_action_sender.as_ref() {
+            sender.send(FileThreadMsg::Quit).expect("Could not send quit msg");
+        }
+    }
+
     pub fn enable_auto_scroll(&mut self) {
         let handler = enable_auto_scroll(&*self.text_view);
         self.autoscroll_handler = Some(handler);
@@ -530,17 +481,14 @@ impl FileView {
     }
 }
 
-fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>, thread_stop_handle: Arc<(Mutex<bool>, Condvar)>, rx: std::sync::mpsc::Receiver<FileThreadMsg>)
+fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>, rx: std::sync::mpsc::Receiver<FileThreadMsg>)
     where T : 'static + Send + Clone + Fn(FileViewMsg)
 {
-    std::thread::spawn(move || {
+    tokio::task::spawn(async move {
         let mut line_offset = 0;
-        let (lock, wait_handle) = thread_stop_handle.as_ref();
-        let mut stopped = lock.lock().unwrap();
-
         let mut active_rules = vec![];
-        let mut encoding: Option<&'static dyn encoding::types::Encoding> = None;
-        while !*stopped {
+
+        loop {
             let check_changes = match log_reader.check_changes() {
                 LogState::Skip => false,
                 LogState::Ok => true,
@@ -588,6 +536,10 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                                 }
                             }
                         }
+                        FileThreadMsg::Quit => {
+                            println!("Quit signal");
+                            break;
+                        }
                     }
                 }
 
@@ -598,8 +550,9 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                         }
                     }
                 } else {
-                    if let Ok(data) = log_reader.read() {
+                    if let Ok(data) = log_reader.read().await {
                         let read_bytes = data.len();
+                        let mut encoding: Option<&'static dyn encoding::types::Encoding> = None;
                         if let Ok(result) = decode_data(&data, encoding) {
                             if result.encoding.is_some() {
                                 encoding = result.encoding;
@@ -616,8 +569,9 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                 }
             }
 
-            stopped = wait_handle.wait_timeout(stopped, Duration::from_millis(500)).unwrap().0;
+            tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
         }
+
         println!("File watcher stopped");
     });
 }
@@ -631,13 +585,6 @@ impl Drop for FileView {
             if let Err(e) = child.wait() {
                 eprintln!("Could not wait for stern child process: {:?}", e);
             }
-        }
-
-        if let Some(stop_handle) = self.stop_handle.take() {
-            let &(ref lock, ref cvar) = stop_handle.as_ref();
-            let mut stop = lock.lock().unwrap();
-            *stop = true;
-            cvar.notify_one();
         }
     }
 }

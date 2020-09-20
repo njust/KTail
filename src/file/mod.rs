@@ -20,4 +20,5 @@ struct RuleChanges {
 
 enum FileThreadMsg {
     ApplyRules(RuleChanges),
+    Quit,
 }

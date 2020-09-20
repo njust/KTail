@@ -18,6 +18,9 @@ log = "0.4.11"
 
 regex = "1.3.9"
 uuid = {version = "0.8.1", features = ["v4"]}
+k8s_client = {git = "https://github.com/njust/k8s_client.git"}
+tokio = { version = "0.2", features = ["full"] }
+async-trait = "0.1.40"
 
 [dependencies.gtk]
 version = "0.9.0"

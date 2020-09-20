@@ -133,6 +133,10 @@ impl FileViewWorkbench {
         }
     }
 
+    pub fn close(&mut self) {
+        self.file_view.close();
+    }
+
     pub fn view(&self) -> &gtk::Box {
         &self.container
     }
