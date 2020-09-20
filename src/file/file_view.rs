@@ -15,6 +15,8 @@ use std::io::{Seek, SeekFrom};
 use std::error::Error;
 use std::process::{Child};
 use k8s_client::{KubeClient, LogOptions};
+use stream_cancel::{Valved, Trigger};
+use tokio::sync::oneshot::Sender;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Receiver;
 
@@ -34,6 +36,7 @@ pub struct FileView {
 pub trait LogReader : std::marker::Send {
     async fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>>;
     fn check_changes(&mut self) -> LogState;
+    fn stop(&mut self);
 }
 
 pub struct LogFileReader {
@@ -88,9 +91,13 @@ impl LogReader for LogFileReader {
 
         return LogState::Ok;
     }
+
+    fn stop(&mut self) {
+    }
 }
 
 pub struct KubernetesLogReader {
+    exit_trigger: Option<(Sender<Trigger>, Trigger)>,
     data_rx: Receiver<Vec<u8>>,
 }
 
@@ -115,13 +122,21 @@ impl LogReader for KubernetesLogReader {
     fn check_changes(&mut self) -> LogState {
         LogState::Ok
     }
+
+    fn stop(&mut self) {
+        if let Some((sender, trigger)) = self.exit_trigger.take() {
+            sender.send(trigger);
+        }
+    }
 }
 
 impl KubernetesLogReader {
     pub fn new(name: String, since: u32) -> Self {
         use tokio::stream::StreamExt;
-        let (mut data_tx, data_rx) = tokio::sync::mpsc::channel(1000);
-        glib::MainContext::new().block_on(async move {
+        let (mut data_tx, data_rx) = tokio::sync::mpsc::channel(100);
+        let (exit_sender,exit_trigger) = glib::MainContext::new().block_on(async move {
+            let (exit_tx, exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();
+            let mut exit_trigger = None;
             let c = KubeClient::load_conf(None).unwrap();
             if let Ok(mut log_stream) = c.logs(&name, Some(
                 LogOptions {
@@ -129,14 +144,18 @@ impl KubernetesLogReader {
                     since_seconds: Some(3600 * since),
                 }
             )).await {
+                let (exit, mut inc) = Valved::new(log_stream);
+                exit_trigger = Some(exit);
                 tokio::spawn(async move {
-                    while let Some(Ok(res)) = log_stream.next().await {
-                        data_tx.send(res.to_vec()).await.expect("Could not send data msg!");
+                    while let Some(Ok(res)) = inc.next().await {
+                        data_tx.send(res.to_vec()).await;
                     }
                 });
             }
+            (exit_tx, exit_trigger.unwrap())
         });
         Self {
+            exit_trigger: Some((exit_sender, exit_trigger)),
             data_rx,
         }
     }
@@ -571,7 +590,7 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
 
             tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
         }
-
+        log_reader.stop();
         println!("File watcher stopped");
     });
 }
