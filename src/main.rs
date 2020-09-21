@@ -139,7 +139,7 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
     dlg.set_default_size(450, 400);
     let header_bar = HeaderBar::new();
     header_bar.set_show_close_button(true);
-    header_bar.set_title(Some("Services"));
+    header_bar.set_title(Some("Pods"));
     dlg.set_titlebar(Some(&header_bar));
     dlg.set_modal(true);
 

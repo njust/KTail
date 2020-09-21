@@ -133,7 +133,7 @@ impl LogReader for KubernetesLogReader {
 impl KubernetesLogReader {
     pub fn new(name: String, since: u32) -> Self {
         use tokio::stream::StreamExt;
-        let (mut data_tx, data_rx) = tokio::sync::mpsc::channel(100);
+        let (mut data_tx, data_rx) = tokio::sync::mpsc::channel(10000);
         let (exit_sender,exit_trigger) = glib::MainContext::new().block_on(async move {
             let (exit_tx, exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();
             let mut exit_trigger = None;

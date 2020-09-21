@@ -28,7 +28,7 @@ pub fn get_default_rules() -> Vec<Rule> {
         Rule {
             id: Uuid::new_v4(),
             regex: Some(r".*\s((?i)error|fatal|failed(?-i))\s.*".into()),
-            color: Some(String::from("rgba(191,64,64,1)")),
+            color: Some(String::from("rgba(255,96,102,1)")),
             name: Some(String::from("Error")),
             is_system: false
         },
