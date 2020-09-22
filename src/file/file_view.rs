@@ -19,6 +19,7 @@ use stream_cancel::{Valved, Trigger};
 use tokio::sync::oneshot::Sender;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Receiver;
+use log::{info, error};
 
 pub struct FileView {
     container: gtk::Box,
@@ -101,16 +102,16 @@ impl LogReader for LogFileReader {
 }
 
 pub struct KubernetesLogReader {
-    exit_trigger: Option<(Sender<Trigger>, Trigger)>,
     options: CreateKubeLogData,
-    is_initialiazed: bool,
+    is_initialized: bool,
     data_rx: Option<Receiver<KubernetesLogReaderMsg>>,
-    cx: glib::MainContext,
+    data_tx: Option<tokio::sync::mpsc::Sender<KubernetesLogReaderMsg>>,
+    streams: HashMap<String, (Sender<Trigger>, Trigger)>
 }
 
 pub enum KubernetesLogReaderMsg {
     Data(Vec<u8>),
-    ReInit,
+    ReInit(String),
 }
 
 #[async_trait]
@@ -128,8 +129,10 @@ impl LogReader for KubernetesLogReader {
                                 break;
                             }
                         }
-                        KubernetesLogReaderMsg::ReInit => {
-                            self.is_initialiazed = false;
+                        KubernetesLogReaderMsg::ReInit(pod) => {
+                            self.is_initialized = false;
+                            info!("Remove pod stream: {}", pod);
+                            self.streams.remove(&pod);
                             break;
                         }
                     }
@@ -143,45 +146,55 @@ impl LogReader for KubernetesLogReader {
 
     async fn init(&mut self) {
         use tokio::stream::StreamExt;
-
-        if self.is_initialiazed {
+        if self.is_initialized {
             return;
         }
-        self.is_initialiazed = true;
-
+        self.is_initialized = true;
 
         let c = KubeClient::load_conf(None).unwrap();
-        let mut target_pod = self.options.pod.clone();
+        let mut pod_list = vec![];
         if let Ok(pods) = c.pods().await {
             for pod in pods {
                 if let Some(name) = pod.metadata.name {
-                    if name.starts_with(&target_pod) {
-                        target_pod = name;
-                        break;
+                    if name.starts_with(&self.options.pod) {
+                        if let Some(status) = pod.status {
+                            // info!("Pod status: {}, {:?}", name, status);
+                        }
+                        pod_list.push(name);
                     }
                 }
             }
         }
 
-        let (mut data_tx, data_rx) = tokio::sync::mpsc::channel(10000);
-        self.data_rx = Some(data_rx);
-        if let Ok(mut log_stream) = c.logs(&target_pod, Some(
-            LogOptions {
-                follow: Some(true),
-                since_seconds: Some(3600 * self.options.since),
+        for pod in pod_list {
+            if self.streams.contains_key(&pod) {
+                // info!("Skipping initiate stream for pod '{}'", pod);
+                continue;
             }
-        )).await {
-            let (exit_tx, exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();
-            let (exit, mut inc) = Valved::new(log_stream);
-            self.exit_trigger = Some((exit_tx, exit));
-            tokio::spawn(async move {
-                while let Some(Ok(res)) = inc.next().await {
-                    data_tx.send(KubernetesLogReaderMsg::Data(res.to_vec())).await;
-                }
-                data_tx.send(KubernetesLogReaderMsg::ReInit).await;
-            });
-        }
 
+            if let Ok(mut log_stream) = c.logs(&pod, Some(
+                LogOptions {
+                    follow: Some(true),
+                    since_seconds: Some(3600 * self.options.since),
+                }
+            )).await {
+                let (exit_tx, exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();
+                let (exit, mut inc) = Valved::new(log_stream);
+                self.streams.insert(pod.clone(), (exit_tx, exit));
+                let mut tx = self.data_tx.clone().unwrap();
+                let pod_name = pod.clone();
+                tokio::spawn(async move {
+                    info!("Stream for pod '{}' started", pod_name);
+                    while let Some(Ok(res)) = inc.next().await {
+                        if let Err(e) = tx.send(KubernetesLogReaderMsg::Data(res.to_vec())).await {
+                            error!("Failed to send stream data for pod '{}': {}", pod_name, e);
+                        }
+                    }
+                    info!("Stream for pod '{}' ended", pod_name);
+                    tx.send(KubernetesLogReaderMsg::ReInit(pod_name)).await;
+                });
+            }
+        }
     }
 
     fn check_changes(&mut self) -> LogState {
@@ -189,20 +202,24 @@ impl LogReader for KubernetesLogReader {
     }
 
     fn stop(&mut self) {
-        if let Some((sender, trigger)) = self.exit_trigger.take() {
-            sender.send(trigger);
+        let pods = self.streams.keys().map(|s|s.clone()).collect::<Vec<String>>();
+        for p in pods {
+            if let Some((sender, trigger)) = self.streams.remove(&p) {
+                sender.send(trigger);
+            }
         }
     }
 }
 
 impl KubernetesLogReader {
     pub fn new(data: CreateKubeLogData) -> Self {
+        let (mut data_tx, data_rx) = tokio::sync::mpsc::channel::<KubernetesLogReaderMsg>(10000);
         let mut instance = Self {
-            exit_trigger: None,
-            data_rx: None,
+            data_rx: Some(data_rx),
+            data_tx: Some(data_tx),
             options: data,
-            is_initialiazed: false,
-            cx: glib::MainContext::new(),
+            is_initialized: false,
+            streams: HashMap::new(),
         };
         Self::init(&mut instance);
         instance
