@@ -179,6 +179,9 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
         service_model.clear();
         for pod in pods {
             if let Some(name) = pod.metadata.name {
+                let parts = name.split("-").collect::<Vec<&str>>();
+                let len = parts.len();
+                let name = parts.into_iter().take(len -2).collect::<Vec<&str>>().join("-");
                 service_model.insert_with_values(None, None, &[0, 1], &[&name, &false]);
             }
         }
@@ -235,8 +238,17 @@ fn create_open_dlg_action(tx: Sender<Msg>) -> SimpleAction {
 }
 
 
-#[tokio::main]
-async fn main() {
+fn main() {
+    let mut rt = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_all()
+        .build().unwrap();
+    rt.block_on(async move {
+        int_main().await;
+    })
+}
+
+async fn int_main() {
     if let Err(e) = log4rs::init_file("config/log4rs.yaml", Default::default()) {
         error!("Could not init log with log4rs config: {:?}", e);
     }

@@ -5,7 +5,7 @@ use std::rc::Rc;
 use std::path::PathBuf;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, CREATE_NO_WINDOW, search, decode_data, read};
-use crate::{FileViewMsg, FileViewData, SearchResultMatch};
+use crate::{FileViewMsg, FileViewData, SearchResultMatch, CreateKubeLogData};
 use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
 use sourceview::{ViewExt};
 use regex::Regex;
@@ -35,6 +35,7 @@ pub struct FileView {
 #[async_trait]
 pub trait LogReader : std::marker::Send {
     async fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>>;
+    async fn init(&mut self);
     fn check_changes(&mut self) -> LogState;
     fn stop(&mut self);
 }
@@ -73,6 +74,9 @@ impl LogReader for LogFileReader {
         Ok(read)
     }
 
+    async fn init(&mut self) {
+    }
+
     fn check_changes(&mut self) -> LogState {
         if !self.path.exists() {
             return LogState::Skip;
@@ -98,7 +102,15 @@ impl LogReader for LogFileReader {
 
 pub struct KubernetesLogReader {
     exit_trigger: Option<(Sender<Trigger>, Trigger)>,
-    data_rx: Receiver<Vec<u8>>,
+    options: CreateKubeLogData,
+    is_initialiazed: bool,
+    data_rx: Option<Receiver<KubernetesLogReaderMsg>>,
+    cx: glib::MainContext,
+}
+
+pub enum KubernetesLogReaderMsg {
+    Data(Vec<u8>),
+    ReInit,
 }
 
 #[async_trait]
@@ -106,17 +118,70 @@ impl LogReader for KubernetesLogReader {
     async fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
         let mut r = vec![];
         loop {
-            if let Ok(mut rc) = self.data_rx.try_recv() {
-                if rc.len() > 0 {
-                    r.append(&mut rc)
+            if let Some(mut rx) = self.data_rx.as_mut() {
+                if let Ok(mut rc) = rx.try_recv() {
+                    match rc {
+                        KubernetesLogReaderMsg::Data(mut data) => {
+                            if data.len() > 0 {
+                                r.append(&mut data)
+                            }else {
+                                break;
+                            }
+                        }
+                        KubernetesLogReaderMsg::ReInit => {
+                            self.is_initialiazed = false;
+                            break;
+                        }
+                    }
                 }else {
                     break;
                 }
-            }else {
-                break;
             }
         }
         Ok(r)
+    }
+
+    async fn init(&mut self) {
+        use tokio::stream::StreamExt;
+
+        if self.is_initialiazed {
+            return;
+        }
+        self.is_initialiazed = true;
+
+
+        let c = KubeClient::load_conf(None).unwrap();
+        let mut target_pod = self.options.pod.clone();
+        if let Ok(pods) = c.pods().await {
+            for pod in pods {
+                if let Some(name) = pod.metadata.name {
+                    if name.starts_with(&target_pod) {
+                        target_pod = name;
+                        break;
+                    }
+                }
+            }
+        }
+
+        let (mut data_tx, data_rx) = tokio::sync::mpsc::channel(10000);
+        self.data_rx = Some(data_rx);
+        if let Ok(mut log_stream) = c.logs(&target_pod, Some(
+            LogOptions {
+                follow: Some(true),
+                since_seconds: Some(3600 * self.options.since),
+            }
+        )).await {
+            let (exit_tx, exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();
+            let (exit, mut inc) = Valved::new(log_stream);
+            self.exit_trigger = Some((exit_tx, exit));
+            tokio::spawn(async move {
+                while let Some(Ok(res)) = inc.next().await {
+                    data_tx.send(KubernetesLogReaderMsg::Data(res.to_vec())).await;
+                }
+                data_tx.send(KubernetesLogReaderMsg::ReInit).await;
+            });
+        }
+
     }
 
     fn check_changes(&mut self) -> LogState {
@@ -131,33 +196,16 @@ impl LogReader for KubernetesLogReader {
 }
 
 impl KubernetesLogReader {
-    pub fn new(name: String, since: u32) -> Self {
-        use tokio::stream::StreamExt;
-        let (mut data_tx, data_rx) = tokio::sync::mpsc::channel(10000);
-        let (exit_sender,exit_trigger) = glib::MainContext::new().block_on(async move {
-            let (exit_tx, exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();
-            let mut exit_trigger = None;
-            let c = KubeClient::load_conf(None).unwrap();
-            if let Ok(mut log_stream) = c.logs(&name, Some(
-                LogOptions {
-                    follow: Some(true),
-                    since_seconds: Some(3600 * since),
-                }
-            )).await {
-                let (exit, mut inc) = Valved::new(log_stream);
-                exit_trigger = Some(exit);
-                tokio::spawn(async move {
-                    while let Some(Ok(res)) = inc.next().await {
-                        data_tx.send(res.to_vec()).await;
-                    }
-                });
-            }
-            (exit_tx, exit_trigger.unwrap())
-        });
-        Self {
-            exit_trigger: Some((exit_sender, exit_trigger)),
-            data_rx,
-        }
+    pub fn new(data: CreateKubeLogData) -> Self {
+        let mut instance = Self {
+            exit_trigger: None,
+            data_rx: None,
+            options: data,
+            is_initialiazed: false,
+            cx: glib::MainContext::new(),
+        };
+        Self::init(&mut instance);
+        instance
     }
 }
 
@@ -197,7 +245,7 @@ impl FileView {
                 }, Box::new(reader),  thread_action_receiver);
             }
             FileViewData::Kube(data) => {
-                let reader = KubernetesLogReader::new(data.pod, data.since);
+                let reader = KubernetesLogReader::new(data);
                 register_file_watcher_thread(move |msg| {
                     file_thread_tx(msg);
                 }, Box::new(reader),  thread_action_receiver);
@@ -508,6 +556,8 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
         let mut active_rules = vec![];
 
         loop {
+            log_reader.init().await;
+
             let check_changes = match log_reader.check_changes() {
                 LogState::Skip => false,
                 LogState::Ok => true,
