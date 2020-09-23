@@ -104,6 +104,7 @@ impl LogReader for LogFileReader {
 pub struct KubernetesLogReader {
     options: CreateKubeLogData,
     is_initialized: bool,
+    is_stopping: bool,
     data_rx: Option<Receiver<KubernetesLogReaderMsg>>,
     data_tx: Option<tokio::sync::mpsc::Sender<KubernetesLogReaderMsg>>,
     streams: HashMap<String, (Sender<Trigger>, Trigger)>
@@ -146,21 +147,23 @@ impl LogReader for KubernetesLogReader {
 
     async fn init(&mut self) {
         use tokio::stream::StreamExt;
-        if self.is_initialized {
+        if self.is_initialized || self.is_stopping {
             return;
         }
         self.is_initialized = true;
 
         let c = KubeClient::load_conf(None).unwrap();
         let mut pod_list = vec![];
+
         if let Ok(pods) = c.pods().await {
             for pod in pods {
+
                 if let Some(name) = pod.metadata.name {
-                    if name.starts_with(&self.options.pod) {
-                        if let Some(status) = pod.status {
-                            // info!("Pod status: {}, {:?}", name, status);
+                    for pod_name in &self.options.pods {
+                        if name.starts_with(pod_name) {
+                            pod_list.push(name.clone());
+                            break;
                         }
-                        pod_list.push(name);
                     }
                 }
             }
@@ -202,6 +205,7 @@ impl LogReader for KubernetesLogReader {
     }
 
     fn stop(&mut self) {
+        self.is_stopping = true;
         let pods = self.streams.keys().map(|s|s.clone()).collect::<Vec<String>>();
         for p in pods {
             if let Some((sender, trigger)) = self.streams.remove(&p) {
@@ -219,6 +223,7 @@ impl KubernetesLogReader {
             data_tx: Some(data_tx),
             options: data,
             is_initialized: false,
+            is_stopping: false,
             streams: HashMap::new(),
         };
         Self::init(&mut instance);

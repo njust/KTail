@@ -23,8 +23,9 @@ use std::collections::HashMap;
 pub const SEARCH_TAG: &'static str = "SEARCH";
 
 pub struct CreateKubeLogData {
-    pod: String,
-    since: u32
+    pods: Vec<String>,
+    since: u32,
+    include_replicas: bool,
 }
 
 pub enum FileViewData {
@@ -36,7 +37,7 @@ impl FileViewData {
     fn get_name(&self) -> String {
         match self {
             FileViewData::File(file_path) => file_path.file_name().unwrap().to_str().unwrap().to_string(),
-            FileViewData::Kube(data) => data.pod.clone()
+            FileViewData::Kube(data) => data.pods.join(",")
         }
     }
 }
@@ -133,7 +134,7 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
     let list = gtk::TreeView::with_model(&*service_model);
 
     list.append_column(&create_col(Some("Add"), 1, ColumnType::Bool, service_model.clone()));
-    list.append_column(&create_col(Some("Service"), 0, ColumnType::String, service_model.clone()));
+    list.append_column(&create_col(Some("Pod"), 0, ColumnType::String, service_model.clone()));
 
     dlg.set_position(WindowPosition::CenterOnParent);
     dlg.set_default_size(450, 400);
@@ -148,6 +149,14 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
     scroll_wnd.set_property_expand(true);
     scroll_wnd.add(&list);
     content.add(&scroll_wnd);
+
+
+    let log_separate_tab_checkbox = gtk::CheckButton::with_label("Logs in separate tab");
+    content.add(&log_separate_tab_checkbox);
+
+    let include_replicas = gtk::CheckButton::with_label("Include replicas");
+    include_replicas.set_active(true);
+    content.add(&include_replicas);
 
     let since_row = gtk::Box::new(Orientation::Horizontal, 0);
     since_row.set_spacing(4);
@@ -179,9 +188,6 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
         service_model.clear();
         for pod in pods {
             if let Some(name) = pod.metadata.name {
-                let parts = name.split("-").collect::<Vec<&str>>();
-                let len = parts.len();
-                let name = parts.into_iter().take(len -2).collect::<Vec<&str>>().join("-");
                 service_model.insert_with_values(None, None, &[0, 1], &[&name, &false]);
             }
         }
@@ -191,6 +197,8 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
         dlg.close();
         let since = since_val.get_text().to_string();
         let since = since.parse::<u32>().unwrap_or(4);
+        let separate_tabs = log_separate_tab_checkbox.get_active();
+        let include_replicas = include_replicas.get_active();
 
         if res == ResponseType::Accept {
             let mut models = vec![];
@@ -208,10 +216,29 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
                     }
                 }
             }
-            for model in models {
+            if separate_tabs {
+                for model in models {
+                    tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
+                        pods: vec![model],
+                        since,
+                        include_replicas
+                    }))).expect("Could not send create tab msg");
+                }
+            }else {
+                let pods = if include_replicas {
+                    models.iter().map(|name| {
+                    let parts = name.split("-").collect::<Vec<&str>>();
+                    let len = parts.len();
+                    parts.into_iter().take(len -2).collect::<Vec<&str>>().join("-")
+                    }).collect::<Vec<String>>()
+                }else {
+                    models
+                };
+
                 tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
-                    pod: model,
+                    pods,
                     since,
+                    include_replicas
                 }))).expect("Could not send create tab msg");
             }
         }
