@@ -3,7 +3,7 @@
 use gtk::prelude::*;
 use gio::prelude::*;
 
-use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow, AccelGroup};
+use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow, AccelGroup, DialogFlags, MessageType, ButtonsType};
 use std::rc::Rc;
 use gio::{SimpleAction};
 use log::{error, info};
@@ -180,69 +180,83 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
     kube_action.connect_activate(move |_,_| {
         let pods = glib::MainContext::default().block_on(async move  {
             let c = KubeClient::load_conf(None).unwrap();
-            let pods = c.pods().await.unwrap();
-            pods
+            c.pods().await
         });
 
-
-        service_model.clear();
-        for pod in pods {
-            if let Some(name) = pod.metadata.name {
-                service_model.insert_with_values(None, None, &[0, 1], &[&name, &false]);
-            }
-        }
-        dlg.show_all();
-
-        let res = dlg.run();
-        dlg.close();
-        let since = since_val.get_text().to_string();
-        let since = since.parse::<u32>().unwrap_or(4);
-        let separate_tabs = log_separate_tab_checkbox.get_active();
-        let include_replicas = include_replicas.get_active();
-
-        if res == ResponseType::Accept {
-            let mut models = vec![];
-            if let Some(iter)  = service_model.get_iter_first() {
-                if let Some((service, active)) = map_model(&service_model, &iter) {
-                    if active {
-                        models.push(service);
+        match pods {
+            Ok(pods) => {
+                service_model.clear();
+                for pod in pods {
+                    if let Some(name) = pod.metadata.name {
+                        service_model.insert_with_values(None, None, &[0, 1], &[&name, &false]);
                     }
                 }
-                while service_model.iter_next(&iter) {
-                    if let Some((service, active)) = map_model(&service_model, &iter) {
-                        if active {
-                            models.push(service);
+
+                dlg.show_all();
+
+                let res = dlg.run();
+                dlg.close();
+                let since = since_val.get_text().to_string();
+                let since = since.parse::<u32>().unwrap_or(4);
+                let separate_tabs = log_separate_tab_checkbox.get_active();
+                let include_replicas = include_replicas.get_active();
+
+                if res == ResponseType::Accept {
+                    let mut models = vec![];
+                    if let Some(iter)  = service_model.get_iter_first() {
+                        if let Some((service, active)) = map_model(&service_model, &iter) {
+                            if active {
+                                models.push(service);
+                            }
+                        }
+                        while service_model.iter_next(&iter) {
+                            if let Some((service, active)) = map_model(&service_model, &iter) {
+                                if active {
+                                    models.push(service);
+                                }
+                            }
                         }
                     }
+
+                    let pods = if include_replicas {
+                        models.iter().map(|name| {
+                            let parts = name.split("-").collect::<Vec<&str>>();
+                            let len = parts.len();
+                            parts.into_iter().take(len -2).collect::<Vec<&str>>().join("-")
+                        }).collect::<Vec<String>>()
+                    }else {
+                        models
+                    };
+
+                    if separate_tabs {
+                        for model in pods {
+                            tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
+                                pods: vec![model],
+                                since,
+                                include_replicas
+                            }))).expect("Could not send create tab msg");
+                        }
+                    }else {
+                        tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
+                            pods,
+                            since,
+                            include_replicas
+                        }))).expect("Could not send create tab msg");
+                    }
                 }
             }
-            if separate_tabs {
-                for model in models {
-                    tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
-                        pods: vec![model],
-                        since,
-                        include_replicas
-                    }))).expect("Could not send create tab msg");
-                }
-            }else {
-                let pods = if include_replicas {
-                    models.iter().map(|name| {
-                    let parts = name.split("-").collect::<Vec<&str>>();
-                    let len = parts.len();
-                    parts.into_iter().take(len -2).collect::<Vec<&str>>().join("-")
-                    }).collect::<Vec<String>>()
-                }else {
-                    models
-                };
-
-                tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
-                    pods,
-                    since,
-                    include_replicas
-                }))).expect("Could not send create tab msg");
+            Err(e) => {
+                error!("Could not get pods: {}", e);
+                let dlg = gtk::MessageDialog::new::<ApplicationWindow>(
+                    None,
+                    DialogFlags::MODAL,
+                    MessageType::Error,
+                    ButtonsType::Ok,
+                    &e.to_string() );
+                dlg.run();
+                dlg.close();
             }
         }
-
     });
     kube_action
 }
