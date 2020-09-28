@@ -132,7 +132,6 @@ impl LogReader for KubernetesLogReader {
                         }
                         KubernetesLogReaderMsg::ReInit(pod) => {
                             self.is_initialized = false;
-                            info!("Remove pod stream: {}", pod);
                             self.streams.remove(&pod);
                             break;
                         }
@@ -157,11 +156,16 @@ impl LogReader for KubernetesLogReader {
 
         if let Ok(pods) = c.pods().await {
             for pod in pods {
-
                 if let Some(name) = pod.metadata.name {
                     for pod_name in &self.options.pods {
                         if name.starts_with(pod_name) {
-                            pod_list.push(name.clone());
+                            if let Some(container_status) = pod.status.as_ref().and_then(|s|s.container_statuses.as_ref()).and_then(|cs|cs.first()) {
+                                if container_status.ready {
+                                    pod_list.push(name.clone());
+                                }else {
+                                    self.is_initialized = false;
+                                }
+                            }
                             break;
                         }
                     }
@@ -189,7 +193,17 @@ impl LogReader for KubernetesLogReader {
                 tokio::spawn(async move {
                     info!("Stream for pod '{}' started", pod_name);
                     while let Some(Ok(res)) = inc.next().await {
-                        if let Err(e) = tx.send(KubernetesLogReaderMsg::Data(res.to_vec())).await {
+                        let data = res.to_vec();
+                        // if data.starts_with(b"unable to retrieve container logs") || data.starts_with(b"rpc error: ") {
+                        //     if let Ok(data) = String::from_utf8(data) {
+                        //         error!("Kublet error: {}", data);
+                        //     }
+                        // }else {
+                        //     if let Err(e) = tx.send(KubernetesLogReaderMsg::Data(data)).await {
+                        //         error!("Failed to send stream data for pod '{}': {}", pod_name, e);
+                        //     }
+                        // }
+                        if let Err(e) = tx.send(KubernetesLogReaderMsg::Data(data)).await {
                             error!("Failed to send stream data for pod '{}': {}", pod_name, e);
                         }
                     }
