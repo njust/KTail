@@ -120,8 +120,8 @@ impl LogReader for KubernetesLogReader {
     async fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
         let mut r = vec![];
         loop {
-            if let Some(mut rx) = self.data_rx.as_mut() {
-                if let Ok(mut rc) = rx.try_recv() {
+            if let Some(rx) = self.data_rx.as_mut() {
+                if let Ok(rc) = rx.try_recv() {
                     match rc {
                         KubernetesLogReaderMsg::Data(mut data) => {
                             if data.len() > 0 {
@@ -179,13 +179,13 @@ impl LogReader for KubernetesLogReader {
                 continue;
             }
 
-            if let Ok(mut log_stream) = c.logs(&pod, Some(
+            if let Ok(log_stream) = c.logs(&pod, Some(
                 LogOptions {
                     follow: Some(true),
                     since_seconds: Some(3600 * self.options.since),
                 }
             )).await {
-                let (exit_tx, exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();
+                let (exit_tx, _exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();
                 let (exit, mut inc) = Valved::new(log_stream);
                 self.streams.insert(pod.clone(), (exit_tx, exit));
                 let mut tx = self.data_tx.clone().unwrap();
@@ -208,7 +208,9 @@ impl LogReader for KubernetesLogReader {
                         }
                     }
                     info!("Stream for pod '{}' ended", pod_name);
-                    tx.send(KubernetesLogReaderMsg::ReInit(pod_name)).await;
+                    if let Err(e) = tx.send(KubernetesLogReaderMsg::ReInit(pod_name)).await {
+                        error!("Could not send kubernetes re init msg: {}", e);
+                    }
                 });
             }
         }
@@ -223,7 +225,9 @@ impl LogReader for KubernetesLogReader {
         let pods = self.streams.keys().map(|s|s.clone()).collect::<Vec<String>>();
         for p in pods {
             if let Some((sender, trigger)) = self.streams.remove(&p) {
-                sender.send(trigger);
+                if let Err(e) = sender.send(trigger) {
+                    error!("Could not send exit trigger: {:?}", e);
+                }
             }
         }
     }
@@ -231,7 +235,7 @@ impl LogReader for KubernetesLogReader {
 
 impl KubernetesLogReader {
     pub fn new(data: CreateKubeLogData) -> Self {
-        let (mut data_tx, data_rx) = tokio::sync::mpsc::channel::<KubernetesLogReaderMsg>(10000);
+        let (data_tx, data_rx) = tokio::sync::mpsc::channel::<KubernetesLogReaderMsg>(10000);
         let mut instance = Self {
             data_rx: Some(data_rx),
             data_tx: Some(data_tx),

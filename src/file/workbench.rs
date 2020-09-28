@@ -85,21 +85,12 @@ impl FileViewWorkbench {
             WorkbenchViewMsg::ToolbarMsg(msg) => {
                 match msg {
                     WorkbenchToolbarMsg::SearchPressed => {
-                        if let Some(rule_view) = self.rules_view.get_rule_by_id(SEARCH_ID) {
-                            let regex = if self.search_text.len() > 0 {
-                                Some(self.search_text.clone())
-                            } else {
-                                None
-                            };
-                            rule_view.set_regex(regex);
-                        }
+                        self.rules_view.set_regex(SEARCH_ID, &self.search_text);
                         let rules = self.rules_view.get_rules();
                         self.file_view.apply_rules(rules);
                     }
                     WorkbenchToolbarMsg::ClearSearchPressed => {
-                        if let Some(rule_view) = self.rules_view.get_rule_by_id(SEARCH_ID) {
-                            rule_view.set_regex(None);
-                        }
+                        self.rules_view.set_regex(SEARCH_ID, &String::new());
                         let rules = self.rules_view.get_rules();
                         self.file_view.apply_rules(rules);
                     }

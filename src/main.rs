@@ -1,5 +1,8 @@
 #![windows_subsystem = "windows"]
 
+#[macro_use]
+extern crate glib;
+
 use gtk::prelude::*;
 use gio::prelude::*;
 
@@ -25,7 +28,6 @@ pub const SEARCH_TAG: &'static str = "SEARCH";
 pub struct CreateKubeLogData {
     pods: Vec<String>,
     since: u32,
-    include_replicas: bool,
 }
 
 pub enum FileViewData {
@@ -68,14 +70,7 @@ pub enum WorkbenchToolbarMsg {
 
 pub enum RuleListViewMsg {
     AddRule(Rule),
-    RuleViewMsg(Uuid, RuleViewMsg)
-}
-
-pub enum RuleViewMsg {
-    NameChanged(String),
-    RegexChanged (String),
-    ColorChanged(String),
-    DeleteRule,
+    DeleteRule(String),
 }
 
 #[derive(Debug, Clone)]
@@ -232,15 +227,13 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
                         for model in pods {
                             tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
                                 pods: vec![model],
-                                since,
-                                include_replicas
+                                since
                             }))).expect("Could not send create tab msg");
                         }
                     }else {
                         tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
                             pods,
-                            since,
-                            include_replicas
+                            since
                         }))).expect("Could not send create tab msg");
                     }
                 }

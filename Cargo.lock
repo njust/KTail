@@ -645,6 +645,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "glib_data_model_helper"
+version = "0.1.0"
+source = "git+https://github.com/njust/glib_data_model_helper.git#e1345e38a66a2822b90dae4c7a68ea9a85e5a4de"
+dependencies = [
+ "glib",
+]
+
+[[package]]
 name = "gobject-sys"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -976,6 +984,7 @@ dependencies = [
  "gdk",
  "gio",
  "glib",
+ "glib_data_model_helper",
  "gtk",
  "k8s_client",
  "log",
