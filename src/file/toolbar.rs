@@ -1,13 +1,15 @@
 use gtk::prelude::*;
-use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, AccelFlags, AccelGroup};
+use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, AccelFlags, AccelGroup, TreeIter};
 use crate::{WorkbenchToolbarMsg};
+use crate::rules::Rule;
 
 pub struct FileViewToolbar {
     container: gtk::Box,
+    rules_selector_data: gtk::ListStore,
 }
 
 impl FileViewToolbar {
-    pub fn new<T>(tx: T, accelerators: &AccelGroup) -> Self
+    pub fn new<T>(tx: T, accelerators: &AccelGroup, init_rules: &Vec<Rule>) -> Self
         where T: 'static + Clone + Fn(WorkbenchToolbarMsg)
     {
         let toolbar = gtk::Box::new(Orientation::Horizontal, 4);
@@ -56,6 +58,31 @@ impl FileViewToolbar {
             toolbar.add(&prev_btn);
         }
 
+        let rules_data = gtk::ListStore::new(&[glib::Type::String, glib::Type::String]);
+        let default_name = String::from("Unamed rule");
+        for rule in init_rules {
+            let name = rule.name.as_ref().unwrap_or(&default_name);
+            let id = rule.id.to_string();
+            rules_data.insert_with_values(None, &[0, 1], &[&id, &name]);
+        }
+
+        let rule_selector = gtk::ComboBox::with_model(&rules_data);
+        let renderer =  gtk::CellRendererText::new();
+        rule_selector.pack_start(&renderer, true);
+        rule_selector.add_attribute(&renderer, "text", 1);
+        rule_selector.set_property_width_request(50);
+        rule_selector.set_id_column(0);
+        rule_selector.set_active(Some(0));
+        toolbar.add(&rule_selector);
+        {
+            let tx = tx.clone();
+            rule_selector.connect_changed(move |cb| {
+                if let Some(selected) = cb.get_active_id() {
+                    tx(WorkbenchToolbarMsg::SelectRule(selected.as_str().into()))
+                }
+            });
+        }
+
         let next_btn = gtk::Button::with_mnemonic("_Next"); {
             let (key, modifier) = gtk::accelerator_parse("<Primary>N");
             next_btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
@@ -86,7 +113,43 @@ impl FileViewToolbar {
 
         Self {
             container: toolbar,
+            rules_selector_data: rules_data,
         }
+    }
+
+    fn get_rule_iter(&mut self, id: &str) -> Option<TreeIter> {
+        if let Some(mut current) = self.rules_selector_data.get_iter_first() {
+            loop {
+                if let Some(current_id) = self.rules_selector_data.get_value(&current, 0).get::<String>().ok().and_then(|v|v) {
+                    if id == current_id {
+                        return Some(current);
+                    }
+                }
+                if !self.rules_selector_data.iter_next(&current) {
+                    break;
+                }
+            }
+        }
+        None
+    }
+
+    pub fn update_rule(&mut self, id: &str, name: &str) {
+        if let Some(iter) = self.get_rule_iter(id) {
+            self.rules_selector_data.set(&iter, &[1], &[&name]);
+        }
+    }
+
+    pub fn delete_rule(&mut self, id: &str) {
+        if let Some(iter) = self.get_rule_iter(id) {
+            self.rules_selector_data.remove(&iter);
+        }
+    }
+
+    pub fn add_rule(&mut self, rule: &Rule) {
+        let default_name = String::from("Unamed rule");
+        let name = rule.name.as_ref().unwrap_or(&default_name);
+        let id = rule.id.to_string();
+        self.rules_selector_data.insert_with_values(None, &[0, 1], &[&id, &name]);
     }
 
     pub fn view(&self) -> &gtk::Box {

@@ -6,6 +6,7 @@ use crate::file::file_view::{FileView};
 use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg, FileViewData};
 use std::rc::Rc;
 use uuid::Uuid;
+use crate::util::{SortedListCompare, CompareResult};
 
 pub struct FileViewWorkbench {
     container: gtk::Box,
@@ -13,6 +14,9 @@ pub struct FileViewWorkbench {
     file_view: FileView,
     search_text: String,
     rules_dlg: Option<gtk::Dialog>,
+    rules: Vec<Rule>,
+    toolbar: FileViewToolbar,
+    active_rule: String,
     sender: Rc<dyn Fn(WorkbenchViewMsg)>
 }
 
@@ -51,7 +55,7 @@ impl FileViewWorkbench {
         let toolbar_msg = sender.clone();
         let toolbar = FileViewToolbar::new(move |msg| {
             toolbar_msg(WorkbenchViewMsg::ToolbarMsg(msg));
-        }, accelerators);
+        }, accelerators, &default_rules);
 
         let file_tx = sender.clone();
         let mut file_view = FileView::new();
@@ -67,17 +71,44 @@ impl FileViewWorkbench {
         let mut rules_view = RuleListView::new(move |msg| {
             rule_msg(WorkbenchViewMsg::RuleViewMsg(msg));
         });
+        rules_view.add_rules(default_rules.clone());
 
-        rules_view.add_rules(default_rules);
+        let mut rules = default_rules.clone();
+        rules.sort_by_key(|r|r.id);
 
         Self {
             container,
             rules_view,
             file_view,
+            toolbar,
             search_text: String::new(),
+            rules,
+            active_rule: SEARCH_ID.to_string(),
             rules_dlg: None,
             sender: Rc::new(sender.clone()),
         }
+    }
+
+    fn calc_rule_delta(&mut self, mut rules: Vec<Rule>) {
+        rules.sort_by_key(|r|r.id);
+        let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
+        for compare_result in compare_results {
+            match compare_result {
+                CompareResult::MissesLeft(new) => {
+                    self.toolbar.add_rule(new);
+                }
+                CompareResult::MissesRight(delete) => {
+                    self.toolbar.delete_rule(&delete.id.to_string());
+                }
+                CompareResult::Equal(_, right) => {
+                    let id = right.id.to_string();
+                    let default = String::from("Unamed rule");
+                    let name = right.name.as_ref().unwrap_or(&default);
+                    self.toolbar.update_rule(&id, &name);
+                }
+            }
+        }
+        self.rules = rules;
     }
 
     pub fn update(&mut self, msg: WorkbenchViewMsg) {
@@ -104,15 +135,19 @@ impl FileViewWorkbench {
                         self.file_view.toggle_autoscroll(enable);
                     }
                     WorkbenchToolbarMsg::SelectNextMatch => {
-                        self.file_view.select_next_match(SEARCH_ID);
+                        self.file_view.select_next_match(&self.active_rule);
                     }
                     WorkbenchToolbarMsg::SelectPrevMatch => {
-                        self.file_view.select_prev_match(SEARCH_ID);
+                        self.file_view.select_prev_match(&self.active_rule);
+                    }
+                    WorkbenchToolbarMsg::SelectRule(id) => {
+                        self.active_rule = id;
                     }
                 }
             }
             WorkbenchViewMsg::ApplyRules => {
                 let rules = self.rules_view.get_rules();
+                self.calc_rule_delta(rules.clone());
                 self.file_view.apply_rules(rules);
             }
             WorkbenchViewMsg::RuleViewMsg(msg) => {

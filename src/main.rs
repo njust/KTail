@@ -65,7 +65,8 @@ pub enum WorkbenchToolbarMsg {
     ShowRules,
     ToggleAutoScroll(bool),
     SelectNextMatch,
-    SelectPrevMatch
+    SelectPrevMatch,
+    SelectRule(String)
 }
 
 pub enum RuleListViewMsg {
@@ -147,6 +148,7 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
 
 
     let log_separate_tab_checkbox = gtk::CheckButton::with_label("Logs in separate tab");
+    log_separate_tab_checkbox.set_active(true);
     content.add(&log_separate_tab_checkbox);
 
     let include_replicas = gtk::CheckButton::with_label("Include replicas");
