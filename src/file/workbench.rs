@@ -100,11 +100,13 @@ impl FileViewWorkbench {
                 CompareResult::MissesRight(delete) => {
                     self.toolbar.delete_rule(&delete.id.to_string());
                 }
-                CompareResult::Equal(_, right) => {
-                    let id = right.id.to_string();
-                    let default = String::from("Unamed rule");
-                    let name = right.name.as_ref().unwrap_or(&default);
-                    self.toolbar.update_rule(&id, &name);
+                CompareResult::Equal(left, right) => {
+                    if left.name != right.name {
+                        let id = right.id.to_string();
+                        let default = String::from("Unamed rule");
+                        let name = right.name.as_ref().unwrap_or(&default);
+                        self.toolbar.update_rule(&id, &name);
+                    }
                 }
             }
         }
@@ -141,6 +143,7 @@ impl FileViewWorkbench {
                         self.file_view.select_prev_match(&self.active_rule);
                     }
                     WorkbenchToolbarMsg::SelectRule(id) => {
+                        self.file_view.set_active_rule(&id);
                         self.active_rule = id;
                     }
                 }

@@ -70,7 +70,7 @@ impl FileViewToolbar {
         let renderer =  gtk::CellRendererText::new();
         rule_selector.pack_start(&renderer, true);
         rule_selector.add_attribute(&renderer, "text", 1);
-        rule_selector.set_property_width_request(50);
+        rule_selector.set_property_width_request(70);
         rule_selector.set_id_column(0);
         rule_selector.set_active(Some(0));
         toolbar.add(&rule_selector);

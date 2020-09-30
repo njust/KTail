@@ -184,14 +184,14 @@ impl RuleListView {
         for i in 0..cnt {
             if let Some(o) = self.rule_list_data.get_object(i) {
                 let id = o.get_property("id").unwrap().get::<String>().unwrap().unwrap();
-                let name = o.get_property("name").unwrap().get::<String>().unwrap().unwrap();
-                let regex = o.get_property("regex").unwrap().get::<String>().unwrap().unwrap();
-                let color = o.get_property("color").unwrap().get::<String>().unwrap().unwrap();
+                let name = o.get_property("name").unwrap().get::<String>().unwrap().and_then(|s|if s.len() <= 0 {None}else {Some(s)});;
+                let regex = o.get_property("regex").unwrap().get::<String>().unwrap().and_then(|s|if s.len() <= 0 {None}else {Some(s)});
+                let color = o.get_property("color").unwrap().get::<String>().unwrap();
                 rules.push(Rule {
                     id: Uuid::parse_str(&id).unwrap(),
-                    name: Some(name),
-                    regex: Some(regex),
-                    color: Some(color),
+                    name,
+                    regex,
+                    color,
                     is_system: false
                 })
             }

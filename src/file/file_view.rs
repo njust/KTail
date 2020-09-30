@@ -26,9 +26,10 @@ pub struct FileView {
     text_view: Rc<sourceview::View>,
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<Rule>,
+    active_rule: String,
     thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
     result_map: HashMap<String, Vec<SearchResultMatch>>,
-    current_result_selection: HashMap<String, usize>,
+    current_result_selection: Option<(String, usize)>,
     result_match_cursor_pos: Option<usize>,
     child_process: Option<Child>,
 }
@@ -337,7 +338,6 @@ impl FileView {
         container.add(&minimap);
 
         let result_map: HashMap<String, Vec<SearchResultMatch>> = HashMap::new();
-        let current_result_selection: HashMap<String, usize> = HashMap::new();
 
         Self {
             container,
@@ -346,17 +346,23 @@ impl FileView {
             rules: vec![],
             thread_action_sender: None,
             result_map,
-            current_result_selection,
+            active_rule: SEARCH_ID.to_string(),
+            current_result_selection: None ,
             result_match_cursor_pos: None,
             child_process: None,
         }
     }
+
 
     fn get_bounds_for_match(buffer: &TextBuffer, result: &SearchResultMatch) -> (TextIter, TextIter) {
         let line = result.line as i32;
         let iter_start = buffer.get_iter_at_line_index(line, result.start as i32);
         let iter_end = buffer.get_iter_at_line_index(line, result.end as i32);
         (iter_start, iter_end)
+    }
+
+    pub fn set_active_rule(&mut self, rule: &str) {
+        self.active_rule = rule.to_string();
     }
 
     fn set_or_remove_selected_match(text_view: &sourceview::View, search_match: &SearchResultMatch, set: bool) {
@@ -371,33 +377,45 @@ impl FileView {
         }
     }
 
-    pub fn select_prev_match(&mut self, id: &str) {
+    pub fn select_prev_match(&mut self, id: &String) {
         self.select_match(id, false);
     }
 
-    pub fn select_next_match(&mut self, id: &str) {
+    pub fn select_next_match(&mut self, id: &String) {
         self.select_match(id, true);
     }
 
-    pub fn select_match(&mut self, id: &str, forward: bool) {
+    pub fn select_match(&mut self, id: &String, forward: bool) {
         if let Some(matches) = self.result_map.get(id) {
-            if let Some(current) = self.current_result_selection.get_mut(id) {
+            if let Some((current_id, current)) = self.current_result_selection.take() {
+                if id != &current_id {
+                    if let Some(rs) = self.result_map.get(&current_id) {
+                        if let Some(c) = rs.get(current) {
+                            if let Some(buffer) = self.text_view.get_buffer() {
+                                let (start, end) = Self::get_bounds_for_match(&buffer, &c);
+                                self.result_match_cursor_pos = self.get_next_from_pos(&start, &id);
+                            }
+                            Self::set_or_remove_selected_match(&*self.text_view, &c, false);
+                        }
+                    }
+                }
+
                 let next = if let Some(next) = self.result_match_cursor_pos.take() {
                     next
                 }else {
                     if forward {
-                        if *current < matches.len() -1 { *current +1 } else { 0 }
+                        if current < matches.len() -1 { current +1 } else { 0 }
                     } else {
-                        if *current > 0 { *current -1 } else { 0 }
+                        if current > 0 { current -1 } else { 0 }
                     }
                 };
-                if let Some(prev) = matches.get(*current) {
+                if let Some(prev) = matches.get(current) {
                     Self::set_or_remove_selected_match(&*self.text_view, &prev, false);
                 }
                 if let Some(next) = matches.get(next) {
                     Self::set_or_remove_selected_match(&*self.text_view, &next, true);
                 }
-                *current = next;
+                self.current_result_selection = Some((id.to_string(), next));
             }else {
                 let start = if let Some(start) = self.result_match_cursor_pos.take() {
                     start
@@ -410,7 +428,7 @@ impl FileView {
                 };
                 if let Some(first_match) = matches.get(start) {
                     Self::set_or_remove_selected_match(&*self.text_view, &first_match, true);
-                    self.current_result_selection.insert(id.to_string(), start);
+                    self.current_result_selection = Some((id.to_string(), start));
                 }
             }
         }
@@ -446,20 +464,7 @@ impl FileView {
                 if let Some(buffer) = self.text_view.get_buffer() {
                     let cursor_pos = buffer.get_property_cursor_position();
                     let cursor_pos = buffer.get_iter_at_offset(cursor_pos);
-
-                    if let Some(search_results) = self.result_map.get(SEARCH_ID) {
-                        let next = search_results.iter().enumerate().find(|(_, m)|{
-                            let search_match_pos = buffer.get_iter_at_line_index(m.line as i32, m.start as i32);
-                            search_match_pos > cursor_pos
-                        }).map(|(idx,_)| idx).or_else(|| {
-                            search_results.iter().enumerate().last().map(|(idx, _)| idx)
-                        });
-
-                        if let Some(next) = next {
-                            let next = if next > 0 {next}else{0};
-                            self.result_match_cursor_pos = Some(next);
-                        }
-                    }
+                    self.result_match_cursor_pos = self.get_next_from_pos(&cursor_pos, &self.active_rule);
                 }
             }
             FileViewMsg::Clear => {
@@ -471,13 +476,33 @@ impl FileView {
         }
     }
 
+
+    fn get_next_from_pos(&self, current_pos: &TextIter, rule_id: &String) -> Option<usize> {
+        if let Some(buffer) = self.text_view.get_buffer() {
+            if let Some(search_results) = self.result_map.get(rule_id) {
+                let next = search_results.iter().enumerate().find(|(_, m)| {
+                    let search_match_pos = buffer.get_iter_at_line_index(m.line as i32, m.start as i32);
+                    &search_match_pos > current_pos
+                }).map(|(idx, _)| idx).or_else(|| {
+                    search_results.iter().enumerate().last().map(|(idx, _)| idx)
+                });
+
+                if let Some(next) = next {
+                    let next = if next > 0 { next } else { 0 };
+                    return Some(next);
+                }
+            }
+        }
+        return None
+    }
+
     fn clear_result_selection_data(&mut self) {
         for (id, pos) in &self.current_result_selection {
             if let Some(d) = self.result_map.get(id).and_then(|m| m.get(*pos)) {
                 Self::set_or_remove_selected_match(&self.text_view, &d, false);
             }
         }
-        self.current_result_selection.clear();
+        self.current_result_selection.take();
         self.result_map.clear();
     }
 
