@@ -392,7 +392,7 @@ impl FileView {
                     if let Some(rs) = self.result_map.get(&current_id) {
                         if let Some(c) = rs.get(current) {
                             if let Some(buffer) = self.text_view.get_buffer() {
-                                let (start, end) = Self::get_bounds_for_match(&buffer, &c);
+                                let (start, _end) = Self::get_bounds_for_match(&buffer, &c);
                                 self.result_match_cursor_pos = self.get_next_from_pos(&start, &id);
                             }
                             Self::set_or_remove_selected_match(&*self.text_view, &c, false);

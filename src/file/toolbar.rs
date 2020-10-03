@@ -119,7 +119,7 @@ impl FileViewToolbar {
     }
 
     pub fn get_rule_iter(&mut self, id: &str) -> Option<TreeIter> {
-        if let Some(mut current) = self.rules_selector_data.get_iter_first() {
+        if let Some(current) = self.rules_selector_data.get_iter_first() {
             loop {
                 if let Some(current_id) = self.rules_selector_data.get_value(&current, 0).get::<String>().ok().and_then(|v|v) {
                     if id == current_id {
@@ -145,10 +145,12 @@ impl FileViewToolbar {
 
     pub fn update_rule(&mut self, iter: &TreeIter, name: &str) {
         self.rules_selector_data.set(&iter, &[1], &[&name]);
+        let current_cnt = self.get_cnt(&iter);
+        self.set_cnt(&iter, current_cnt);
     }
 
     pub fn clear_counts(&mut self) {
-        if let Some(mut current) = self.rules_selector_data.get_iter_first() {
+        if let Some(current) = self.rules_selector_data.get_iter_first() {
             loop {
                 self.set_cnt(&current, 0);
                 if !self.rules_selector_data.iter_next(&current) {
@@ -169,9 +171,13 @@ impl FileViewToolbar {
         self.rules_selector_data.set(&iter, &[3], &[&label]);
     }
 
+    fn get_cnt(&self, iter: &TreeIter) -> i32 {
+        self.rules_selector_data.get_value(&iter, 2).get::<i32>().ok().and_then(|v|v).unwrap_or(0)
+    }
+
     pub fn inc_rule(&mut self, id: &str, cnt: i32) {
         if let Some(iter) = self.get_rule_iter(id) {
-            let current_cnt = self.rules_selector_data.get_value(&iter, 2).get::<i32>().ok().and_then(|v|v).unwrap_or(0);
+            let current_cnt = self.get_cnt(&iter);
             self.set_cnt(&iter, current_cnt + cnt)
         }
     }

@@ -77,6 +77,9 @@ impl DataModelDescription for RuleData {
             }),
             subclass::Property("color", |name| {
                 glib::ParamSpec::string(name,"Color","Color",None, glib::ParamFlags::READWRITE)
+            }),
+            subclass::Property("isSystem", |name| {
+                glib::ParamSpec::boolean(name,"System","System",false, glib::ParamFlags::READWRITE)
             })
         ]
     }
@@ -96,6 +99,10 @@ impl RuleListView {
 
             let id = item.get_property("id").ok()
                 .and_then(|id| id.get::<String>().ok())
+                .and_then(|id|id).unwrap();
+
+            let is_system = item.get_property("isSystem").ok()
+                .and_then(|id| id.get::<bool>().ok())
                 .and_then(|id|id).unwrap();
 
             let name_entry = gtk::Entry::new();
@@ -132,7 +139,7 @@ impl RuleListView {
                 btn.connect_clicked(move |_| {
                     tx(RuleListViewMsg::DeleteRule(id.clone()));
                 });
-                // btn.set_sensitive(!rule.is_system);
+                btn.set_sensitive(!is_system);
                 container.add(&btn);
             }
 
@@ -175,7 +182,7 @@ impl RuleListView {
         let name = data.name.unwrap_or(String::new());
         let regex = data.regex.unwrap_or(String::new());
         let color = data.color.unwrap_or(String::new());
-        self.rule_list_data.append(&RuleData::new(&[("id", &id), ("name", &name), ("regex", &regex), ("color", &color)]));
+        self.rule_list_data.append(&RuleData::new(&[("id", &id), ("name", &name), ("regex", &regex), ("color", &color), ("isSystem", &data.is_system)]));
     }
 
     pub fn get_rules(&self) -> Vec<Rule> {
@@ -184,15 +191,16 @@ impl RuleListView {
         for i in 0..cnt {
             if let Some(o) = self.rule_list_data.get_object(i) {
                 let id = o.get_property("id").unwrap().get::<String>().unwrap().unwrap();
-                let name = o.get_property("name").unwrap().get::<String>().unwrap().and_then(|s|if s.len() <= 0 {None}else {Some(s)});;
+                let name = o.get_property("name").unwrap().get::<String>().unwrap().and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let regex = o.get_property("regex").unwrap().get::<String>().unwrap().and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let color = o.get_property("color").unwrap().get::<String>().unwrap();
+                let is_system = o.get_property("isSystem").unwrap().get::<bool>().unwrap().unwrap_or(false);
                 rules.push(Rule {
                     id: Uuid::parse_str(&id).unwrap(),
                     name,
                     regex,
                     color,
-                    is_system: false
+                    is_system
                 })
             }
         }
