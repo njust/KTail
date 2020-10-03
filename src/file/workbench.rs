@@ -7,6 +7,7 @@ use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg, FileViewData, FileViewMsg};
 use std::rc::Rc;
 use uuid::Uuid;
 use crate::util::{SortedListCompare, CompareResult};
+use log::{info};
 
 
 pub struct FileViewWorkbench {
@@ -26,14 +27,14 @@ pub fn get_default_rules() -> Vec<Rule> {
         Rule {
             id: Uuid::parse_str(SEARCH_ID).unwrap(),
             regex: None,
-            color: Some(String::from("rgba(229,190,90,1)")),
+            color: Some(String::from("rgba(188,150,0,1)")),
             name: Some(String::from("Search")),
             is_system: true
         },
         Rule {
             id: Uuid::new_v4(),
             regex: Some(r".*\s((?i)error|fatal|failed(?-i))\s.*".into()),
-            color: Some(String::from("rgba(255,96,102,1)")),
+            color: Some(String::from("rgba(239,41,41,1)")),
             name: Some(String::from("Error")),
             is_system: false
         },
@@ -125,7 +126,7 @@ impl FileViewWorkbench {
                 match msg {
                     WorkbenchToolbarMsg::SearchPressed => {
                         let regex = if self.search_text.len() > 0 {
-                            format!("(?i){}", self.search_text)
+                            format!("(?i).*{}.*", self.search_text)
                         }else {
                             String::new()
                         };
@@ -218,6 +219,6 @@ impl FileViewWorkbench {
 
 impl Drop for FileViewWorkbench {
     fn drop(&mut self) {
-        println!("Drop workbench");
+        info!("Drop workbench");
     }
 }

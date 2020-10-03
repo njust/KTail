@@ -19,7 +19,7 @@ use stream_cancel::{Valved, Trigger};
 use tokio::sync::oneshot::Sender;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Receiver;
-use log::{info, error};
+use log::{info, error, debug};
 
 pub struct FileView {
     container: gtk::Box,
@@ -210,7 +210,7 @@ impl LogReader for KubernetesLogReader {
                     }
                     info!("Stream for pod '{}' ended", pod_name);
                     if let Err(e) = tx.send(KubernetesLogReaderMsg::ReInit(pod_name)).await {
-                        error!("Could not send kubernetes re init msg: {}", e);
+                        debug!("Could not send kubernetes re init msg: {}", e);
                     }
                 });
             }
@@ -227,7 +227,7 @@ impl LogReader for KubernetesLogReader {
         for p in pods {
             if let Some((sender, trigger)) = self.streams.remove(&p) {
                 if let Err(e) = sender.send(trigger) {
-                    error!("Could not send exit trigger: {:?}", e);
+                    debug!("Could not send exit trigger: {:?}", e);
                 }
             }
         }
@@ -296,7 +296,7 @@ impl FileView {
     pub fn new() -> Self {
         let tag_table = TextTagTable::new();
         let current_cursor_tag = gtk::TextTag::new(Some(CURRENT_CURSOR_TAG));
-        current_cursor_tag.set_property_background(Some("green"));
+        current_cursor_tag.set_property_background(Some("rgba(114,159,207,1)"));
         tag_table.add(&current_cursor_tag);
         current_cursor_tag.set_priority(tag_table.get_size() - 1);
 
@@ -676,7 +676,7 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                             }
                         }
                         FileThreadMsg::Quit => {
-                            println!("Quit signal");
+                            debug!("Quit signal");
                             break;
                         }
                     }
@@ -711,7 +711,7 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
             tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
         }
         log_reader.stop();
-        println!("File watcher stopped");
+        info!("File watcher stopped");
     });
 }
 

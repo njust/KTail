@@ -364,7 +364,7 @@ async fn int_main() {
 
 
         window.set_title("Log Viewer");
-        window.set_default_size(800, 600);
+        window.set_default_size(1280, 600);
 
         let menu_model = gio::Menu::new();
         app.set_accels_for_action("app.open", &["<Primary>O"]);
