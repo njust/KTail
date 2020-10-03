@@ -514,11 +514,13 @@ impl FileView {
         rules.sort_by_key(|i| i.id);
         let init = self.rules.len() <= 0;
         let mut clear_cursor = false;
+        let mut has_changes = false;
         let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
         for compare_result in compare_results {
             let text_view = self.text_view.clone();
             match compare_result {
                 CompareResult::MissesLeft(new) => {
+                    has_changes = true;
                     add.push(new.clone());
                     if let Some(tags) = text_view.get_buffer()
                         .and_then(|buffer| buffer.get_tag_table()) {
@@ -534,6 +536,7 @@ impl FileView {
                     }
                 }
                 CompareResult::MissesRight(delete) => {
+                    has_changes = true;
                     remove.push(delete.id.to_string());
                     if let Some(tags) = text_view.get_buffer().and_then(|buffer| buffer.get_tag_table()) {
                         if let Some(tag) = tags.lookup(&delete.id.to_string()) {
@@ -548,6 +551,7 @@ impl FileView {
                         tag.set_property_background(right.color.as_ref().map(|s|s.as_str()));
                     }
                     if left.regex != right.regex {
+                        has_changes = true;
                         update.push(right.clone());
                         if let Some(tb) = text_view.get_buffer() {
                             let (start, end) = tb.get_bounds();
@@ -562,24 +566,25 @@ impl FileView {
             self.clear_result_selection_data();
         }
 
-        let mut data :Option<String> = None;
-        if !init {
-            let text_view = self.text_view.clone();
-            if let Some(tb) = text_view.get_buffer() {
-                let (start, end) = tb.get_bounds();
-                data = tb.get_text(&start, &end, false).map(|s|s.to_string());
+        if has_changes {
+            let mut data :Option<String> = None;
+            if !init {
+                let text_view = self.text_view.clone();
+                if let Some(tb) = text_view.get_buffer() {
+                    let (start, end) = tb.get_bounds();
+                    data = tb.get_text(&start, &end, false).map(|s|s.to_string());
+                }
+            }
+            if let Some(thread_action_sender) = self.thread_action_sender.as_ref() {
+                thread_action_sender.send(FileThreadMsg::ApplyRules(RuleChanges {
+                    add,
+                    remove,
+                    update,
+                    data,
+                })).expect("Could not send apply rules");
             }
         }
-
         self.rules = rules;
-        if let Some(thread_action_sender) = self.thread_action_sender.as_ref() {
-            thread_action_sender.send(FileThreadMsg::ApplyRules(RuleChanges {
-                add,
-                remove,
-                update,
-                data,
-            })).expect("Could not send apply rules");
-        }
     }
 
     pub fn toggle_autoscroll(&mut self, enable: bool) {

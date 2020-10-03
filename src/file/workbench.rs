@@ -3,10 +3,11 @@ use crate::file::toolbar::FileViewToolbar;
 use gtk::{Orientation, WindowPosition, HeaderBar, AccelGroup};
 use crate::rules::{RuleListView, SEARCH_ID, Rule};
 use crate::file::file_view::{FileView};
-use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg, FileViewData};
+use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg, FileViewData, FileViewMsg};
 use std::rc::Rc;
 use uuid::Uuid;
 use crate::util::{SortedListCompare, CompareResult};
+
 
 pub struct FileViewWorkbench {
     container: gtk::Box,
@@ -89,7 +90,7 @@ impl FileViewWorkbench {
         }
     }
 
-    fn calc_rule_delta(&mut self, mut rules: Vec<Rule>) {
+    fn apply_rules(&mut self, mut rules: Vec<Rule>) {
         rules.sort_by_key(|r|r.id);
         let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
         for compare_result in compare_results {
@@ -101,11 +102,16 @@ impl FileViewWorkbench {
                     self.toolbar.delete_rule(&delete.id.to_string());
                 }
                 CompareResult::Equal(left, right) => {
-                    if left.name != right.name {
-                        let id = right.id.to_string();
-                        let default = String::from("Unamed rule");
-                        let name = right.name.as_ref().unwrap_or(&default);
-                        self.toolbar.update_rule(&id, &name);
+                    if let Some(iter) = self.toolbar.get_rule_iter(&left.id.to_string()) {
+                        if left.regex != right.regex {
+                            self.toolbar.set_cnt(&iter, 0);
+                        }
+
+                        if left.name != right.name {
+                            let default = String::from("Unamed rule");
+                            let name = right.name.as_ref().unwrap_or(&default);
+                            self.toolbar.update_rule(&iter, &name);
+                        }
                     }
                 }
             }
@@ -118,13 +124,20 @@ impl FileViewWorkbench {
             WorkbenchViewMsg::ToolbarMsg(msg) => {
                 match msg {
                     WorkbenchToolbarMsg::SearchPressed => {
-                        self.rules_view.set_regex(SEARCH_ID, &self.search_text);
+                        let regex = if self.search_text.len() > 0 {
+                            format!("(?i){}", self.search_text)
+                        }else {
+                            String::new()
+                        };
+                        self.rules_view.set_regex(SEARCH_ID, &regex);
                         let rules = self.rules_view.get_rules();
+                        self.apply_rules(rules.clone());
                         self.file_view.apply_rules(rules);
                     }
                     WorkbenchToolbarMsg::ClearSearchPressed => {
                         self.rules_view.set_regex(SEARCH_ID, &String::new());
                         let rules = self.rules_view.get_rules();
+                        self.apply_rules(rules.clone());
                         self.file_view.apply_rules(rules);
                     }
                     WorkbenchToolbarMsg::ShowRules => {
@@ -150,13 +163,16 @@ impl FileViewWorkbench {
             }
             WorkbenchViewMsg::ApplyRules => {
                 let rules = self.rules_view.get_rules();
-                self.calc_rule_delta(rules.clone());
+                self.apply_rules(rules.clone());
                 self.file_view.apply_rules(rules);
             }
             WorkbenchViewMsg::RuleViewMsg(msg) => {
                 self.rules_view.update(msg);
             }
             WorkbenchViewMsg::FileViewMsg(msg) => {
+                if let FileViewMsg::Data(_length, _data, matches) = &msg {
+                    self.toolbar.update_results(matches);
+                }
                 self.file_view.update(msg);
             }
         }

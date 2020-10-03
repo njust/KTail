@@ -1,7 +1,8 @@
 use gtk::prelude::*;
 use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, AccelFlags, AccelGroup, TreeIter};
-use crate::{WorkbenchToolbarMsg};
+use crate::{WorkbenchToolbarMsg, SearchResultMatch};
 use crate::rules::Rule;
+use std::collections::HashMap;
 
 pub struct FileViewToolbar {
     container: gtk::Box,
@@ -58,18 +59,18 @@ impl FileViewToolbar {
             toolbar.add(&prev_btn);
         }
 
-        let rules_data = gtk::ListStore::new(&[glib::Type::String, glib::Type::String]);
+        let rules_data = gtk::ListStore::new(&[glib::Type::String, glib::Type::String, glib::Type::I32, glib::Type::String]);
         let default_name = String::from("Unamed rule");
         for rule in init_rules {
             let name = rule.name.as_ref().unwrap_or(&default_name);
             let id = rule.id.to_string();
-            rules_data.insert_with_values(None, &[0, 1], &[&id, &name]);
+            rules_data.insert_with_values(None, &[0, 1, 2, 3], &[&id, &name, &0, &name]);
         }
 
         let rule_selector = gtk::ComboBox::with_model(&rules_data);
         let renderer =  gtk::CellRendererText::new();
         rule_selector.pack_start(&renderer, true);
-        rule_selector.add_attribute(&renderer, "text", 1);
+        rule_selector.add_attribute(&renderer, "text", 3);
         rule_selector.set_property_width_request(70);
         rule_selector.set_id_column(0);
         rule_selector.set_active(Some(0));
@@ -117,7 +118,7 @@ impl FileViewToolbar {
         }
     }
 
-    fn get_rule_iter(&mut self, id: &str) -> Option<TreeIter> {
+    pub fn get_rule_iter(&mut self, id: &str) -> Option<TreeIter> {
         if let Some(mut current) = self.rules_selector_data.get_iter_first() {
             loop {
                 if let Some(current_id) = self.rules_selector_data.get_value(&current, 0).get::<String>().ok().and_then(|v|v) {
@@ -133,9 +134,34 @@ impl FileViewToolbar {
         None
     }
 
-    pub fn update_rule(&mut self, id: &str, name: &str) {
+    pub fn update_results(&mut self, matches: &HashMap<String, Vec<SearchResultMatch>>) {
+        for (id, results) in matches {
+            let cnt = results.len() as i32;
+            if cnt > 0 {
+                self.inc_rule(id, cnt);
+            }
+        }
+    }
+
+    pub fn update_rule(&mut self, iter: &TreeIter, name: &str) {
+        self.rules_selector_data.set(&iter, &[1], &[&name]);
+    }
+
+    pub fn set_cnt(&mut self, iter: &TreeIter, cnt: i32) {
+        let name = self.rules_selector_data.get_value(&iter, 1).get::<String>().ok().and_then(|v|v).unwrap();
+        self.rules_selector_data.set(&iter, &[2], &[&(cnt)]);
+        let label = if cnt > 0 {
+            format!("{} ({})", name, cnt)
+        }else {
+            name
+        };
+        self.rules_selector_data.set(&iter, &[3], &[&label]);
+    }
+
+    pub fn inc_rule(&mut self, id: &str, cnt: i32) {
         if let Some(iter) = self.get_rule_iter(id) {
-            self.rules_selector_data.set(&iter, &[1], &[&name]);
+            let current_cnt = self.rules_selector_data.get_value(&iter, 2).get::<i32>().ok().and_then(|v|v).unwrap_or(0);
+            self.set_cnt(&iter, current_cnt + cnt)
         }
     }
 
