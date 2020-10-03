@@ -104,7 +104,7 @@ impl FileViewWorkbench {
                 CompareResult::Equal(left, right) => {
                     if let Some(iter) = self.toolbar.get_rule_iter(&left.id.to_string()) {
                         if left.regex != right.regex {
-                            self.toolbar.set_cnt(&iter, 0);
+                            self.toolbar.clear_counts();
                         }
 
                         if left.name != right.name {

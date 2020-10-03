@@ -147,6 +147,17 @@ impl FileViewToolbar {
         self.rules_selector_data.set(&iter, &[1], &[&name]);
     }
 
+    pub fn clear_counts(&mut self) {
+        if let Some(mut current) = self.rules_selector_data.get_iter_first() {
+            loop {
+                self.set_cnt(&current, 0);
+                if !self.rules_selector_data.iter_next(&current) {
+                    break;
+                }
+            }
+        }
+    }
+
     pub fn set_cnt(&mut self, iter: &TreeIter, cnt: i32) {
         let name = self.rules_selector_data.get_value(&iter, 1).get::<String>().ok().and_then(|v|v).unwrap();
         self.rules_selector_data.set(&iter, &[2], &[&(cnt)]);
