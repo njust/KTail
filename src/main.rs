@@ -117,12 +117,14 @@ fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid, accelerators: &Acce
     (tab_header, file_view)
 }
 
-use k8s_client::{
-    KubeClient,
-};
+use k8s_client::{KubeClient, KubeConfig};
 
 
-fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
+fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
+    if !KubeConfig::default_path().exists() {
+        return None;
+    }
+
     let kube_action = SimpleAction::new("kube", None);
     let dlg = gtk::Dialog::new();
     let service_model = Rc::new(TreeStore::new(&[glib::Type::String, glib::Type::Bool]));
@@ -176,8 +178,14 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
 
     kube_action.connect_activate(move |_,_| {
         let pods = glib::MainContext::default().block_on(async move  {
-            let c = KubeClient::load_conf(None).unwrap();
-            c.pods().await
+            match KubeClient::load_conf(None) {
+                Ok(c) => {
+                    c.pods().await
+                }
+                Err(e) => {
+                    Err(e)
+                }
+            }
         });
 
         match pods {
@@ -253,7 +261,7 @@ fn create_open_kube_action(tx: Sender<Msg>) -> SimpleAction {
             }
         }
     });
-    kube_action
+    Some(kube_action)
 }
 
 fn create_open_dlg_action(tx: Sender<Msg>) -> SimpleAction {
@@ -272,7 +280,6 @@ fn create_open_dlg_action(tx: Sender<Msg>) -> SimpleAction {
     });
     open_action
 }
-
 
 fn main() {
     let mut rt = tokio::runtime::Builder::new()
@@ -296,14 +303,18 @@ async fn int_main() {
     ).expect("failed to initialize GTK application");
 
     application.connect_activate(move |app| {
+        let menu_model = gio::Menu::new();
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
         let notebook = Notebook::new();
         let open_action = create_open_dlg_action(tx.clone());
         app.add_action(&open_action);
 
 
-        let kube_action = create_open_kube_action(tx.clone());
-        app.add_action(&kube_action);
+        if let Some(kube_action) = create_open_kube_action(tx.clone()) {
+            app.add_action(&kube_action);
+            app.set_accels_for_action("app.kube", &["<Primary>K"]);
+            menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));
+        }
 
         let tx2 = tx.clone();
         app.connect_shutdown(move|_| {
@@ -362,15 +373,11 @@ async fn int_main() {
             glib::Continue(true)
         });
 
-
         window.set_title("Log Viewer");
         window.set_default_size(1280, 600);
 
-        let menu_model = gio::Menu::new();
         app.set_accels_for_action("app.open", &["<Primary>O"]);
-        app.set_accels_for_action("app.kube", &["<Primary>K"]);
         menu_model.append_item(&gio::MenuItem::new(Some("Open"), Some("app.open")));
-        menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));
         menu_model.append_item(&gio::MenuItem::new(Some("Quit"), Some("app.quit")));
 
         let menu_button = MenuButton::new();
