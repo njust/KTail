@@ -47,6 +47,8 @@ impl FileViewData {
 pub enum Msg {
     CloseTab(Uuid),
     CreateTab(FileViewData),
+    NextTab,
+    PrevTab,
     WorkbenchMsg(Uuid, WorkbenchViewMsg),
     Exit
 }
@@ -101,9 +103,7 @@ fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid, accelerators: &Acce
         tx2.send(Msg::WorkbenchMsg(id, msg)).expect("Could not send msg");
     }, accelerators);
 
-    let (key, modifier) = gtk::accelerator_parse("<Primary>W");
     let close_btn = Button::from_icon_name(Some("window-close-symbolic"), IconSize::Menu);
-    close_btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
     close_btn.set_relief(ReliefStyle::None);
 
     let tab_header = gtk::Box::new(Orientation::Horizontal, 0);
@@ -333,6 +333,27 @@ async fn int_main() {
         let open_action = create_open_dlg_action(tx.clone());
         app.add_action(&open_action);
 
+        {
+            let tx = tx.clone();
+            let next_tab_action = SimpleAction::new("next_tab", None);
+            app.add_action(&next_tab_action);
+            next_tab_action.connect_activate(move |_,_| {
+                tx.send(Msg::NextTab);
+            });
+            app.set_accels_for_action("app.next_tab", &["<Primary>Tab"]);
+        }
+
+
+        {
+            let tx = tx.clone();
+            let prev_tab_action = SimpleAction::new("prev_tab", None);
+            app.add_action(&prev_tab_action);
+            prev_tab_action.connect_activate(move |_, _| {
+                tx.send(Msg::PrevTab);
+            });
+            app.set_accels_for_action("app.prev_tab", &["<Primary><Shift>Tab"]);
+        }
+
 
         if let Some(kube_action) = create_open_kube_action(tx.clone()) {
             app.add_action(&kube_action);
@@ -393,6 +414,12 @@ async fn int_main() {
                     // notebook.set_tab_detachable(file_view.view(), true);
                     file_views.insert(id, file_view);
                     notebook.show_all();
+                }
+                Msg::NextTab => {
+                    notebook.next_page();
+                }
+                Msg::PrevTab => {
+                    notebook.prev_page();
                 }
             }
             glib::Continue(true)
