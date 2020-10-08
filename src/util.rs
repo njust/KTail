@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::io::{BufReader, SeekFrom, Read, Seek, BufRead};
 use std::error::Error;
 use encoding::all::{UTF_8, UTF_16LE, UTF_16BE};
-use encoding::{DecoderTrap};
+use encoding::{DecoderTrap, Encoding};
 use glib::bitflags::_core::cmp::Ordering;
 use crate::{SearchResultMatch};
 use serde::Deserialize;
@@ -25,7 +25,7 @@ pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     })
 }
 
-pub fn get_encoding(bytes: &[u8]) -> &'static dyn encoding::types::Encoding {
+pub fn get_encoding(bytes: &[u8]) -> &'static (dyn encoding::types::Encoding + Send + Sync) {
     if bytes.len() <= 2 {
         return UTF_8;
     }
@@ -40,36 +40,33 @@ pub fn get_encoding(bytes: &[u8]) -> &'static dyn encoding::types::Encoding {
     }
 }
 
-pub struct ReadResult {
-    pub data: String,
-    pub encoding: Option<&'static dyn encoding::types::Encoding>
-}
 
 pub struct SearchResult {
     pub lines: usize,
     pub matches: Vec<SearchResultMatch>,
 }
 
-pub fn decode_data(buffer: &[u8], encoding: Option<&'static dyn encoding::types::Encoding>) -> Result<ReadResult, Box<dyn Error>> {
-    let encoding = if let Some(encoding) = encoding {
-        encoding
-    }else {
-        get_encoding(&buffer)
-    };
+pub fn decode_data<'a>(buffer: &[u8], _encoding_name: &mut Option<String>) -> Result<String, Box<dyn Error>> {
+    // let enc = if let Some(encoding) = encoding_name {
+    //     encoding::label::encoding_from_whatwg_label(&encoding)
+    // }else {
+    //     let encoding = get_encoding(buffer);
+    //     let name = encoding.whatwg_name().unwrap();
+    //     encoding_name.replace(name.to_string());
+    //     Some(encoding)
+    // }.unwrap();
 
-    let mut data = encoding.decode(buffer, DecoderTrap::Ignore)?;
+    // let mut data = enc.decode(buffer, DecoderTrap::Ignore)?;
+
+    let mut data = UTF_8.decode(buffer, DecoderTrap::Ignore)?;
     // let re = Regex::new("\n\r|\r\n|\r")?;
     // data = re.replace_all(&data, "").to_string();
+    data = data.replace("\0", "");
     data = data.replace("\n\r", "\n");
     data = data.replace("\r\n", "\n");
     data = data.replace("\r", "\n");
     data = data.replace("", "");
-
-
-    Ok(ReadResult {
-        data,
-        encoding: Some(encoding)
-    })
+    return Ok(data);
 }
 
 pub fn read_file(path: &PathBuf, start: u64) -> Result<Vec<u8>, Box<dyn Error>> {

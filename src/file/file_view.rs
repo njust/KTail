@@ -280,10 +280,16 @@ impl FileView {
         let file_thread_tx = sender.clone();
         match data {
             FileViewData::File(path) => {
-                let reader = LogFileReader::new(path).unwrap();
-                register_file_watcher_thread(move |msg| {
-                    file_thread_tx(msg);
-                }, Box::new(reader),  thread_action_receiver);
+                match LogFileReader::new(path) {
+                    Ok(reader) => {
+                        register_file_watcher_thread(move |msg| {
+                            file_thread_tx(msg);
+                        }, Box::new(reader),  thread_action_receiver);
+                    }
+                    Err(e) => {
+                        error!("Could not open file: {}", e);
+                    }
+                }
             }
             FileViewData::Kube(data) => {
                 let reader = KubernetesLogReader::new(data);
@@ -597,7 +603,9 @@ impl FileView {
 
     pub fn close(&mut self) {
         if let Some(sender) = self.thread_action_sender.as_ref() {
-            sender.send(FileThreadMsg::Quit).expect("Could not send quit msg");
+            if let Err(e) = sender.send(FileThreadMsg::Quit) {
+                error!("Could not send quit msg: {}", e);
+            }
         }
     }
 
@@ -625,6 +633,7 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
         let mut line_offset = 0;
         let mut active_rules = vec![];
 
+        let mut encoding = None;
         loop {
             log_reader.init().await;
 
@@ -691,16 +700,11 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                 } else {
                     if let Ok(data) = log_reader.read().await {
                         let read_bytes = data.len();
-                        let mut encoding: Option<&'static dyn encoding::types::Encoding> = None;
-                        if let Ok(result) = decode_data(&data, encoding) {
-                            if result.encoding.is_some() {
-                                encoding = result.encoding;
-                            }
-
-                            if let Ok(r) = search(&result.data, &mut active_rules, line_offset) {
+                        if let Ok(data) = decode_data(&data, &mut encoding) {
+                            if let Ok(r) = search(&data, &mut active_rules, line_offset) {
                                 line_offset += r.lines;
                                 if read_bytes > 0 {
-                                    sender(FileViewMsg::Data(read_bytes as u64, result.data, r.results));
+                                    sender(FileViewMsg::Data(read_bytes as u64, data, r.results));
                                 }
                             }
                         }

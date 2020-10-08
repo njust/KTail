@@ -306,6 +306,28 @@ async fn int_main() {
         let menu_model = gio::Menu::new();
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
         let notebook = Notebook::new();
+        {
+            let tx = tx.clone();
+            let te = gtk::TargetEntry::new("text/uri-list", gtk::TargetFlags::OTHER_APP, 129);
+            notebook.drag_dest_set(gtk::DestDefaults::ALL, &[te], gdk::DragAction::DEFAULT);
+            notebook.connect_drag_data_received(move |_, _, _, _, data, _, _| {
+                let uris = data.get_uris();
+                for uri in uris {
+                    let mut parts = uri.split("///");
+                    if let Some(file) = parts.nth(1) {
+                        // Whitespaces are encoded in file path
+                        let file = file.replace("%20", " ");
+                        let file = PathBuf::from(file);
+                        if let Some(mime) = mime_guess::from_path(&file).first() {
+                            if mime.type_() == mime_guess::mime::TEXT  {
+                                tx.send(Msg::CreateTab(FileViewData::File(file))).expect("Could not send");
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         let open_action = create_open_dlg_action(tx.clone());
         app.add_action(&open_action);
 
@@ -366,6 +388,7 @@ async fn int_main() {
                     let id = Uuid::new_v4();
                     let (tab_header, file_view) = create_tab(tab, tx.clone(), id, &ag);
                     notebook.append_page(file_view.view(), Some(&tab_header));
+                    // notebook.set_tab_detachable(file_view.view(), true);
                     file_views.insert(id, file_view);
                     notebook.show_all();
                 }
