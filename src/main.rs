@@ -6,7 +6,7 @@ extern crate glib;
 use gtk::prelude::*;
 use gio::prelude::*;
 
-use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow, AccelGroup, DialogFlags, MessageType, ButtonsType};
+use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow, AccelGroup, DialogFlags, MessageType, ButtonsType, AccelFlags};
 use std::rc::Rc;
 use gio::{SimpleAction};
 use log::{error, info};
@@ -101,7 +101,9 @@ fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid, accelerators: &Acce
         tx2.send(Msg::WorkbenchMsg(id, msg)).expect("Could not send msg");
     }, accelerators);
 
+    let (key, modifier) = gtk::accelerator_parse("<Primary>W");
     let close_btn = Button::from_icon_name(Some("window-close-symbolic"), IconSize::Menu);
+    close_btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
     close_btn.set_relief(ReliefStyle::None);
 
     let tab_header = gtk::Box::new(Orientation::Horizontal, 0);
