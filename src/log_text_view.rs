@@ -3,7 +3,7 @@ use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::rc::Rc;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data};
-use crate::model::{LogTextViewMsg, LogTextViewData, SearchResultMatch};
+use crate::model::{LogTextViewMsg, LogTextViewData, SearchResultMatch, LogReplacer};
 
 use sourceview::{ViewExt};
 use regex::Regex;
@@ -402,6 +402,8 @@ impl LogTextView {
     }
 }
 
+
+
 fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, rx: std::sync::mpsc::Receiver<LogTextViewThreadMsg>)
     where T : 'static + Send + Clone + Fn(LogTextViewMsg)
 {
@@ -410,7 +412,13 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
         let mut active_rules = vec![];
 
         let mut encoding = None;
+        let replacers = vec![
+            LogReplacer { regex: Regex::new(r"\\n\\r|\\r\\n|\\r").unwrap(), replace_with: "\n" },
+            LogReplacer { regex: Regex::new(r"|\\0").unwrap(), replace_with: "" }
+        ];
+
         loop {
+
             log_reader.init().await;
 
             let check_changes = match log_reader.check_changes() {
@@ -476,7 +484,7 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                 } else {
                     if let Ok(data) = log_reader.read().await {
                         let read_bytes = data.len();
-                        if let Ok(data) = decode_data(&data, &mut encoding) {
+                        if let Ok(data) = decode_data(&data, &mut encoding, &replacers) {
                             if let Ok(r) = search(&data, &mut active_rules, line_offset) {
                                 line_offset += r.lines;
                                 if read_bytes > 0 {

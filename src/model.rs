@@ -109,3 +109,8 @@ pub enum LogTextViewThreadMsg {
     ApplyRules(RuleChanges),
     Quit,
 }
+
+pub struct LogReplacer<'a> {
+    pub regex: Regex,
+    pub replace_with: &'a str,
+}
