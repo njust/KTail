@@ -1,263 +1,40 @@
 use gtk::{prelude::*, TextIter, TextBuffer};
-
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::rc::Rc;
-use std::path::PathBuf;
 use glib::{SignalHandlerId};
-use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, CREATE_NO_WINDOW, search, decode_data, read};
-use crate::{FileViewMsg, FileViewData, SearchResultMatch, CreateKubeLogData};
-use crate::file::{FileThreadMsg, Rule, RuleChanges, ActiveRule};
+use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data};
+use crate::model::{LogTextViewMsg, LogTextViewData, SearchResultMatch};
+
 use sourceview::{ViewExt};
 use regex::Regex;
 use std::collections::HashMap;
-use crate::rules::SEARCH_ID;
-use std::io::{Seek, SeekFrom};
-use std::error::Error;
-use std::process::{Child};
-use k8s_client::{KubeClient, LogOptions};
-use stream_cancel::{Valved, Trigger};
-use tokio::sync::oneshot::Sender;
-use async_trait::async_trait;
-use tokio::sync::mpsc::Receiver;
-use log::{info, error, debug};
+use crate::highlighters::{SEARCH_ID, Highlighter};
 
-pub struct FileView {
+use log::{info, error, debug};
+use crate::log_file_reader::LogFileReader;
+use crate::kubernetes_log_reader::KubernetesLogReader;
+use crate::model::{LogState, ActiveRule, LogReader, LogTextViewThreadMsg, RuleChanges};
+
+pub struct LogTextView {
     container: gtk::Box,
     text_view: Rc<sourceview::View>,
     autoscroll_handler: Option<SignalHandlerId>,
-    rules: Vec<Rule>,
+    rules: Vec<Highlighter>,
     active_rule: String,
-    thread_action_sender: Option<std::sync::mpsc::Sender<FileThreadMsg>>,
+    thread_action_sender: Option<std::sync::mpsc::Sender<LogTextViewThreadMsg>>,
     result_map: HashMap<String, Vec<SearchResultMatch>>,
     current_result_selection: Option<(String, usize)>,
     result_match_cursor_pos: Option<usize>,
-    child_process: Option<Child>,
-}
-
-#[async_trait]
-pub trait LogReader : std::marker::Send {
-    async fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>>;
-    async fn init(&mut self);
-    fn check_changes(&mut self) -> LogState;
-    fn stop(&mut self);
-}
-
-pub struct LogFileReader {
-    path: PathBuf,
-    file: std::fs::File,
-    offset: u64,
-}
-
-impl LogFileReader {
-    pub fn new(path: PathBuf) -> Result<Self, std::io::Error> {
-        let file = std::fs::File::open(&path)?;
-        Ok(Self {
-            path,
-            file,
-            offset: 0
-        })
-    }
-}
-
-pub enum LogState {
-    Ok,
-    Skip,
-    Reload
-}
-
-#[async_trait]
-impl LogReader for LogFileReader {
-    async fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
-        if self.offset > 0 {
-            self.file.seek(SeekFrom::Start(self.offset))?;
-        }
-        let read = read(&mut self.file)?;
-        self.offset += read.len() as u64;
-        Ok(read)
-    }
-
-    async fn init(&mut self) {
-    }
-
-    fn check_changes(&mut self) -> LogState {
-        if !self.path.exists() {
-            return LogState::Skip;
-        }
-
-        if let Ok(metadata) = std::fs::metadata(&self.path) {
-            let len = metadata.len();
-            if len <= 0 {
-                return LogState::Skip;
-            }
-            if len < self.offset {
-                self.offset = 0;
-                return LogState::Reload;
-            }
-        }
-
-        return LogState::Ok;
-    }
-
-    fn stop(&mut self) {
-    }
-}
-
-pub struct KubernetesLogReader {
-    options: CreateKubeLogData,
-    is_initialized: bool,
-    is_stopping: bool,
-    data_rx: Option<Receiver<KubernetesLogReaderMsg>>,
-    data_tx: Option<tokio::sync::mpsc::Sender<KubernetesLogReaderMsg>>,
-    streams: HashMap<String, (Sender<Trigger>, Trigger)>
-}
-
-pub enum KubernetesLogReaderMsg {
-    Data(Vec<u8>),
-    ReInit(String),
-}
-
-#[async_trait]
-impl LogReader for KubernetesLogReader {
-    async fn read(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
-        let mut r = vec![];
-        loop {
-            if let Some(rx) = self.data_rx.as_mut() {
-                if let Ok(rc) = rx.try_recv() {
-                    match rc {
-                        KubernetesLogReaderMsg::Data(mut data) => {
-                            if data.len() > 0 {
-                                r.append(&mut data)
-                            }else {
-                                break;
-                            }
-                        }
-                        KubernetesLogReaderMsg::ReInit(pod) => {
-                            self.is_initialized = false;
-                            self.streams.remove(&pod);
-                            break;
-                        }
-                    }
-                }else {
-                    break;
-                }
-            }
-        }
-        Ok(r)
-    }
-
-    async fn init(&mut self) {
-        use tokio::stream::StreamExt;
-        if self.is_initialized || self.is_stopping {
-            return;
-        }
-        self.is_initialized = true;
-
-        let c = KubeClient::load_conf(None).unwrap();
-        let mut pod_list = vec![];
-
-        if let Ok(pods) = c.pods().await {
-            for pod in pods {
-                if let Some(name) = pod.metadata.name {
-                    for pod_name in &self.options.pods {
-                        if name.starts_with(pod_name) {
-                            if let Some(container_status) = pod.status.as_ref().and_then(|s|s.container_statuses.as_ref()).and_then(|cs|cs.first()) {
-                                if container_status.ready {
-                                    pod_list.push(name.clone());
-                                }else {
-                                    self.is_initialized = false;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        for pod in pod_list {
-            if self.streams.contains_key(&pod) {
-                // info!("Skipping initiate stream for pod '{}'", pod);
-                continue;
-            }
-
-            if let Ok(log_stream) = c.logs(&pod, Some(
-                LogOptions {
-                    follow: Some(true),
-                    since_seconds: Some(3600 * self.options.since),
-                }
-            )).await {
-                let (exit_tx, _exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();
-                let (exit, mut inc) = Valved::new(log_stream);
-                self.streams.insert(pod.clone(), (exit_tx, exit));
-                let mut tx = self.data_tx.clone().unwrap();
-                let pod_name = pod.clone();
-                tokio::spawn(async move {
-                    info!("Stream for pod '{}' started", pod_name);
-                    while let Some(Ok(res)) = inc.next().await {
-                        let data = res.to_vec();
-                        // if data.starts_with(b"unable to retrieve container logs") || data.starts_with(b"rpc error: ") {
-                        //     if let Ok(data) = String::from_utf8(data) {
-                        //         error!("Kublet error: {}", data);
-                        //     }
-                        // }else {
-                        //     if let Err(e) = tx.send(KubernetesLogReaderMsg::Data(data)).await {
-                        //         error!("Failed to send stream data for pod '{}': {}", pod_name, e);
-                        //     }
-                        // }
-                        if let Err(e) = tx.send(KubernetesLogReaderMsg::Data(data)).await {
-                            error!("Failed to send stream data for pod '{}': {}", pod_name, e);
-                        }
-                    }
-                    info!("Stream for pod '{}' ended", pod_name);
-                    if let Err(e) = tx.send(KubernetesLogReaderMsg::ReInit(pod_name)).await {
-                        debug!("Could not send kubernetes re init msg: {}", e);
-                    }
-                });
-            }
-        }
-    }
-
-    fn check_changes(&mut self) -> LogState {
-        LogState::Ok
-    }
-
-    fn stop(&mut self) {
-        self.is_stopping = true;
-        let pods = self.streams.keys().map(|s|s.clone()).collect::<Vec<String>>();
-        for p in pods {
-            if let Some((sender, trigger)) = self.streams.remove(&p) {
-                if let Err(e) = sender.send(trigger) {
-                    debug!("Could not send exit trigger: {:?}", e);
-                }
-            }
-        }
-    }
-}
-
-impl KubernetesLogReader {
-    pub fn new(data: CreateKubeLogData) -> Self {
-        let (data_tx, data_rx) = tokio::sync::mpsc::channel::<KubernetesLogReaderMsg>(10000);
-        let mut instance = Self {
-            data_rx: Some(data_rx),
-            data_tx: Some(data_tx),
-            options: data,
-            is_initialized: false,
-            is_stopping: false,
-            streams: HashMap::new(),
-        };
-        Self::init(&mut instance);
-        instance
-    }
 }
 
 const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
 
-impl FileView {
-    pub fn start<T>(&mut self, data: FileViewData, sender: T, default_rules: Vec<Rule>)
-        where T : 'static + Send + Clone + Fn(FileViewMsg)
+impl LogTextView {
+    pub fn start<T>(&mut self, data: LogTextViewData, sender: T, default_rules: Vec<Highlighter>)
+        where T : 'static + Send + Clone + Fn(LogTextViewMsg)
     {
         let (thread_action_sender, thread_action_receiver) =
-            std::sync::mpsc::channel::<FileThreadMsg>();
+            std::sync::mpsc::channel::<LogTextViewThreadMsg>();
 
         self.thread_action_sender = Some(thread_action_sender);
         self.apply_rules(default_rules);
@@ -265,7 +42,7 @@ impl FileView {
         {
             let tx = sender.clone();
             self.text_view.connect_button_press_event(move |_,_|{
-                tx(FileViewMsg::CursorChanged);
+                tx(LogTextViewMsg::CursorChanged);
                 gtk::Inhibit(false)
             });
         }
@@ -273,29 +50,29 @@ impl FileView {
         {
             let tx = sender.clone();
             self.text_view.connect_move_cursor(move |_,_,_,_| {
-                tx(FileViewMsg::CursorChanged);
+                tx(LogTextViewMsg::CursorChanged);
             });
         }
 
         let file_thread_tx = sender.clone();
         match data {
-            FileViewData::File(path) => {
+            LogTextViewData::File(path) => {
                 match LogFileReader::new(path) {
                     Ok(reader) => {
-                        register_file_watcher_thread(move |msg| {
+                        register_log_data_watcher(move |msg| {
                             file_thread_tx(msg);
-                        }, Box::new(reader),  thread_action_receiver);
+                        }, Box::new(reader), thread_action_receiver);
                     }
                     Err(e) => {
                         error!("Could not open file: {}", e);
                     }
                 }
             }
-            FileViewData::Kube(data) => {
+            LogTextViewData::Kube(data) => {
                 let reader = KubernetesLogReader::new(data);
-                register_file_watcher_thread(move |msg| {
+                register_log_data_watcher(move |msg| {
                     file_thread_tx(msg);
-                }, Box::new(reader),  thread_action_receiver);
+                }, Box::new(reader), thread_action_receiver);
             }
         }
     }
@@ -355,7 +132,6 @@ impl FileView {
             active_rule: SEARCH_ID.to_string(),
             current_result_selection: None ,
             result_match_cursor_pos: None,
-            child_process: None,
         }
     }
 
@@ -440,9 +216,9 @@ impl FileView {
         }
     }
 
-    pub fn update(&mut self, msg: FileViewMsg) {
+    pub fn update(&mut self, msg: LogTextViewMsg) {
         match msg {
-            FileViewMsg::Data(read, data, search_result_list) => {
+            LogTextViewMsg::Data(read, data, search_result_list) => {
                 if let Some(buffer) = &self.text_view.get_buffer() {
                     let (_start, mut end) = buffer.get_bounds();
                     if read > 0 {
@@ -466,14 +242,14 @@ impl FileView {
                     }
                 }
             }
-            FileViewMsg::CursorChanged => {
+            LogTextViewMsg::CursorChanged => {
                 if let Some(buffer) = self.text_view.get_buffer() {
                     let cursor_pos = buffer.get_property_cursor_position();
                     let cursor_pos = buffer.get_iter_at_offset(cursor_pos);
                     self.result_match_cursor_pos = self.get_next_from_pos(&cursor_pos, &self.active_rule);
                 }
             }
-            FileViewMsg::Clear => {
+            LogTextViewMsg::Clear => {
                 if let Some(buffer) = &self.text_view.get_buffer() {
                     buffer.set_text("");
                     self.clear_result_selection_data();
@@ -512,7 +288,7 @@ impl FileView {
         self.result_map.clear();
     }
 
-    pub fn apply_rules(&mut self, mut rules: Vec<Rule>) {
+    pub fn apply_rules(&mut self, mut rules: Vec<Highlighter>) {
         let mut add = vec![];
         let mut remove = vec![];
         let mut update = vec![];
@@ -582,7 +358,7 @@ impl FileView {
                 }
             }
             if let Some(thread_action_sender) = self.thread_action_sender.as_ref() {
-                thread_action_sender.send(FileThreadMsg::ApplyRules(RuleChanges {
+                thread_action_sender.send(LogTextViewThreadMsg::ApplyRules(RuleChanges {
                     add,
                     remove,
                     update,
@@ -603,7 +379,7 @@ impl FileView {
 
     pub fn close(&mut self) {
         if let Some(sender) = self.thread_action_sender.as_ref() {
-            if let Err(e) = sender.send(FileThreadMsg::Quit) {
+            if let Err(e) = sender.send(LogTextViewThreadMsg::Quit) {
                 error!("Could not send quit msg: {}", e);
             }
         }
@@ -626,8 +402,8 @@ impl FileView {
     }
 }
 
-fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>, rx: std::sync::mpsc::Receiver<FileThreadMsg>)
-    where T : 'static + Send + Clone + Fn(FileViewMsg)
+fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, rx: std::sync::mpsc::Receiver<LogTextViewThreadMsg>)
+    where T : 'static + Send + Clone + Fn(LogTextViewMsg)
 {
     tokio::task::spawn(async move {
         let mut line_offset = 0;
@@ -642,7 +418,7 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                 LogState::Ok => true,
                 LogState::Reload => {
                     line_offset = 0;
-                    sender(FileViewMsg::Clear);
+                    sender(LogTextViewMsg::Clear);
                     false
                 }
             };
@@ -651,7 +427,7 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                 let mut full_search_data = None;
                 if let Ok(msg) = rx.try_recv() {
                     match msg {
-                        FileThreadMsg::ApplyRules(changes) => {
+                        LogTextViewThreadMsg::ApplyRules(changes) => {
                             full_search_data = changes.data;
                             for new in &changes.add {
                                 let regex = if let Some(regex) = new.regex.as_ref() {
@@ -684,7 +460,7 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                                 }
                             }
                         }
-                        FileThreadMsg::Quit => {
+                        LogTextViewThreadMsg::Quit => {
                             debug!("Quit signal");
                             break;
                         }
@@ -694,7 +470,7 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                 if let Some(data) = full_search_data {
                     if let Ok(r) = search(&data, &mut active_rules, 0) {
                         if r.results.len() > 0 {
-                            sender(FileViewMsg::Data(0, data, r.results));
+                            sender(LogTextViewMsg::Data(0, data, r.results));
                         }
                     }
                 } else {
@@ -704,7 +480,7 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
                             if let Ok(r) = search(&data, &mut active_rules, line_offset) {
                                 line_offset += r.lines;
                                 if read_bytes > 0 {
-                                    sender(FileViewMsg::Data(read_bytes as u64, data, r.results));
+                                    sender(LogTextViewMsg::Data(read_bytes as u64, data, r.results));
                                 }
                             }
                         }
@@ -717,17 +493,4 @@ fn register_file_watcher_thread<T>(sender: T, mut log_reader: Box<dyn LogReader>
         log_reader.stop();
         info!("File watcher stopped");
     });
-}
-
-impl Drop for FileView {
-    fn drop(&mut self) {
-        if let Some(mut child) = self.child_process.take() {
-            if let Err(e) = child.kill() {
-                eprintln!("Could not kill stern child process: {:?}", e);
-            }
-            if let Err(e) = child.wait() {
-                eprintln!("Could not wait for stern child process: {:?}", e);
-            }
-        }
-    }
 }

@@ -1,44 +1,43 @@
 use gtk::prelude::*;
-use crate::file::toolbar::FileViewToolbar;
+use crate::toolbar::LogViewToolbar;
 use gtk::{Orientation, WindowPosition, HeaderBar, AccelGroup};
-use crate::rules::{RuleListView, SEARCH_ID, Rule};
-use crate::file::file_view::{FileView};
-use crate::{WorkbenchViewMsg, WorkbenchToolbarMsg, FileViewData, FileViewMsg};
+use crate::highlighters::{HighlighterListView, SEARCH_ID, Highlighter};
+use crate::log_text_view::{LogTextView};
+use crate::model::{LogViewMsg, LogViewToolbarMsg, LogTextViewData, LogTextViewMsg};
 use std::rc::Rc;
 use uuid::Uuid;
 use crate::util::{SortedListCompare, CompareResult};
-use log::{info};
 
 
-pub struct FileViewWorkbench {
+pub struct LogView {
     container: gtk::Box,
-    rules_view: RuleListView,
-    file_view: FileView,
+    highlighters_view: HighlighterListView,
+    log_text_view: LogTextView,
     search_text: String,
-    rules_dlg: Option<gtk::Dialog>,
-    rules: Vec<Rule>,
-    toolbar: FileViewToolbar,
+    highlighters_dlg: Option<gtk::Dialog>,
+    highlighters: Vec<Highlighter>,
+    toolbar: LogViewToolbar,
     active_rule: String,
-    sender: Rc<dyn Fn(WorkbenchViewMsg)>
+    sender: Rc<dyn Fn(LogViewMsg)>
 }
 
-pub fn get_default_rules() -> Vec<Rule> {
+pub fn get_default_highlighters() -> Vec<Highlighter> {
     vec![
-        Rule {
+        Highlighter {
             id: Uuid::parse_str(SEARCH_ID).unwrap(),
             regex: None,
             color: Some(String::from("rgba(188,150,0,1)")),
             name: Some(String::from("Search")),
             is_system: true
         },
-        Rule {
+        Highlighter {
             id: Uuid::new_v4(),
             regex: Some(r".*\s((?i)error|fatal|failed(?-i))\s.*".into()),
             color: Some(String::from("rgba(239,41,41,1)")),
             name: Some(String::from("Error")),
             is_system: false
         },
-        Rule {
+        Highlighter {
             id: Uuid::new_v4(),
             regex: Some(r".*\s((?i)warn(?-i))\s.*".into()),
             color: Some(String::from("rgba(207,111,57,1)")),
@@ -48,21 +47,21 @@ pub fn get_default_rules() -> Vec<Rule> {
     ]
 }
 
-impl FileViewWorkbench {
-    pub fn new<T>(data: FileViewData, sender: T, accelerators: &AccelGroup) -> Self
-        where T: 'static + Send + Clone + Fn(WorkbenchViewMsg)
+impl LogView {
+    pub fn new<T>(data: LogTextViewData, sender: T, accelerators: &AccelGroup) -> Self
+        where T: 'static + Send + Clone + Fn(LogViewMsg)
     {
-        let default_rules = get_default_rules();
+        let default_rules = get_default_highlighters();
 
         let toolbar_msg = sender.clone();
-        let toolbar = FileViewToolbar::new(move |msg| {
-            toolbar_msg(WorkbenchViewMsg::ToolbarMsg(msg));
+        let toolbar = LogViewToolbar::new(move |msg| {
+            toolbar_msg(LogViewMsg::ToolbarMsg(msg));
         }, accelerators, &default_rules);
 
         let file_tx = sender.clone();
-        let mut file_view = FileView::new();
+        let mut file_view = LogTextView::new();
         file_view.start(data, move |msg| {
-            file_tx(WorkbenchViewMsg::FileViewMsg(msg));
+            file_tx(LogViewMsg::LogTextViewMsg(msg));
         }, default_rules.clone());
 
         let container = gtk::Box::new(Orientation::Vertical, 0);
@@ -70,30 +69,30 @@ impl FileViewWorkbench {
         container.add(file_view.view());
 
         let rule_msg = sender.clone();
-        let mut rules_view = RuleListView::new(move |msg| {
-            rule_msg(WorkbenchViewMsg::RuleViewMsg(msg));
+        let mut rules_view = HighlighterListView::new(move |msg| {
+            rule_msg(LogViewMsg::HighlighterViewMsg(msg));
         });
-        rules_view.add_rules(default_rules.clone());
+        rules_view.add_highlighters(default_rules.clone());
 
         let mut rules = default_rules.clone();
         rules.sort_by_key(|r|r.id);
 
         Self {
             container,
-            rules_view,
-            file_view,
+            highlighters_view: rules_view,
+            log_text_view: file_view,
             toolbar,
             search_text: String::new(),
-            rules,
+            highlighters: rules,
             active_rule: SEARCH_ID.to_string(),
-            rules_dlg: None,
+            highlighters_dlg: None,
             sender: Rc::new(sender.clone()),
         }
     }
 
-    fn apply_rules(&mut self, mut rules: Vec<Rule>) {
+    fn apply_rules(&mut self, mut rules: Vec<Highlighter>) {
         rules.sort_by_key(|r|r.id);
-        let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
+        let compare_results = SortedListCompare::new(&mut self.highlighters, &mut rules);
         for compare_result in compare_results {
             match compare_result {
                 CompareResult::MissesLeft(new) => {
@@ -117,70 +116,70 @@ impl FileViewWorkbench {
                 }
             }
         }
-        self.rules = rules;
+        self.highlighters = rules;
     }
 
-    pub fn update(&mut self, msg: WorkbenchViewMsg) {
+    pub fn update(&mut self, msg: LogViewMsg) {
         match msg {
-            WorkbenchViewMsg::ToolbarMsg(msg) => {
+            LogViewMsg::ToolbarMsg(msg) => {
                 match msg {
-                    WorkbenchToolbarMsg::SearchPressed => {
+                    LogViewToolbarMsg::SearchPressed => {
                         let regex = if self.search_text.len() > 0 {
                             format!("(?i).*{}.*", self.search_text)
                         }else {
                             String::new()
                         };
-                        self.rules_view.set_regex(SEARCH_ID, &regex);
-                        let rules = self.rules_view.get_rules();
+                        self.highlighters_view.set_regex(SEARCH_ID, &regex);
+                        let rules = self.highlighters_view.get_highlighter();
                         self.apply_rules(rules.clone());
-                        self.file_view.apply_rules(rules);
+                        self.log_text_view.apply_rules(rules);
                     }
-                    WorkbenchToolbarMsg::ClearSearchPressed => {
-                        self.rules_view.set_regex(SEARCH_ID, &String::new());
-                        let rules = self.rules_view.get_rules();
+                    LogViewToolbarMsg::ClearSearchPressed => {
+                        self.highlighters_view.set_regex(SEARCH_ID, &String::new());
+                        let rules = self.highlighters_view.get_highlighter();
                         self.apply_rules(rules.clone());
-                        self.file_view.apply_rules(rules);
+                        self.log_text_view.apply_rules(rules);
                     }
-                    WorkbenchToolbarMsg::ShowRules => {
+                    LogViewToolbarMsg::ShowRules => {
                         self.show_dlg();
                     }
-                    WorkbenchToolbarMsg::TextChange(text) => {
+                    LogViewToolbarMsg::TextChange(text) => {
                         self.search_text = text;
                     }
-                    WorkbenchToolbarMsg::ToggleAutoScroll(enable) => {
-                        self.file_view.toggle_autoscroll(enable);
+                    LogViewToolbarMsg::ToggleAutoScroll(enable) => {
+                        self.log_text_view.toggle_autoscroll(enable);
                     }
-                    WorkbenchToolbarMsg::SelectNextMatch => {
-                        self.file_view.select_next_match(&self.active_rule);
+                    LogViewToolbarMsg::SelectNextMatch => {
+                        self.log_text_view.select_next_match(&self.active_rule);
                     }
-                    WorkbenchToolbarMsg::SelectPrevMatch => {
-                        self.file_view.select_prev_match(&self.active_rule);
+                    LogViewToolbarMsg::SelectPrevMatch => {
+                        self.log_text_view.select_prev_match(&self.active_rule);
                     }
-                    WorkbenchToolbarMsg::SelectRule(id) => {
-                        self.file_view.set_active_rule(&id);
+                    LogViewToolbarMsg::SelectRule(id) => {
+                        self.log_text_view.set_active_rule(&id);
                         self.active_rule = id;
                     }
                 }
             }
-            WorkbenchViewMsg::ApplyRules => {
-                let rules = self.rules_view.get_rules();
+            LogViewMsg::ApplyRules => {
+                let rules = self.highlighters_view.get_highlighter();
                 self.apply_rules(rules.clone());
-                self.file_view.apply_rules(rules);
+                self.log_text_view.apply_rules(rules);
             }
-            WorkbenchViewMsg::RuleViewMsg(msg) => {
-                self.rules_view.update(msg);
+            LogViewMsg::HighlighterViewMsg(msg) => {
+                self.highlighters_view.update(msg);
             }
-            WorkbenchViewMsg::FileViewMsg(msg) => {
-                if let FileViewMsg::Data(_length, _data, matches) = &msg {
+            LogViewMsg::LogTextViewMsg(msg) => {
+                if let LogTextViewMsg::Data(_length, _data, matches) = &msg {
                     self.toolbar.update_results(matches);
                 }
-                self.file_view.update(msg);
+                self.log_text_view.update(msg);
             }
         }
     }
 
     pub fn close(&mut self) {
-        self.file_view.close();
+        self.log_text_view.close();
     }
 
     pub fn view(&self) -> &gtk::Box {
@@ -188,7 +187,7 @@ impl FileViewWorkbench {
     }
 
     pub fn show_dlg(&mut self) {
-        if self.rules_dlg.is_none() {
+        if self.highlighters_dlg.is_none() {
             let dlg = gtk::Dialog::new();
             dlg.set_position(WindowPosition::CenterOnParent);
             dlg.set_default_size(400, 200);
@@ -199,26 +198,19 @@ impl FileViewWorkbench {
             dlg.set_modal(true);
 
             let content = dlg.get_content_area();
-            content.add(self.rules_view.view());
+            content.add(self.highlighters_view.view());
 
             let tx = self.sender.clone();
             dlg.connect_delete_event(move |dlg, _| {
-                (*tx)(WorkbenchViewMsg::ApplyRules);
+                (*tx)(LogViewMsg::ApplyRules);
                 dlg.hide();
                 gtk::Inhibit(true)
             });
-            self.rules_dlg = Some(dlg);
+            self.highlighters_dlg = Some(dlg);
         }
 
-        if let Some(dlg)= &self.rules_dlg {
+        if let Some(dlg)= &self.highlighters_dlg {
             dlg.show_all();
         }
-    }
-}
-
-
-impl Drop for FileViewWorkbench {
-    fn drop(&mut self) {
-        info!("Drop workbench");
     }
 }

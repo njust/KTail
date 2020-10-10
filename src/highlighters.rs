@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 
 use gtk::{Orientation, WidgetExt, ContainerExt, ButtonExt, IconSize, ReliefStyle};
-use crate::{RuleListViewMsg};
+use crate::model::{RuleListViewMsg};
 use glib::bitflags::_core::cmp::Ordering;
 use uuid::Uuid;
 use std::collections::HashMap;
@@ -16,7 +16,7 @@ use gio::{ListStoreExt, ListModelExt};
 use glib::Object;
 
 #[derive(Debug, Default, Clone)]
-pub struct Rule {
+pub struct Highlighter {
     pub id: uuid::Uuid,
     pub name: Option<String>,
     pub color: Option<String>,
@@ -24,7 +24,7 @@ pub struct Rule {
     pub is_system: bool,
 }
 
-impl Rule {
+impl Highlighter {
     pub fn new() -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
@@ -36,34 +36,34 @@ impl Rule {
     }
 }
 
-impl PartialEq for Rule {
+impl PartialEq for Highlighter {
     fn eq(&self, other: &Self) -> bool {
         self.id.eq(&other.id)
     }
 }
 
-impl PartialOrd for Rule {
+impl PartialOrd for Highlighter {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.id.partial_cmp(&other.id)
     }
 }
 
 #[derive(Clone)]
-pub struct RuleList {
-    rules: HashMap<Uuid, Rule>
+pub struct HighlighterList {
+    rules: HashMap<Uuid, Highlighter>
 }
 
 pub const SEARCH_ID: &'static str = "ba5b70bb-57b9-4f5c-95c9-e80953ae113e";
 
 
-pub struct RuleListView {
+pub struct HighlighterListView {
     container: gtk::Box,
-    rule_list_data: gio::ListStore
+    highlighter_list_data: gio::ListStore
 }
 
-data_model!(RuleData);
-impl DataModelDescription for RuleData {
-    const NAME: &'static str = "RuleData";
+data_model!(HighlighterData);
+impl DataModelDescription for HighlighterData {
+    const NAME: &'static str = "HighlighterData";
     fn get_properties() -> &'static [Property<'static>] {
         &[
             subclass::Property("id", |name| {
@@ -85,17 +85,17 @@ impl DataModelDescription for RuleData {
     }
 }
 
-impl RuleListView {
+impl HighlighterListView {
     pub fn new<T>(tx: T) -> Self
         where T: 'static + Clone + Fn(RuleListViewMsg)
     {
-        let list = gio::ListStore::new(RuleData::static_type());
+        let list = gio::ListStore::new(HighlighterData::static_type());
         let list_box = gtk::ListBox::new();
         let tx2 = tx.clone();
         list_box.bind_model(Some(&list), move |item| {
             let row = gtk::ListBoxRow::new();
             let container = gtk::Box::new(Orientation::Horizontal, 4);
-            let item = item.downcast_ref::<RuleData>().expect("Row data is of wrong type");
+            let item = item.downcast_ref::<HighlighterData>().expect("Row data is of wrong type");
 
             let id = item.get_property("id").ok()
                 .and_then(|id| id.get::<String>().ok())
@@ -155,7 +155,7 @@ impl RuleListView {
             add_btn.set_relief(ReliefStyle::None);
             let tx = tx.clone();
             add_btn.connect_clicked(move |_| {
-                let rule_data = Rule::new();
+                let rule_data = Highlighter::new();
                 tx(RuleListViewMsg::AddRule(rule_data));
             });
             toolbar.add(&add_btn);
@@ -167,35 +167,35 @@ impl RuleListView {
 
         Self {
             container,
-            rule_list_data: list
+            highlighter_list_data: list
         }
     }
 
-    pub fn add_rules(&mut self, data: Vec<Rule>) {
+    pub fn add_highlighters(&mut self, data: Vec<Highlighter>) {
         for rule in data {
-            self.add_rule(rule);
+            self.add_highlighter(rule);
         }
     }
 
-    pub fn add_rule(&mut self, data: Rule) {
+    pub fn add_highlighter(&mut self, data: Highlighter) {
         let id = data.id.to_string();
         let name = data.name.unwrap_or(String::new());
         let regex = data.regex.unwrap_or(String::new());
         let color = data.color.unwrap_or(String::new());
-        self.rule_list_data.append(&RuleData::new(&[("id", &id), ("name", &name), ("regex", &regex), ("color", &color), ("isSystem", &data.is_system)]));
+        self.highlighter_list_data.append(&HighlighterData::new(&[("id", &id), ("name", &name), ("regex", &regex), ("color", &color), ("isSystem", &data.is_system)]));
     }
 
-    pub fn get_rules(&self) -> Vec<Rule> {
-        let cnt = self.rule_list_data.get_n_items();
+    pub fn get_highlighter(&self) -> Vec<Highlighter> {
+        let cnt = self.highlighter_list_data.get_n_items();
         let mut rules = vec![];
         for i in 0..cnt {
-            if let Some(o) = self.rule_list_data.get_object(i) {
+            if let Some(o) = self.highlighter_list_data.get_object(i) {
                 let id = o.get_property("id").unwrap().get::<String>().unwrap().unwrap();
                 let name = o.get_property("name").unwrap().get::<String>().unwrap().and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let regex = o.get_property("regex").unwrap().get::<String>().unwrap().and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let color = o.get_property("color").unwrap().get::<String>().unwrap();
                 let is_system = o.get_property("isSystem").unwrap().get::<bool>().unwrap().unwrap_or(false);
-                rules.push(Rule {
+                rules.push(Highlighter {
                     id: Uuid::parse_str(&id).unwrap(),
                     name,
                     regex,
@@ -208,21 +208,21 @@ impl RuleListView {
     }
 
     pub fn set_regex(&mut self, id: &str, regex: &String) {
-        if let Some(o) = self.get_rule_by_id(id) {
+        if let Some(o) = self.get_highlighter_by_id(id) {
             if let Err(e) = o.set_property("regex", &regex) {
                 error!("Could not set regex: {}", e);
             }
         }
     }
 
-    fn get_rule_by_id(&self, rid: &str) -> Option<Object> {
-        self.get_rule_idx(rid).and_then(|idx|self.rule_list_data.get_object(idx))
+    fn get_highlighter_by_id(&self, rid: &str) -> Option<Object> {
+        self.get_highlighter_idx(rid).and_then(|idx|self.highlighter_list_data.get_object(idx))
     }
 
-    fn get_rule_idx(&self, sid: &str) -> Option<u32> {
-        let cnt = self.rule_list_data.get_n_items();
+    fn get_highlighter_idx(&self, sid: &str) -> Option<u32> {
+        let cnt = self.highlighter_list_data.get_n_items();
         for i in 0..cnt {
-            if let Some(o) = self.rule_list_data.get_object(i) {
+            if let Some(o) = self.highlighter_list_data.get_object(i) {
                 let id = o.get_property("id").unwrap().get::<String>().unwrap().unwrap();
                 if id == sid {
                     return Some(i)
@@ -235,11 +235,11 @@ impl RuleListView {
     pub fn update(&mut self, msg: RuleListViewMsg) {
         match msg {
             RuleListViewMsg::AddRule(rule) => {
-                self.add_rule(rule.clone());
+                self.add_highlighter(rule.clone());
             }
             RuleListViewMsg::DeleteRule(id) => {
-                if let Some(idx) = self.get_rule_idx(&id.to_string()) {
-                    self.rule_list_data.remove(idx);
+                if let Some(idx) = self.get_highlighter_idx(&id.to_string()) {
+                    self.highlighter_list_data.remove(idx);
                 }
             }
         }

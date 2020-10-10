@@ -3,103 +3,34 @@
 #[macro_use]
 extern crate glib;
 
+mod model;
+mod util;
+mod pod_selection;
+mod log_view;
+mod toolbar;
+mod log_text_view;
+mod log_file_reader;
+mod kubernetes_log_reader;
+mod highlighters;
+
 use gtk::prelude::*;
 use gio::prelude::*;
-
-use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow, AccelGroup, DialogFlags, MessageType, ButtonsType, AccelFlags};
-use std::rc::Rc;
+use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, AccelGroup};
 use gio::{SimpleAction};
 use log::{error, info};
-
-mod file;
-pub mod rules;
-pub mod util;
-
-use crate::file::workbench::FileViewWorkbench;
 use uuid::Uuid;
-use crate::rules::Rule;
-use crate::util::{create_col, ColumnType};
 use std::path::PathBuf;
 use glib::Sender;
+use crate::pod_selection::create_open_kube_action;
 use std::collections::HashMap;
+use crate::log_view::LogView;
+use crate::model::{LogTextViewData, Msg};
 
-pub const SEARCH_TAG: &'static str = "SEARCH";
 
-pub struct CreateKubeLogData {
-    pods: Vec<String>,
-    since: u32,
-}
-
-pub enum FileViewData {
-    File(PathBuf),
-    Kube(CreateKubeLogData)
-}
-
-impl FileViewData {
-    fn get_name(&self) -> String {
-        match self {
-            FileViewData::File(file_path) => file_path.file_name().unwrap().to_str().unwrap().to_string(),
-            FileViewData::Kube(data) => data.pods.join(",")
-        }
-    }
-}
-
-pub enum Msg {
-    CloseTab(Uuid),
-    CreateTab(FileViewData),
-    NextTab,
-    PrevTab,
-    WorkbenchMsg(Uuid, WorkbenchViewMsg),
-    Exit
-}
-
-pub enum WorkbenchViewMsg {
-    ApplyRules,
-    ToolbarMsg(WorkbenchToolbarMsg),
-    RuleViewMsg(RuleListViewMsg),
-    FileViewMsg(FileViewMsg)
-}
-
-pub enum WorkbenchToolbarMsg {
-    TextChange(String),
-    SearchPressed,
-    ClearSearchPressed,
-    ShowRules,
-    ToggleAutoScroll(bool),
-    SelectNextMatch,
-    SelectPrevMatch,
-    SelectRule(String)
-}
-
-pub enum RuleListViewMsg {
-    AddRule(Rule),
-    DeleteRule(String),
-}
-
-#[derive(Debug, Clone)]
-pub struct SearchResultMatch {
-    pub line: usize,
-    pub start: usize,
-    pub end: usize,
-}
-
-#[derive(Debug)]
-pub enum FileViewMsg {
-    Data(u64, String, HashMap<String, Vec<SearchResultMatch>>),
-    Clear,
-    CursorChanged,
-}
-
-fn map_model(model: &TreeStore, iter: &TreeIter) -> Option<(String, bool)> {
-    let name = model.get_value(iter, 0).get::<String>().unwrap_or(None)?;
-    let active = model.get_value(iter, 1).get::<bool>().unwrap_or(None)?;
-    Some((name, active))
-}
-
-fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid, accelerators: &AccelGroup) -> (gtk::Box, FileViewWorkbench) {
+fn create_tab(data: LogTextViewData, tx: Sender<Msg>, id: Uuid, accelerators: &AccelGroup) -> (gtk::Box, LogView) {
     let tx2 = tx.clone();
     let tab_name = data.get_name();
-    let file_view = FileViewWorkbench::new(data, move |msg| {
+    let file_view = LogView::new(data, move |msg| {
         tx2.send(Msg::WorkbenchMsg(id, msg)).expect("Could not send msg");
     }, accelerators);
 
@@ -119,154 +50,7 @@ fn create_tab(data: FileViewData, tx: Sender<Msg>, id: Uuid, accelerators: &Acce
     (tab_header, file_view)
 }
 
-use k8s_client::{KubeClient, KubeConfig};
-
-
-fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
-    if !KubeConfig::default_path().exists() {
-        return None;
-    }
-
-    let kube_action = SimpleAction::new("kube", None);
-    let dlg = gtk::Dialog::new();
-    let service_model = Rc::new(TreeStore::new(&[glib::Type::String, glib::Type::Bool]));
-    service_model.set_sort_column_id(SortColumn::Index(0), SortType::Ascending);
-    let list = gtk::TreeView::with_model(&*service_model);
-
-    list.append_column(&create_col(Some("Add"), 1, ColumnType::Bool, service_model.clone()));
-    list.append_column(&create_col(Some("Pod"), 0, ColumnType::String, service_model.clone()));
-
-    dlg.set_position(WindowPosition::CenterOnParent);
-    dlg.set_default_size(450, 400);
-    let header_bar = HeaderBar::new();
-    header_bar.set_show_close_button(true);
-    header_bar.set_title(Some("Pods"));
-    dlg.set_titlebar(Some(&header_bar));
-    dlg.set_modal(true);
-
-    let content = dlg.get_content_area();
-    let scroll_wnd = ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
-    scroll_wnd.set_property_expand(true);
-    scroll_wnd.add(&list);
-    content.add(&scroll_wnd);
-
-
-    let log_separate_tab_checkbox = gtk::CheckButton::with_label("Logs in separate tab");
-    log_separate_tab_checkbox.set_active(true);
-    content.add(&log_separate_tab_checkbox);
-
-    let include_replicas = gtk::CheckButton::with_label("Include replicas");
-    include_replicas.set_active(true);
-    content.add(&include_replicas);
-
-    let since_row = gtk::Box::new(Orientation::Horizontal, 0);
-    since_row.set_spacing(4);
-    let adjustment = gtk::Adjustment::new(4.0, 1.0, 721.0, 1.0, 1.0, 1.0);
-    let since_val = gtk::SpinButton::new(Some(&adjustment), 1.0, 0);
-    since_val.set_value(4.0);
-    since_row.add(&gtk::Label::new(Some("Since hours:")));
-    since_row.add(&since_val);
-    since_row.set_margin_top(8);
-
-    content.add(&since_row);
-
-    dlg.connect_delete_event(move |dlg, _| {
-        dlg.hide();
-        gtk::Inhibit(true)
-    });
-
-    dlg.add_button("_Cancel", ResponseType::Cancel);
-    dlg.add_button("_Open", ResponseType::Accept);
-
-    kube_action.connect_activate(move |_,_| {
-        let pods = glib::MainContext::default().block_on(async move  {
-            match KubeClient::load_conf(None) {
-                Ok(c) => {
-                    c.pods().await
-                }
-                Err(e) => {
-                    Err(e)
-                }
-            }
-        });
-
-        match pods {
-            Ok(pods) => {
-                service_model.clear();
-                for pod in pods {
-                    if let Some(name) = pod.metadata.name {
-                        service_model.insert_with_values(None, None, &[0, 1], &[&name, &false]);
-                    }
-                }
-
-                dlg.show_all();
-
-                let res = dlg.run();
-                dlg.close();
-                let since = since_val.get_text().to_string();
-                let since = since.parse::<u32>().unwrap_or(4);
-                let separate_tabs = log_separate_tab_checkbox.get_active();
-                let include_replicas = include_replicas.get_active();
-
-                if res == ResponseType::Accept {
-                    let mut models = vec![];
-                    if let Some(iter)  = service_model.get_iter_first() {
-                        if let Some((service, active)) = map_model(&service_model, &iter) {
-                            if active {
-                                models.push(service);
-                            }
-                        }
-                        while service_model.iter_next(&iter) {
-                            if let Some((service, active)) = map_model(&service_model, &iter) {
-                                if active {
-                                    models.push(service);
-                                }
-                            }
-                        }
-                    }
-
-                    let pods = if include_replicas {
-                        models.iter().map(|name| {
-                            let parts = name.split("-").collect::<Vec<&str>>();
-                            let len = parts.len();
-                            parts.into_iter().take(len -2).collect::<Vec<&str>>().join("-")
-                        }).collect::<Vec<String>>()
-                    }else {
-                        models
-                    };
-
-                    if separate_tabs {
-                        for model in pods {
-                            tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
-                                pods: vec![model],
-                                since
-                            }))).expect("Could not send create tab msg");
-                        }
-                    }else {
-                        tx.send(Msg::CreateTab(FileViewData::Kube(CreateKubeLogData {
-                            pods,
-                            since
-                        }))).expect("Could not send create tab msg");
-                    }
-                }
-            }
-            Err(e) => {
-                error!("Could not get pods: {}", e);
-                let dlg = gtk::MessageDialog::new::<ApplicationWindow>(
-                    None,
-                    DialogFlags::MODAL,
-                    MessageType::Error,
-                    ButtonsType::Ok,
-                    &e.to_string() );
-                dlg.run();
-                dlg.close();
-            }
-        }
-    });
-    Some(kube_action)
-}
-
-fn create_open_dlg_action(tx: Sender<Msg>) -> SimpleAction {
+fn create_open_file_dlg_action(tx: Sender<Msg>) -> SimpleAction {
     let open_action = SimpleAction::new("open", None);
     open_action.connect_activate(move |_a, _b| {
         let dialog = FileChooserDialog::new::<ApplicationWindow>(Some("Open File"), None, FileChooserAction::Open);
@@ -276,7 +60,7 @@ fn create_open_dlg_action(tx: Sender<Msg>) -> SimpleAction {
         dialog.close();
         if res == ResponseType::Accept {
             if let Some(file_path) = dialog.get_filename() {
-                tx.send(Msg::CreateTab(FileViewData::File(file_path))).expect("Could not send create tab msg");
+                tx.send(Msg::CreateTab(LogTextViewData::File(file_path))).expect("Could not send create tab msg");
             }
         }
     });
@@ -322,7 +106,7 @@ async fn int_main() {
                         let file = PathBuf::from(file);
                         if let Some(mime) = mime_guess::from_path(&file).first() {
                             if mime.type_() == mime_guess::mime::TEXT  {
-                                tx.send(Msg::CreateTab(FileViewData::File(file))).expect("Could not send");
+                                tx.send(Msg::CreateTab(LogTextViewData::File(file))).expect("Could not send");
                             }
                         }
                     }
@@ -330,7 +114,7 @@ async fn int_main() {
             });
         }
 
-        let open_action = create_open_dlg_action(tx.clone());
+        let open_action = create_open_file_dlg_action(tx.clone());
         app.add_action(&open_action);
 
         {
@@ -374,7 +158,7 @@ async fn int_main() {
             app.add_action(&exit_action);
         }
 
-        let mut file_views = HashMap::<Uuid, FileViewWorkbench>::new();
+        let mut file_views = HashMap::<Uuid, LogView>::new();
         let window = ApplicationWindow::new(app);
         let ag = AccelGroup::new();
         window.add_accel_group(&ag);

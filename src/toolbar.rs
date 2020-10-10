@@ -1,17 +1,17 @@
 use gtk::prelude::*;
 use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, AccelFlags, AccelGroup, TreeIter};
-use crate::{WorkbenchToolbarMsg, SearchResultMatch};
-use crate::rules::Rule;
+use crate::model::{LogViewToolbarMsg, SearchResultMatch};
+use crate::highlighters::Highlighter;
 use std::collections::HashMap;
 
-pub struct FileViewToolbar {
+pub struct LogViewToolbar {
     container: gtk::Box,
     rules_selector_data: gtk::ListStore,
 }
 
-impl FileViewToolbar {
-    pub fn new<T>(tx: T, accelerators: &AccelGroup, init_rules: &Vec<Rule>) -> Self
-        where T: 'static + Clone + Fn(WorkbenchToolbarMsg)
+impl LogViewToolbar {
+    pub fn new<T>(tx: T, accelerators: &AccelGroup, init_rules: &Vec<Highlighter>) -> Self
+        where T: 'static + Clone + Fn(LogViewToolbarMsg)
     {
         let toolbar = gtk::Box::new(Orientation::Horizontal, 4);
         toolbar.set_property_margin(4);
@@ -24,19 +24,19 @@ impl FileViewToolbar {
             let tx = tx.clone();
             search_txt.connect_changed(move |e| {
                 let text = e.get_text().to_string();
-                tx(WorkbenchToolbarMsg::TextChange(text));
+                tx(LogViewToolbarMsg::TextChange(text));
             });
         }
         {
             let tx = tx.clone();
             search_txt.connect_icon_release(move |_, _, _| {
-                tx(WorkbenchToolbarMsg::ClearSearchPressed);
+                tx(LogViewToolbarMsg::ClearSearchPressed);
             });
         }
         {
             let tx = tx.clone();
             search_txt.connect_activate(move |_| {
-                tx(WorkbenchToolbarMsg::SearchPressed);
+                tx(LogViewToolbarMsg::SearchPressed);
             });
             toolbar.add(&search_txt);
         }
@@ -44,7 +44,7 @@ impl FileViewToolbar {
         let search_btn = Button::with_label("Search"); {
             let tx = tx.clone();
             search_btn.connect_clicked(move |_| {
-                tx(WorkbenchToolbarMsg::SearchPressed);
+                tx(LogViewToolbarMsg::SearchPressed);
             });
             toolbar.add(&search_btn);
         }
@@ -54,7 +54,7 @@ impl FileViewToolbar {
             let (key, modifier) = gtk::accelerator_parse("<Primary>P");
             prev_btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
             prev_btn.connect_clicked(move |_| {
-                tx(WorkbenchToolbarMsg::SelectPrevMatch);
+                tx(LogViewToolbarMsg::SelectPrevMatch);
             });
             toolbar.add(&prev_btn);
         }
@@ -79,7 +79,7 @@ impl FileViewToolbar {
             let tx = tx.clone();
             rule_selector.connect_changed(move |cb| {
                 if let Some(selected) = cb.get_active_id() {
-                    tx(WorkbenchToolbarMsg::SelectRule(selected.as_str().into()))
+                    tx(LogViewToolbarMsg::SelectRule(selected.as_str().into()))
                 }
             });
         }
@@ -89,7 +89,7 @@ impl FileViewToolbar {
             next_btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
             let tx = tx.clone();
             next_btn.connect_clicked(move |_| {
-                tx(WorkbenchToolbarMsg::SelectNextMatch);
+                tx(LogViewToolbarMsg::SelectNextMatch);
             });
             toolbar.add(&next_btn);
         }
@@ -97,7 +97,7 @@ impl FileViewToolbar {
         let show_rules_btn = Button::with_label("Highlighters"); {
             let tx = tx.clone();
             show_rules_btn.connect_clicked(move |_| {
-                tx(WorkbenchToolbarMsg::ShowRules);
+                tx(LogViewToolbarMsg::ShowRules);
             });
             toolbar.add(&show_rules_btn);
         }
@@ -105,7 +105,7 @@ impl FileViewToolbar {
         let toggle_auto_scroll_btn = ToggleButton::new(); {
             let tx = tx.clone();
             toggle_auto_scroll_btn.connect_clicked(move |b| {
-                tx(WorkbenchToolbarMsg::ToggleAutoScroll(b.get_active()));
+                tx(LogViewToolbarMsg::ToggleAutoScroll(b.get_active()));
             });
 
             toggle_auto_scroll_btn.set_image(Some(&gtk::Image::from_icon_name(Some("go-bottom-symbolic"), IconSize::Menu)));
@@ -188,7 +188,7 @@ impl FileViewToolbar {
         }
     }
 
-    pub fn add_rule(&mut self, rule: &Rule) {
+    pub fn add_rule(&mut self, rule: &Highlighter) {
         let default_name = String::from("Unamed rule");
         let name = rule.name.as_ref().unwrap_or(&default_name);
         let id = rule.id.to_string();

@@ -1,20 +1,18 @@
 use gtk::prelude::*;
 use glib::{SignalHandlerId, Value};
-use std::path::PathBuf;
-use std::io::{BufReader, SeekFrom, Read, Seek, BufRead};
+
+use std::io::{BufReader, Read, BufRead};
 use std::error::Error;
-use encoding::all::{UTF_8, UTF_16LE, UTF_16BE};
+use encoding::all::{UTF_8};
 use encoding::{DecoderTrap, Encoding};
 use glib::bitflags::_core::cmp::Ordering;
-use crate::{SearchResultMatch};
-use serde::Deserialize;
-use std::process::{Command, Stdio};
-use std::collections::{HashSet, HashMap};
+
+
+use std::collections::{HashMap};
 use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore};
 use std::rc::Rc;
-use crate::file::ActiveRule;
+use crate::model::{ActiveRule, SearchResultData, SearchResultMatch};
 
-pub const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     text_view.connect_size_allocate(|tv, _b| {
@@ -25,39 +23,7 @@ pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     })
 }
 
-pub fn get_encoding(bytes: &[u8]) -> &'static (dyn encoding::types::Encoding + Send + Sync) {
-    if bytes.len() <= 2 {
-        return UTF_8;
-    }
-
-    // https://de.wikipedia.org/wiki/Byte_Order_Mark
-    let bom = &bytes[0..2];
-    match &bom {
-        &[239u8, 187u8] => UTF_8,
-        &[254u8, 255u8] => UTF_16BE,
-        &[255u8, 254u8] => UTF_16LE,
-        _ => UTF_8
-    }
-}
-
-
-pub struct SearchResult {
-    pub lines: usize,
-    pub matches: Vec<SearchResultMatch>,
-}
-
 pub fn decode_data<'a>(buffer: &[u8], _encoding_name: &mut Option<String>) -> Result<String, Box<dyn Error>> {
-    // let enc = if let Some(encoding) = encoding_name {
-    //     encoding::label::encoding_from_whatwg_label(&encoding)
-    // }else {
-    //     let encoding = get_encoding(buffer);
-    //     let name = encoding.whatwg_name().unwrap();
-    //     encoding_name.replace(name.to_string());
-    //     Some(encoding)
-    // }.unwrap();
-
-    // let mut data = enc.decode(buffer, DecoderTrap::Ignore)?;
-
     let mut data = UTF_8.decode(buffer, DecoderTrap::Ignore)?;
     // let re = Regex::new("\n\r|\r\n|\r")?;
     // data = re.replace_all(&data, "").to_string();
@@ -69,13 +35,6 @@ pub fn decode_data<'a>(buffer: &[u8], _encoding_name: &mut Option<String>) -> Re
     return Ok(data);
 }
 
-pub fn read_file(path: &PathBuf, start: u64) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut file = std::fs::File::open(path)?;
-    if start > 0 {
-        file.seek(SeekFrom::Start(start))?;
-    }
-    read(&mut file)
-}
 
 pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut reader = BufReader::new(stream);
@@ -97,11 +56,6 @@ pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>, Box<dyn Error>> {
     }
 
     Ok(buffer)
-}
-
-pub struct SearchResultData {
-    pub lines: usize,
-    pub results: HashMap<String, Vec<SearchResultMatch>>,
 }
 
 pub fn search(text: &str, active_rules: &mut Vec<ActiveRule>, line_offset: usize) -> Result<SearchResultData, Box<dyn Error>> {
@@ -205,47 +159,6 @@ impl<'a, 'b, T: PartialOrd> Iterator for SortedListCompare<'a, 'b, T> {
     }
 }
 
-#[derive(Deserialize)]
-struct PodContainer {
-    name: String,
-}
-
-#[derive(Deserialize)]
-struct PodSpec {
-    containers: Vec<PodContainer>,
-}
-
-#[derive(Deserialize)]
-struct PodItems {
-    spec: PodSpec,
-}
-
-#[derive(Deserialize)]
-struct GetPodsResult {
-    items: Vec<PodItems>
-}
-
-
-#[test]
-pub fn test_get_pods() {
-    if let Ok(p) = get_pods() {
-        println!("P: {:?}", p);
-    }
-}
-
-pub fn kubectl_file_name() -> &'static str {
-    #[cfg(target_family = "windows")]
-        let bin = "kubectl.exe";
-    #[cfg(target_family = "unix")]
-        let bin = "kubectl";
-    bin
-}
-
-pub fn kubectl_in_path() -> bool {
-    let bin = kubectl_file_name();
-    is_file_in_path(bin)
-}
-
 pub enum ColumnType {
     String,
     Bool
@@ -282,55 +195,6 @@ pub fn create_col(title: Option<&str>, idx: i32, col_type: ColumnType, ts: Rc<Tr
     col
 }
 
-pub fn get_pods() -> Result<Vec<String>, Box<dyn Error>> {
-    let bin = kubectl_file_name();
-
-    let mut cmd = Command::new(bin);
-    #[cfg(target_family = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    let cmd = cmd
-        .stdout(Stdio::piped())
-        .arg("get")
-        .arg("pods")
-        .arg("-o")
-        .arg("json")
-        .spawn()?;
-
-    let mut names = HashSet::new();
-    if let Some(mut out)=cmd.stdout {
-        let mut data = String::new();
-        out.read_to_string(&mut data)?;
-        let res = serde_json::from_str::<GetPodsResult>(&data)?;
-        for item in res.items {
-            if let Some(f) = &item.spec.containers.first() {
-                names.insert(f.name.clone());
-            }
-        }
-    }
-    Ok(names.into_iter().collect())
-}
-
-pub fn is_file_in_path(file_name: &str) -> bool {
-    #[cfg(target_family = "windows")]
-    let separator = ";";
-    #[cfg(target_family = "unix")]
-    let separator = ":";
-
-    if let Ok(path) = std::env::var("PATH") {
-        let seg = path.split(separator);
-        for current_path in seg {
-            let file_path = std::path::Path::new(current_path).join(file_name);
-            if file_path.exists() {
-                return true;
-            }
-        }
-    }
-    return false;
-}
 
 impl<'a, 'b, T:PartialOrd> SortedListCompare<'a, 'b, T> {
     pub fn new(lh: &'a mut Vec<T>, rh: &'b mut Vec<T>) -> Self {
