@@ -37,6 +37,7 @@ pub enum Msg {
     CreateTab(LogTextViewData),
     NextTab,
     PrevTab,
+    CloseActiveTab,
     WorkbenchMsg(Uuid, LogViewMsg),
     Exit
 }

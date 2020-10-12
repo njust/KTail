@@ -138,6 +138,16 @@ async fn int_main() {
             app.set_accels_for_action("app.prev_tab", &["<Primary><Shift>Tab"]);
         }
 
+        {
+            let tx = tx.clone();
+            let close_current_tab_action = SimpleAction::new("close_current_tab", None);
+            app.add_action(&close_current_tab_action);
+            close_current_tab_action.connect_activate(move |_, _| {
+                tx.send(Msg::CloseActiveTab);
+            });
+            app.set_accels_for_action("app.close_current_tab", &["<Primary>W"]);
+        }
+
 
         if let Some(kube_action) = create_open_kube_action(tx.clone()) {
             app.add_action(&kube_action);
@@ -204,6 +214,22 @@ async fn int_main() {
                 }
                 Msg::PrevTab => {
                     notebook.prev_page();
+                }
+                Msg::CloseActiveTab => {
+                    if let Some(current) = notebook.get_nth_page(notebook.get_current_page()) {
+                        let active_tab = file_views.iter().find(|(_, file_view)| {
+                            let view = file_view.view().upcast_ref::<gtk::Widget>();
+                            view == &current
+                        }).map(|(id, _)| id.clone());
+
+                        if let Some(id) = active_tab {
+                            if let Some(tab) = file_views.get_mut(&id) {
+                                tab.close();
+                                notebook.detach_tab(tab.view());
+                                file_views.remove(&id);
+                            }
+                        }
+                    }
                 }
             }
             glib::Continue(true)
