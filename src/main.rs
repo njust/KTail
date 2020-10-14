@@ -82,6 +82,7 @@ async fn int_main() {
         error!("Could not init log with log4rs config: {:?}", e);
     }
     info!("Logger initialized");
+    info!("Started with args: {:?}", std::env::args());
 
     let application = Application::new(
         Some("de.njust.ktail"),
@@ -148,6 +149,16 @@ async fn int_main() {
             app.set_accels_for_action("app.close_current_tab", &["<Primary>W"]);
         }
 
+
+        if let Some(open_with) = std::env::args().nth(1) {
+            if std::path::Path::new(&open_with).exists() {
+                let tx = tx.clone();
+                let open_with = open_with.clone();
+                if let Err(e) = tx.send(Msg::CreateTab(LogTextViewData::File(std::path::PathBuf::from(open_with)))) {
+                    error!("Could not open file: {:?}", e);
+                }
+            }
+        }
 
         if let Some(kube_action) = create_open_kube_action(tx.clone()) {
             app.add_action(&kube_action);

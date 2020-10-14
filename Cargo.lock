@@ -977,7 +977,7 @@ dependencies = [
 
 [[package]]
 name = "ktail"
-version = "0.1.2"
+version = "0.1.5"
 dependencies = [
  "async-trait",
  "encoding",

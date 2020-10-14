@@ -22,11 +22,13 @@ pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     })
 }
 
-pub fn decode_data<'a>(buffer: &[u8], _encoding_name: &mut Option<String>, replacers: &Vec<LogReplacer>) -> Result<String, Box<dyn Error>> {
+pub fn decode_data<'a>(buffer: &[u8], _encoding_name: &mut Option<String>, _replacers: &Vec<LogReplacer>) -> Result<String, Box<dyn Error>> {
     let mut data = UTF_8.decode(buffer, DecoderTrap::Ignore)?;
-    for replacer in replacers {
-        data = replacer.regex.replace_all(&data, replacer.replace_with).to_string();
-    }
+    data = data.replace("\0", "");
+    data = data.replace("\n\r", "\n");
+    data = data.replace("\r\n", "\n");
+    data = data.replace("\r", "\n");
+    data = data.replace("", "");
 
     return Ok(data);
 }
