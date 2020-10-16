@@ -81,6 +81,7 @@ impl LogReader for KubernetesLogReader {
             }
         }
 
+        let prefix_log_entries = pod_list.len() > 1;
         for pod in pod_list {
             if self.streams.contains_key(&pod) {
                 // info!("Skipping initiate stream for pod '{}'", pod);
@@ -100,17 +101,16 @@ impl LogReader for KubernetesLogReader {
                 let pod_name = pod.clone();
                 tokio::spawn(async move {
                     info!("Stream for pod '{}' started", pod_name);
+                    let pod_id = pod_name.split("-").last().unwrap_or(&pod_name);
                     while let Some(Ok(res)) = inc.next().await {
-                        let data = res.to_vec();
-                        // if data.starts_with(b"unable to retrieve container logs") || data.starts_with(b"rpc error: ") {
-                        //     if let Ok(data) = String::from_utf8(data) {
-                        //         error!("Kublet error: {}", data);
-                        //     }
-                        // }else {
-                        //     if let Err(e) = tx.send(KubernetesLogReaderMsg::Data(data)).await {
-                        //         error!("Failed to send stream data for pod '{}': {}", pod_name, e);
-                        //     }
-                        // }
+                        let data = if prefix_log_entries {
+                            let mut data = format!("[{}]\t", pod_id).into_bytes();
+                            data.append(&mut res.to_vec());
+                            data
+                        }else {
+                            res.to_vec()
+                        };
+
                         if let Err(e) = tx.send(KubernetesLogReaderMsg::Data(data)).await {
                             error!("Failed to send stream data for pod '{}': {}", pod_name, e);
                         }

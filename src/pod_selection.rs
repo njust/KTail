@@ -6,13 +6,49 @@ use log::{error};
 
 use crate::util::{create_col, ColumnType};
 use glib::Sender;
-use k8s_client::{KubeConfig, KubeClient};
+use k8s_client::{KubeConfig, KubeClient, Pod};
 use crate::model::{Msg, LogTextViewData, CreateKubeLogData};
+use std::error::Error;
+use std::collections::{HashSet};
 
 fn map_model(model: &TreeStore, iter: &TreeIter) -> Option<(String, bool)> {
     let name = model.get_value(iter, 0).get::<String>().unwrap_or(None)?;
     let active = model.get_value(iter, 1).get::<bool>().unwrap_or(None)?;
     Some((name, active))
+}
+
+fn get_pods() -> Result<Vec<Pod>, Box<dyn Error>> {
+    glib::MainContext::default().block_on(async move  {
+        match KubeClient::load_conf(None) {
+            Ok(c) => {
+                c.pods().await
+            }
+            Err(e) => {
+                Err(e)
+            }
+        }
+    })
+}
+
+fn set_pods(pod_model: &TreeStore, pods: Vec<Pod>, include_replicas: bool) {
+    pod_model.clear();
+    let mut duplicates = HashSet::new();
+    for pod in pods.into_iter() {
+        if let Some(name) = pod.metadata.name {
+            let name = if include_replicas {
+                let parts = name.split("-").collect::<Vec<&str>>();
+                let len = parts.len();
+                parts.into_iter().take(len -2).collect::<Vec<&str>>().join("-")
+            }else {
+                name
+            };
+
+            if !duplicates.contains(&name) {
+                pod_model.insert_with_values(None, None, &[0, 1], &[&name, &false]);
+                duplicates.insert(name);
+            }
+        }
+    }
 }
 
 pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
@@ -49,8 +85,16 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
     content.add(&log_separate_tab_checkbox);
 
     let include_replicas = gtk::CheckButton::with_label("Include replicas");
-    include_replicas.set_active(true);
-    content.add(&include_replicas);
+    {
+        let service_model = service_model.clone();
+        include_replicas.connect_toggled(move |checkbox| {
+            if let Ok(pods) = get_pods() {
+                set_pods(&service_model, pods, checkbox.get_active());
+            }
+        });
+        include_replicas.set_active(true);
+        content.add(&include_replicas);
+    }
 
     let since_row = gtk::Box::new(Orientation::Horizontal, 0);
     since_row.set_spacing(4);
@@ -72,26 +116,9 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
     dlg.add_button("_Open", ResponseType::Accept);
 
     kube_action.connect_activate(move |_,_| {
-        let pods = glib::MainContext::default().block_on(async move  {
-            match KubeClient::load_conf(None) {
-                Ok(c) => {
-                    c.pods().await
-                }
-                Err(e) => {
-                    Err(e)
-                }
-            }
-        });
-
-        match pods {
+        match get_pods() {
             Ok(pods) => {
-                service_model.clear();
-                for pod in pods {
-                    if let Some(name) = pod.metadata.name {
-                        service_model.insert_with_values(None, None, &[0, 1], &[&name, &false]);
-                    }
-                }
-
+                set_pods(&service_model, pods, include_replicas.get_active());
                 dlg.show_all();
 
                 let res = dlg.run();
@@ -99,7 +126,6 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
                 let since = since_val.get_text().to_string();
                 let since = since.parse::<u32>().unwrap_or(4);
                 let separate_tabs = log_separate_tab_checkbox.get_active();
-                let include_replicas = include_replicas.get_active();
 
                 if res == ResponseType::Accept {
                     let mut models = vec![];
@@ -118,18 +144,8 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
                         }
                     }
 
-                    let pods = if include_replicas {
-                        models.iter().map(|name| {
-                            let parts = name.split("-").collect::<Vec<&str>>();
-                            let len = parts.len();
-                            parts.into_iter().take(len -2).collect::<Vec<&str>>().join("-")
-                        }).collect::<Vec<String>>()
-                    }else {
-                        models
-                    };
-
                     if separate_tabs {
-                        for model in pods {
+                        for model in models {
                             tx.send(Msg::CreateTab(LogTextViewData::Kube(CreateKubeLogData {
                                 pods: vec![model],
                                 since
@@ -137,7 +153,7 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
                         }
                     }else {
                         tx.send(Msg::CreateTab(LogTextViewData::Kube(CreateKubeLogData {
-                            pods,
+                            pods: models,
                             since
                         }))).expect("Could not send create tab msg");
                     }
