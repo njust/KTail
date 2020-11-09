@@ -218,13 +218,21 @@ impl LogTextView {
 
     pub fn update(&mut self, msg: LogTextViewMsg) {
         match msg {
-            LogTextViewMsg::Data(read, data, search_result_list) => {
+            LogTextViewMsg::Data(full_search, res) => {
                 if let Some(buffer) = &self.text_view.get_buffer() {
                     let (_start, mut end) = buffer.get_bounds();
-                    if read > 0 {
-                        buffer.insert(&mut end, &data);
+                    let offset = if full_search { 0 } else
+                    {
+                        if buffer.get_line_count() > 0 {
+                            buffer.get_line_count() - 1
+                        } else {
+                            0
+                        }
+                    };
+                    if res.data.len() > 0 {
+                        buffer.insert(&mut end, &res.data);
                     }
-                    for (tag, matches) in search_result_list {
+                    for (tag, matches) in res.matches {
                         if !self.result_map.contains_key(&tag) {
                             self.result_map.insert(tag.clone(), vec![]);
                         }
@@ -232,7 +240,7 @@ impl LogTextView {
                         let result = self.result_map.get_mut(&tag).expect("Could not get result map");
 
                         for search_match in matches {
-                            let line = search_match.line as i32;
+                            let line = search_match.line as i32 + offset;
                             let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
                             let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
                             buffer.apply_tag_by_name(&tag, &iter_start, &iter_end);
@@ -286,6 +294,14 @@ impl LogTextView {
         }
         self.current_result_selection.take();
         self.result_map.clear();
+    }
+
+    pub fn clear_log(&mut self) {
+        if let Some(buffer) = self.text_view.get_buffer() {
+            self.result_map.clear();
+            self.current_result_selection.take();
+            buffer.set_text("");
+        }
     }
 
     pub fn apply_rules(&mut self, mut rules: Vec<Highlighter>) {
@@ -408,7 +424,6 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
     where T : 'static + Send + Clone + Fn(LogTextViewMsg)
 {
     tokio::task::spawn(async move {
-        let mut line_offset = 0;
         let mut active_rules = vec![];
 
         let mut encoding = None;
@@ -418,14 +433,12 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
         ];
 
         loop {
-
             log_reader.init().await;
 
             let check_changes = match log_reader.check_changes() {
                 LogState::Skip => false,
                 LogState::Ok => true,
                 LogState::Reload => {
-                    line_offset = 0;
                     sender(LogTextViewMsg::Clear);
                     false
                 }
@@ -438,12 +451,7 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                         LogTextViewThreadMsg::ApplyRules(changes) => {
                             full_search_data = changes.data;
                             for new in &changes.add {
-                                let regex = if let Some(regex) = new.regex.as_ref() {
-                                    Regex::new(regex).ok()
-                                } else {
-                                    None
-                                };
-
+                                let regex = new.regex.as_ref().and_then(|r| Regex::new(r).ok());
                                 active_rules.push(ActiveRule {
                                     id: new.id.to_string(),
                                     line_offset: 0,
@@ -476,19 +484,18 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                 }
 
                 if let Some(data) = full_search_data {
-                    if let Ok(r) = search(&data, &mut active_rules, 0) {
-                        if r.results.len() > 0 {
-                            sender(LogTextViewMsg::Data(0, data, r.results));
+                    if let Ok(result) = search(data, &mut active_rules) {
+                        if result.matches.len() > 0 {
+                            sender(LogTextViewMsg::Data(true, result));
                         }
                     }
                 } else {
                     if let Ok(data) = log_reader.read().await {
                         let read_bytes = data.len();
                         if let Ok(data) = decode_data(&data, &mut encoding, &replacers) {
-                            if let Ok(r) = search(&data, &mut active_rules, line_offset) {
-                                line_offset += r.lines;
+                            if let Ok(result) = search(data, &mut active_rules) {
                                 if read_bytes > 0 {
-                                    sender(LogTextViewMsg::Data(read_bytes as u64, data, r.results));
+                                    sender(LogTextViewMsg::Data(false, result));
                                 }
                             }
                         }

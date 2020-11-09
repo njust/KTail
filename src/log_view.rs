@@ -142,6 +142,10 @@ impl LogView {
                             self.log_text_view.apply_rules(rules);
                         }
                     }
+                    LogViewToolbarMsg::Clear  => {
+                        self.toolbar.clear_counts();
+                        self.log_text_view.clear_log();
+                    }
                     LogViewToolbarMsg::ShowRules => {
                         self.show_dlg();
                     }
@@ -173,8 +177,8 @@ impl LogView {
                 self.highlighters_view.update(msg);
             }
             LogViewMsg::LogTextViewMsg(msg) => {
-                if let LogTextViewMsg::Data(_length, _data, matches) = &msg {
-                    self.toolbar.update_results(matches);
+                if let LogTextViewMsg::Data(_, res) = &msg {
+                    self.toolbar.update_results(&res.matches);
                 }
                 self.log_text_view.update(msg);
             }

@@ -27,9 +27,10 @@ impl LogTextViewData {
 }
 
 
+#[derive(Debug)]
 pub struct SearchResultData {
-    pub lines: usize,
-    pub results: HashMap<String, Vec<SearchResultMatch>>,
+    pub data: String,
+    pub matches: HashMap<String, Vec<SearchResultMatch>>,
 }
 
 pub enum Msg {
@@ -57,7 +58,8 @@ pub enum LogViewToolbarMsg {
     ToggleAutoScroll(bool),
     SelectNextMatch,
     SelectPrevMatch,
-    SelectRule(String)
+    SelectRule(String),
+    Clear
 }
 
 pub enum RuleListViewMsg {
@@ -74,7 +76,7 @@ pub struct SearchResultMatch {
 
 #[derive(Debug)]
 pub enum LogTextViewMsg {
-    Data(u64, String, HashMap<String, Vec<SearchResultMatch>>),
+    Data(bool, SearchResultData),
     Clear,
     CursorChanged,
 }

@@ -56,13 +56,11 @@ pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(buffer)
 }
 
-pub fn search(text: &str, active_rules: &mut Vec<ActiveRule>, line_offset: usize) -> Result<SearchResultData, Box<dyn Error>> {
+pub fn search(text: String, active_rules: &mut Vec<ActiveRule>) -> Result<SearchResultData, Box<dyn Error>> {
     let lines = text.split("\n").enumerate();
-    let mut line_cnt = 0;
 
     let mut matches: HashMap<String, Vec<SearchResultMatch>> = HashMap::new();
     for (n, line) in lines {
-        line_cnt = n;
         for search_data in active_rules.iter_mut() {
             if search_data.line_offset > n {
                 continue;
@@ -77,7 +75,7 @@ pub fn search(text: &str, active_rules: &mut Vec<ActiveRule>, line_offset: usize
                     if text.len() > 0 {
                         for mat in regex.find_iter(&line) {
                             matches.push(SearchResultMatch {
-                                line: n + line_offset,
+                                line: n,
                                 start: mat.start(),
                                 end: mat.end()
                             });
@@ -92,8 +90,8 @@ pub fn search(text: &str, active_rules: &mut Vec<ActiveRule>, line_offset: usize
 
 
     Ok(SearchResultData {
-        lines: line_cnt,
-        results: matches
+        data: text,
+        matches
     })
 }
 

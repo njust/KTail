@@ -112,6 +112,15 @@ impl LogViewToolbar {
             toolbar.add(&toggle_auto_scroll_btn);
         }
 
+        let clear_btn = Button::with_label("Clear");
+        {
+            let tx = tx.clone();
+            clear_btn.connect_clicked(move |_|{
+                tx(LogViewToolbarMsg::Clear);
+            });
+            toolbar.add(&clear_btn);
+        }
+
         Self {
             container: toolbar,
             rules_selector_data: rules_data,
