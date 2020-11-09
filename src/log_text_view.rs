@@ -218,10 +218,10 @@ impl LogTextView {
 
     pub fn update(&mut self, msg: LogTextViewMsg) {
         match msg {
-            LogTextViewMsg::Data(full_search, res) => {
+            LogTextViewMsg::Data(res) => {
                 if let Some(buffer) = &self.text_view.get_buffer() {
                     let (_start, mut end) = buffer.get_bounds();
-                    let offset = if full_search { 0 } else
+                    let offset = if res.full_search { 0 } else
                     {
                         if buffer.get_line_count() > 0 {
                             buffer.get_line_count() - 1
@@ -484,18 +484,18 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                 }
 
                 if let Some(data) = full_search_data {
-                    if let Ok(result) = search(data, &mut active_rules) {
+                    if let Ok(result) = search(data, &mut active_rules, true) {
                         if result.matches.len() > 0 {
-                            sender(LogTextViewMsg::Data(true, result));
+                            sender(LogTextViewMsg::Data(result));
                         }
                     }
                 } else {
                     if let Ok(data) = log_reader.read().await {
                         let read_bytes = data.len();
                         if let Ok(data) = decode_data(&data, &mut encoding, &replacers) {
-                            if let Ok(result) = search(data, &mut active_rules) {
+                            if let Ok(result) = search(data, &mut active_rules, false) {
                                 if read_bytes > 0 {
-                                    sender(LogTextViewMsg::Data(false, result));
+                                    sender(LogTextViewMsg::Data(result));
                                 }
                             }
                         }

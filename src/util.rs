@@ -56,7 +56,7 @@ pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(buffer)
 }
 
-pub fn search(text: String, active_rules: &mut Vec<ActiveRule>) -> Result<SearchResultData, Box<dyn Error>> {
+pub fn search(text: String, active_rules: &mut Vec<ActiveRule>, full_search: bool) -> Result<SearchResultData, Box<dyn Error>> {
     let lines = text.split("\n").enumerate();
 
     let mut matches: HashMap<String, Vec<SearchResultMatch>> = HashMap::new();
@@ -88,9 +88,15 @@ pub fn search(text: String, active_rules: &mut Vec<ActiveRule>) -> Result<Search
         }
     }
 
+    let data = if full_search {
+        String::new()
+    }else {
+        text
+    };
 
     Ok(SearchResultData {
-        data: text,
+        full_search,
+        data,
         matches
     })
 }

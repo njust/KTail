@@ -177,7 +177,7 @@ impl LogView {
                 self.highlighters_view.update(msg);
             }
             LogViewMsg::LogTextViewMsg(msg) => {
-                if let LogTextViewMsg::Data(_, res) = &msg {
+                if let LogTextViewMsg::Data(res) = &msg {
                     self.toolbar.update_results(&res.matches);
                 }
                 self.log_text_view.update(msg);

@@ -29,6 +29,7 @@ impl LogTextViewData {
 
 #[derive(Debug)]
 pub struct SearchResultData {
+    pub full_search: bool,
     pub data: String,
     pub matches: HashMap<String, Vec<SearchResultMatch>>,
 }
@@ -76,7 +77,7 @@ pub struct SearchResultMatch {
 
 #[derive(Debug)]
 pub enum LogTextViewMsg {
-    Data(bool, SearchResultData),
+    Data(SearchResultData),
     Clear,
     CursorChanged,
 }
