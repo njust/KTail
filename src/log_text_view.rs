@@ -439,7 +439,7 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                             full_search_data = changes.data;
                             for new in &changes.add {
                                 let regex = if let Some(regex) = new.regex.as_ref() {
-                                    Some(Regex::new(regex).unwrap())
+                                    Regex::new(regex).ok()
                                 } else {
                                     None
                                 };
@@ -461,7 +461,7 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                                 if let Some((_idx, search)) = active_rules.iter_mut().enumerate().find(|(_, item)| item.id == sid) {
                                     if let Some(regex) = update.regex.as_ref() {
                                         search.line_offset = 0;
-                                        search.regex = Some(Regex::new(regex).unwrap())
+                                        search.regex = Regex::new(regex).ok();
                                     } else {
                                         search.regex.take();
                                     }

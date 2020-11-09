@@ -130,15 +130,17 @@ impl LogView {
                             String::new()
                         };
                         self.highlighters_view.set_regex(SEARCH_ID, &regex);
-                        let rules = self.highlighters_view.get_highlighter();
-                        self.apply_rules(rules.clone());
-                        self.log_text_view.apply_rules(rules);
+                        if let Ok(rules) = self.highlighters_view.get_highlighter() {
+                            self.apply_rules(rules.clone());
+                            self.log_text_view.apply_rules(rules);
+                        }
                     }
                     LogViewToolbarMsg::ClearSearchPressed => {
                         self.highlighters_view.set_regex(SEARCH_ID, &String::new());
-                        let rules = self.highlighters_view.get_highlighter();
-                        self.apply_rules(rules.clone());
-                        self.log_text_view.apply_rules(rules);
+                        if let Ok(rules) = self.highlighters_view.get_highlighter() {
+                            self.apply_rules(rules.clone());
+                            self.log_text_view.apply_rules(rules);
+                        }
                     }
                     LogViewToolbarMsg::ShowRules => {
                         self.show_dlg();
@@ -162,9 +164,10 @@ impl LogView {
                 }
             }
             LogViewMsg::ApplyRules => {
-                let rules = self.highlighters_view.get_highlighter();
-                self.apply_rules(rules.clone());
-                self.log_text_view.apply_rules(rules);
+                if let Ok(rules) = self.highlighters_view.get_highlighter() {
+                    self.apply_rules(rules.clone());
+                    self.log_text_view.apply_rules(rules);
+                }
             }
             LogViewMsg::HighlighterViewMsg(msg) => {
                 self.highlighters_view.update(msg);

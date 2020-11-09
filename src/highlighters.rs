@@ -7,13 +7,13 @@ use uuid::Uuid;
 use std::collections::HashMap;
 use gdk::RGBA;
 use log::{error};
-
 use glib_data_model_helper::{
     prelude::*,
     data_model,
 };
 use gio::{ListStoreExt, ListModelExt};
 use glib::Object;
+use crate::Result;
 
 #[derive(Debug, Default, Clone)]
 pub struct Highlighter {
@@ -54,6 +54,11 @@ pub struct HighlighterList {
 }
 
 pub const SEARCH_ID: &'static str = "ba5b70bb-57b9-4f5c-95c9-e80953ae113e";
+pub const ID_PROP: &'static str = "id";
+pub const NAME_PROP: &'static str = "name";
+pub const REGEX_PROP: &'static str = "regex";
+pub const COLOR_PROP: &'static str = "color";
+pub const IS_SYSTEM_PROP: &'static str = "isSystem";
 
 
 pub struct HighlighterListView {
@@ -66,19 +71,19 @@ impl DataModelDescription for HighlighterData {
     const NAME: &'static str = "HighlighterData";
     fn get_properties() -> &'static [Property<'static>] {
         &[
-            subclass::Property("id", |name| {
+            subclass::Property(ID_PROP, |name| {
                 glib::ParamSpec::string(name,"Id","Id",None, glib::ParamFlags::READWRITE)
             }),
-            subclass::Property("name", |name| {
+            subclass::Property(NAME_PROP, |name| {
                 glib::ParamSpec::string(name,"Name","Name",None, glib::ParamFlags::READWRITE)
             }),
-            subclass::Property("regex", |name| {
+            subclass::Property(REGEX_PROP, |name| {
                 glib::ParamSpec::string(name,"Regex","Regex",None, glib::ParamFlags::READWRITE)
             }),
-            subclass::Property("color", |name| {
+            subclass::Property(COLOR_PROP, |name| {
                 glib::ParamSpec::string(name,"Color","Color",None, glib::ParamFlags::READWRITE)
             }),
-            subclass::Property("isSystem", |name| {
+            subclass::Property(IS_SYSTEM_PROP, |name| {
                 glib::ParamSpec::boolean(name,"System","System",false, glib::ParamFlags::READWRITE)
             })
         ]
@@ -97,26 +102,26 @@ impl HighlighterListView {
             let container = gtk::Box::new(Orientation::Horizontal, 4);
             let item = item.downcast_ref::<HighlighterData>().expect("Row data is of wrong type");
 
-            let id = item.get_property("id").ok()
+            let id = item.get_property(ID_PROP).ok()
                 .and_then(|id| id.get::<String>().ok())
                 .and_then(|id|id).unwrap();
 
-            let is_system = item.get_property("isSystem").ok()
+            let is_system = item.get_property(IS_SYSTEM_PROP).ok()
                 .and_then(|id| id.get::<bool>().ok())
                 .and_then(|id|id).unwrap();
 
             let name_entry = gtk::Entry::new();
-            item.bind_property("name", &name_entry, "text")
+            item.bind_property(NAME_PROP, &name_entry, "text")
                 .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
             container.add(&name_entry);
 
             let regex_entry = gtk::Entry::new();
-            item.bind_property("regex", &regex_entry, "text")
+            item.bind_property(REGEX_PROP, &regex_entry, "text")
                 .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
             container.add(&regex_entry);
 
             let color_button = gtk::ColorButton::new();
-            item.bind_property("color", &color_button, "rgba")
+            item.bind_property(COLOR_PROP, &color_button, "rgba")
                 .transform_to(|_, value| {
                     let rgba =
                         value.get::<String>().ok()
@@ -178,23 +183,26 @@ impl HighlighterListView {
     }
 
     pub fn add_highlighter(&mut self, data: Highlighter) {
-        let id = data.id.to_string();
-        let name = data.name.unwrap_or(String::new());
-        let regex = data.regex.unwrap_or(String::new());
-        let color = data.color.unwrap_or(String::new());
-        self.highlighter_list_data.append(&HighlighterData::new(&[("id", &id), ("name", &name), ("regex", &regex), ("color", &color), ("isSystem", &data.is_system)]));
+        self.highlighter_list_data.append(&HighlighterData::new(&[
+            (ID_PROP, &data.id.to_string()),
+            (NAME_PROP, &data.name.unwrap_or_default()),
+            (REGEX_PROP, &data.regex.unwrap_or_default()),
+            (COLOR_PROP, &data.color),
+            (IS_SYSTEM_PROP, &data.is_system)
+        ]));
     }
 
-    pub fn get_highlighter(&self) -> Vec<Highlighter> {
+
+    pub fn get_highlighter(&self) -> Result<Vec<Highlighter>> {
         let cnt = self.highlighter_list_data.get_n_items();
         let mut rules = vec![];
         for i in 0..cnt {
             if let Some(o) = self.highlighter_list_data.get_object(i) {
-                let id = o.get_property("id").unwrap().get::<String>().unwrap().unwrap();
-                let name = o.get_property("name").unwrap().get::<String>().unwrap().and_then(|s|if s.len() <= 0 {None}else {Some(s)});
-                let regex = o.get_property("regex").unwrap().get::<String>().unwrap().and_then(|s|if s.len() <= 0 {None}else {Some(s)});
-                let color = o.get_property("color").unwrap().get::<String>().unwrap();
-                let is_system = o.get_property("isSystem").unwrap().get::<bool>().unwrap().unwrap_or(false);
+                let id = o.get_property(ID_PROP)?.get::<String>()?.ok_or("No id")?;
+                let name = o.get_property(NAME_PROP)?.get::<String>()?.and_then(|s|if s.len() <= 0 {None}else {Some(s)});
+                let regex = o.get_property(REGEX_PROP)?.get::<String>()?.and_then(|s|if s.len() <= 0 {None}else {Some(s)});
+                let color = o.get_property(COLOR_PROP)?.get::<String>().unwrap_or(None);
+                let is_system = o.get_property(IS_SYSTEM_PROP)?.get::<bool>()?.unwrap_or(false);
                 rules.push(Highlighter {
                     id: Uuid::parse_str(&id).unwrap(),
                     name,
@@ -204,7 +212,7 @@ impl HighlighterListView {
                 })
             }
         }
-        rules
+        Ok(rules)
     }
 
     pub fn set_regex(&mut self, id: &str, regex: &String) {

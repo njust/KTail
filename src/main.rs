@@ -26,6 +26,7 @@ use std::collections::HashMap;
 use crate::log_view::LogView;
 use crate::model::{LogTextViewData, Msg};
 
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn create_tab(data: LogTextViewData, tx: Sender<Msg>, id: Uuid, accelerators: &AccelGroup) -> (gtk::Box, LogView) {
     let tx2 = tx.clone();
