@@ -348,7 +348,7 @@ impl LogTextView {
                         .and_then(|tag_table| tag_table.lookup(&left.id.to_string())) {
                         tag.set_property_background(right.color.as_ref().map(|s|s.as_str()));
                     }
-                    if left.regex != right.regex {
+                    if left.regex != right.regex || left.is_exclude() != right.is_exclude() {
                         has_changes = true;
                         update.push(right.clone());
                         if let Some(tb) = text_view.get_buffer() {
@@ -455,7 +455,8 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                                 active_rules.push(ActiveRule {
                                     id: new.id.to_string(),
                                     line_offset: 0,
-                                    regex
+                                    regex,
+                                    is_exclude: new.is_exclude()
                                 });
                             }
                             for remove in &changes.remove {
@@ -470,6 +471,7 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                                     if let Some(regex) = update.regex.as_ref() {
                                         search.line_offset = 0;
                                         search.regex = Regex::new(regex).ok();
+                                        search.is_exclude = update.is_exclude()
                                     } else {
                                         search.regex.take();
                                     }

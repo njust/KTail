@@ -201,7 +201,7 @@ impl LogViewToolbar {
         let default_name = String::from("Unamed rule");
         let name = rule.name.as_ref().unwrap_or(&default_name);
         let id = rule.id.to_string();
-        self.rules_selector_data.insert_with_values(None, &[0, 1], &[&id, &name]);
+        self.rules_selector_data.insert_with_values(None, &[0, 1, 2, 3], &[&id, &name, &0, &name]);
     }
 
     pub fn view(&self) -> &gtk::Box {

@@ -58,41 +58,53 @@ pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>, Box<dyn Error>> {
 
 pub fn search(text: String, active_rules: &mut Vec<ActiveRule>, full_search: bool) -> Result<SearchResultData, Box<dyn Error>> {
     let lines = text.split("\n").enumerate();
-
     let mut matches: HashMap<String, Vec<SearchResultMatch>> = HashMap::new();
+
+    let mut data = String::new();
+    let mut line_count = 0;
+
     for (n, line) in lines {
-        for search_data in active_rules.iter_mut() {
-            if search_data.line_offset > n {
+        if line.len() <= 0 {
+            continue;
+        }
+
+        let mut add_line = true;
+        for rule in active_rules.iter_mut() {
+            if rule.line_offset > n {
                 continue;
             }
 
-            if !matches.contains_key(&search_data.id) {
-                matches.insert(search_data.id.clone(), vec![]);
-            }
-
-            if let Some(matches) = matches.get_mut(&search_data.id) {
-                if let Some(regex) = &search_data.regex {
-                    if text.len() > 0 {
-                        for mat in regex.find_iter(&line) {
-                            matches.push(SearchResultMatch {
-                                line: n,
-                                start: mat.start(),
-                                end: mat.end()
-                            });
+            if let Some(regex) = &rule.regex {
+                if !rule.is_exclude {
+                    for rule_match in regex.find_iter(&line) {
+                        if !matches.contains_key(&rule.id) {
+                            matches.insert(rule.id.clone(), vec![]);
                         }
 
+                        let rule_matches = matches.get_mut(&rule.id).unwrap();
+
+                        rule_matches.push(SearchResultMatch {
+                            line: line_count,
+                            start: rule_match.start(),
+                            end: rule_match.end()
+                        });
+                    }
+                }else {
+                    if regex.is_match(&line) {
+                        add_line = false;
                     }
                 }
             }
 
         }
+        if add_line {
+            if !full_search {
+                data.push_str(line);
+                data.push_str("\n");
+            }
+            line_count += 1;
+        }
     }
-
-    let data = if full_search {
-        String::new()
-    }else {
-        text
-    };
 
     Ok(SearchResultData {
         full_search,

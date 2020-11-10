@@ -22,17 +22,23 @@ pub struct Highlighter {
     pub color: Option<String>,
     pub regex: Option<String>,
     pub is_system: bool,
+    pub rule_type: String,
 }
 
 impl Highlighter {
-    pub fn new() -> Self {
+    pub fn new(rule_type: &str) -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
             name: None,
             color: None,
             regex: None,
             is_system: false,
+            rule_type: rule_type.to_string(),
         }
+    }
+
+    pub fn is_exclude(&self) -> bool {
+        self.rule_type == RULE_TYPE_EXCLUDE
     }
 }
 
@@ -59,6 +65,10 @@ pub const NAME_PROP: &'static str = "name";
 pub const REGEX_PROP: &'static str = "regex";
 pub const COLOR_PROP: &'static str = "color";
 pub const IS_SYSTEM_PROP: &'static str = "isSystem";
+pub const RULE_TYPE: &'static str = "ruleType";
+
+pub const RULE_TYPE_HIGHLIGHT: &'static str = "highlight";
+pub const RULE_TYPE_EXCLUDE: &'static str = "exclude";
 
 
 pub struct HighlighterListView {
@@ -85,7 +95,10 @@ impl DataModelDescription for HighlighterData {
             }),
             subclass::Property(IS_SYSTEM_PROP, |name| {
                 glib::ParamSpec::boolean(name,"System","System",false, glib::ParamFlags::READWRITE)
-            })
+            }),
+            subclass::Property(RULE_TYPE, |name|{
+                glib::ParamSpec::string(name, "Type", "Type", None, glib::ParamFlags::READWRITE)
+            }),
         ]
     }
 }
@@ -109,6 +122,16 @@ impl HighlighterListView {
             let is_system = item.get_property(IS_SYSTEM_PROP).ok()
                 .and_then(|id| id.get::<bool>().ok())
                 .and_then(|id|id).unwrap();
+
+            let type_selector = gtk::ComboBoxText::new();
+            type_selector.append(Some(RULE_TYPE_HIGHLIGHT), "Highlight");
+            type_selector.append(Some(RULE_TYPE_EXCLUDE), "Exclude");
+            // type_selector.append(Some("include"), "Include");
+            item.bind_property(RULE_TYPE, &type_selector, "active-id")
+                .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
+            type_selector.set_sensitive(!is_system);
+            container.add(&type_selector);
+
 
             let name_entry = gtk::Entry::new();
             item.bind_property(NAME_PROP, &name_entry, "text")
@@ -160,7 +183,7 @@ impl HighlighterListView {
             add_btn.set_relief(ReliefStyle::None);
             let tx = tx.clone();
             add_btn.connect_clicked(move |_| {
-                let rule_data = Highlighter::new();
+                let rule_data = Highlighter::new(RULE_TYPE_HIGHLIGHT);
                 tx(RuleListViewMsg::AddRule(rule_data));
             });
             toolbar.add(&add_btn);
@@ -188,7 +211,8 @@ impl HighlighterListView {
             (NAME_PROP, &data.name.unwrap_or_default()),
             (REGEX_PROP, &data.regex.unwrap_or_default()),
             (COLOR_PROP, &data.color),
-            (IS_SYSTEM_PROP, &data.is_system)
+            (IS_SYSTEM_PROP, &data.is_system),
+            (RULE_TYPE, &data.rule_type)
         ]));
     }
 
@@ -202,13 +226,15 @@ impl HighlighterListView {
                 let name = o.get_property(NAME_PROP)?.get::<String>()?.and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let regex = o.get_property(REGEX_PROP)?.get::<String>()?.and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let color = o.get_property(COLOR_PROP)?.get::<String>().unwrap_or(None);
+                let rule_type = o.get_property(RULE_TYPE)?.get::<String>()?.ok_or("No type for rule")?;
                 let is_system = o.get_property(IS_SYSTEM_PROP)?.get::<bool>()?.unwrap_or(false);
                 rules.push(Highlighter {
                     id: Uuid::parse_str(&id).unwrap(),
                     name,
                     regex,
                     color,
-                    is_system
+                    is_system,
+                    rule_type
                 })
             }
         }

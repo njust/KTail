@@ -100,6 +100,7 @@ pub struct ActiveRule {
     pub id: String,
     pub line_offset: usize,
     pub regex: Option<Regex>,
+    pub is_exclude: bool,
 }
 
 pub struct RuleChanges {

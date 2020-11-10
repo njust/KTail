@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 use crate::toolbar::LogViewToolbar;
 use gtk::{Orientation, WindowPosition, HeaderBar, AccelGroup};
-use crate::highlighters::{HighlighterListView, SEARCH_ID, Highlighter};
+use crate::highlighters::{HighlighterListView, SEARCH_ID, Highlighter, RULE_TYPE_HIGHLIGHT};
 use crate::log_text_view::{LogTextView};
 use crate::model::{LogViewMsg, LogViewToolbarMsg, LogTextViewData, LogTextViewMsg};
 use std::rc::Rc;
@@ -28,21 +28,24 @@ pub fn get_default_highlighters() -> Vec<Highlighter> {
             regex: None,
             color: Some(String::from("rgba(188,150,0,1)")),
             name: Some(String::from("Search")),
-            is_system: true
+            is_system: true,
+            rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
         },
         Highlighter {
             id: Uuid::new_v4(),
             regex: Some(r".*\s((?i)error|fatal|failed(?-i))\s.*".into()),
             color: Some(String::from("rgba(239,41,41,1)")),
             name: Some(String::from("Error")),
-            is_system: false
+            is_system: false,
+            rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
         },
         Highlighter {
             id: Uuid::new_v4(),
             regex: Some(r".*\s((?i)warn(?-i))\s.*".into()),
             color: Some(String::from("rgba(207,111,57,1)")),
             name: Some(String::from("Warning")),
-            is_system: false
+            is_system: false,
+            rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
         }
     ]
 }
@@ -90,8 +93,10 @@ impl LogView {
         }
     }
 
-    fn apply_rules(&mut self, mut rules: Vec<Highlighter>) {
+    fn apply_rules(&mut self, rules: Vec<Highlighter>) {
+        let mut rules = rules.into_iter().filter(|r| r.rule_type == RULE_TYPE_HIGHLIGHT ).collect::<Vec<Highlighter>>();
         rules.sort_by_key(|r|r.id);
+
         let compare_results = SortedListCompare::new(&mut self.highlighters, &mut rules);
         for compare_result in compare_results {
             match compare_result {
