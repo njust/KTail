@@ -32,7 +32,7 @@ fn create_tab(data: LogTextViewData, tx: Sender<Msg>, id: Uuid, accelerators: &A
     let tx2 = tx.clone();
     let tab_name = data.get_name();
     let file_view = LogView::new(data, move |msg| {
-        tx2.send(Msg::WorkbenchMsg(id, msg)).expect("Could not send msg");
+        send_msg(&tx2, Msg::LogViewMsg(id, msg));
     }, accelerators);
 
     let close_btn = Button::from_icon_name(Some("window-close-symbolic"), IconSize::Menu);
@@ -44,7 +44,7 @@ fn create_tab(data: LogTextViewData, tx: Sender<Msg>, id: Uuid, accelerators: &A
 
     let tx = tx.clone();
     close_btn.connect_clicked(move |_| {
-        tx.send(Msg::CloseTab(id)).expect("Could not send close tab msg");
+        send_msg(&tx, Msg::CloseTab(id));
     });
 
     tab_header.show_all();
@@ -61,7 +61,7 @@ fn create_open_file_dlg_action(tx: Sender<Msg>) -> SimpleAction {
         dialog.close();
         if res == ResponseType::Accept {
             if let Some(file_path) = dialog.get_filename() {
-                tx.send(Msg::CreateTab(LogTextViewData::File(file_path))).expect("Could not send create tab msg");
+                send_msg(&tx, Msg::CreateTab(LogTextViewData::File(file_path)));
             }
         }
     });
@@ -108,7 +108,7 @@ async fn int_main() {
                         let file = PathBuf::from(file);
                         if let Some(mime) = mime_guess::from_path(&file).first() {
                             if mime.type_() == mime_guess::mime::TEXT  {
-                                tx.send(Msg::CreateTab(LogTextViewData::File(file))).expect("Could not send");
+                                send_msg(&tx, Msg::CreateTab(LogTextViewData::File(file)));
                             }
                         }
                     }
@@ -124,7 +124,7 @@ async fn int_main() {
             let next_tab_action = SimpleAction::new("next_tab", None);
             app.add_action(&next_tab_action);
             next_tab_action.connect_activate(move |_,_| {
-                tx.send(Msg::NextTab);
+                send_msg(&tx, Msg::NextTab);
             });
             app.set_accels_for_action("app.next_tab", &["<Primary>Tab"]);
         }
@@ -135,7 +135,7 @@ async fn int_main() {
             let prev_tab_action = SimpleAction::new("prev_tab", None);
             app.add_action(&prev_tab_action);
             prev_tab_action.connect_activate(move |_, _| {
-                tx.send(Msg::PrevTab);
+                send_msg(&tx, Msg::PrevTab);
             });
             app.set_accels_for_action("app.prev_tab", &["<Primary><Shift>Tab"]);
         }
@@ -145,7 +145,7 @@ async fn int_main() {
             let close_current_tab_action = SimpleAction::new("close_current_tab", None);
             app.add_action(&close_current_tab_action);
             close_current_tab_action.connect_activate(move |_, _| {
-                tx.send(Msg::CloseActiveTab);
+                send_msg(&tx, Msg::CloseActiveTab);
             });
             app.set_accels_for_action("app.close_current_tab", &["<Primary>W"]);
         }
@@ -155,9 +155,7 @@ async fn int_main() {
             if std::path::Path::new(&open_with).exists() {
                 let tx = tx.clone();
                 let open_with = open_with.clone();
-                if let Err(e) = tx.send(Msg::CreateTab(LogTextViewData::File(std::path::PathBuf::from(open_with)))) {
-                    error!("Could not open file: {:?}", e);
-                }
+                send_msg(&tx, Msg::CreateTab(LogTextViewData::File(std::path::PathBuf::from(open_with))));
             }
         }
 
@@ -169,13 +167,13 @@ async fn int_main() {
 
         let tx2 = tx.clone();
         app.connect_shutdown(move|_| {
-            tx2.send(Msg::Exit).expect("Could not send exit msg");
+            send_msg(&tx2, Msg::Exit);
         });
 
         let exit_action = SimpleAction::new("quit", None); {
             let tx = tx.clone();
             exit_action.connect_activate(move |_a, _b| {
-                tx.send(Msg::Exit).expect("Could not send exit msg");
+                send_msg(&tx, Msg::Exit);
             });
             app.add_action(&exit_action);
         }
@@ -192,7 +190,7 @@ async fn int_main() {
         let tx = tx.clone();
         rx.attach(None, move |msg| {
             match msg {
-                Msg::WorkbenchMsg(id, msg) => {
+                Msg::LogViewMsg(id, msg) => {
                     if let Some(tab) = file_views.get_mut(&id) {
                         tab.update(msg);
                     }
@@ -216,10 +214,11 @@ async fn int_main() {
                 Msg::CreateTab(tab) => {
                     let id = Uuid::new_v4();
                     let (tab_header, file_view) = create_tab(tab, tx.clone(), id, &ag);
-                    notebook.append_page(file_view.view(), Some(&tab_header));
+                    let new_tab_index = notebook.append_page(file_view.view(), Some(&tab_header));
                     // notebook.set_tab_detachable(file_view.view(), true);
                     file_views.insert(id, file_view);
                     notebook.show_all();
+                    notebook.set_current_page(Some(new_tab_index));
                 }
                 Msg::NextTab => {
                     notebook.next_page();
@@ -269,4 +268,10 @@ async fn int_main() {
     });
 
     application.run(&[]);
+}
+
+fn send_msg(tx: &Sender<Msg>, msg: Msg) {
+    if let Err(e) = tx.send(msg) {
+        error!("Could not send msg: {}", e);
+    }
 }

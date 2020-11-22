@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 
 use gtk::{Orientation, WidgetExt, ContainerExt, ButtonExt, IconSize, ReliefStyle};
-use crate::model::{RuleListViewMsg};
+use crate::model::{HighlighterViewMsg};
 use glib::bitflags::_core::cmp::Ordering;
 use uuid::Uuid;
 use std::collections::HashMap;
@@ -105,7 +105,7 @@ impl DataModelDescription for HighlighterData {
 
 impl HighlighterListView {
     pub fn new<T>(tx: T) -> Self
-        where T: 'static + Clone + Fn(RuleListViewMsg)
+        where T: 'static + Clone + Fn(HighlighterViewMsg)
     {
         let list = gio::ListStore::new(HighlighterData::static_type());
         let list_box = gtk::ListBox::new();
@@ -165,7 +165,7 @@ impl HighlighterListView {
                 btn.set_relief(ReliefStyle::None);
                 let tx = tx2.clone();
                 btn.connect_clicked(move |_| {
-                    tx(RuleListViewMsg::DeleteRule(id.clone()));
+                    tx(HighlighterViewMsg::DeleteRule(id.clone()));
                 });
                 btn.set_sensitive(!is_system);
                 container.add(&btn);
@@ -184,7 +184,7 @@ impl HighlighterListView {
             let tx = tx.clone();
             add_btn.connect_clicked(move |_| {
                 let rule_data = Highlighter::new(RULE_TYPE_HIGHLIGHT);
-                tx(RuleListViewMsg::AddRule(rule_data));
+                tx(HighlighterViewMsg::AddRule(rule_data));
             });
             toolbar.add(&add_btn);
         }
@@ -266,12 +266,12 @@ impl HighlighterListView {
         None
     }
 
-    pub fn update(&mut self, msg: RuleListViewMsg) {
+    pub fn update(&mut self, msg: HighlighterViewMsg) {
         match msg {
-            RuleListViewMsg::AddRule(rule) => {
+            HighlighterViewMsg::AddRule(rule) => {
                 self.add_highlighter(rule.clone());
             }
-            RuleListViewMsg::DeleteRule(id) => {
+            HighlighterViewMsg::DeleteRule(id) => {
                 if let Some(idx) = self.get_highlighter_idx(&id.to_string()) {
                     self.highlighter_list_data.remove(idx);
                 }

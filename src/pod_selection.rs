@@ -34,19 +34,15 @@ fn set_pods(pod_model: &TreeStore, pods: Vec<Pod>, include_replicas: bool) {
     pod_model.clear();
     let mut duplicates = HashSet::new();
     for pod in pods.into_iter() {
-        if let Some(name) = pod.metadata.name {
-            let name = if include_replicas {
-                let parts = name.split("-").collect::<Vec<&str>>();
-                let len = parts.len();
-                parts.into_iter().take(len -2).collect::<Vec<&str>>().join("-")
-            }else {
-                name
-            };
+        let name = if include_replicas {
+          pod.spec.containers.first().map(|c|c.name.clone()).unwrap_or_default()
+        }else {
+            pod.metadata.name.unwrap_or_default()
+        };
 
-            if !duplicates.contains(&name) {
-                pod_model.insert_with_values(None, None, &[0, 1], &[&name, &false]);
-                duplicates.insert(name);
-            }
+        if !duplicates.contains(&name) {
+            pod_model.insert_with_values(None, None, &[0, 1], &[&name, &false]);
+            duplicates.insert(name);
         }
     }
 }
@@ -87,12 +83,12 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
     let include_replicas = gtk::CheckButton::with_label("Include replicas");
     {
         let service_model = service_model.clone();
+        include_replicas.set_active(true);
         include_replicas.connect_toggled(move |checkbox| {
             if let Ok(pods) = get_pods() {
                 set_pods(&service_model, pods, checkbox.get_active());
             }
         });
-        include_replicas.set_active(true);
         content.add(&include_replicas);
     }
 

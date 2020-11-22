@@ -144,7 +144,7 @@ impl LogReader for KubernetesLogReader {
 impl KubernetesLogReader {
     pub fn new(data: CreateKubeLogData) -> Self {
         let (data_tx, data_rx) = tokio::sync::mpsc::channel::<KubernetesLogReaderMsg>(10000);
-        let mut instance = Self {
+        let instance = Self {
             data_rx: Some(data_rx),
             data_tx: Some(data_tx),
             options: data,
@@ -152,7 +152,6 @@ impl KubernetesLogReader {
             is_stopping: false,
             streams: HashMap::new(),
         };
-        Self::init(&mut instance);
         instance
     }
 }

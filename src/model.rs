@@ -40,14 +40,14 @@ pub enum Msg {
     NextTab,
     PrevTab,
     CloseActiveTab,
-    WorkbenchMsg(Uuid, LogViewMsg),
+    LogViewMsg(Uuid, LogViewMsg),
     Exit
 }
 
 pub enum LogViewMsg {
     ApplyRules,
     ToolbarMsg(LogViewToolbarMsg),
-    HighlighterViewMsg(RuleListViewMsg),
+    HighlighterViewMsg(HighlighterViewMsg),
     LogTextViewMsg(LogTextViewMsg)
 }
 
@@ -63,7 +63,14 @@ pub enum LogViewToolbarMsg {
     Clear
 }
 
-pub enum RuleListViewMsg {
+#[derive(Debug)]
+pub enum LogTextViewMsg {
+    Data(SearchResultData),
+    Clear,
+    CursorChanged,
+}
+
+pub enum HighlighterViewMsg {
     AddRule(Highlighter),
     DeleteRule(String),
 }
@@ -73,13 +80,6 @@ pub struct SearchResultMatch {
     pub line: usize,
     pub start: usize,
     pub end: usize,
-}
-
-#[derive(Debug)]
-pub enum LogTextViewMsg {
-    Data(SearchResultData),
-    Clear,
-    CursorChanged,
 }
 
 pub enum LogState {
