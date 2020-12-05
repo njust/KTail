@@ -239,12 +239,13 @@ impl LogTextView {
 
                         let result = self.result_map.get_mut(&tag).expect("Could not get result map");
 
-                        for search_match in matches {
+                        for mut search_match in matches {
                             let line = search_match.line as i32 + offset;
                             let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
                             let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
                             buffer.apply_tag_by_name(&tag, &iter_start, &iter_end);
 
+                            search_match.line = line as usize;
                             result.push(search_match);
                         }
                     }

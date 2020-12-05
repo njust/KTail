@@ -3,6 +3,8 @@ use crate::util::{read};
 use std::error::Error;
 use async_trait::async_trait;
 use crate::model::{LogReader, LogState};
+use std::io::{Seek, SeekFrom};
+use log::{warn};
 
 pub struct LogFileReader {
     path: PathBuf,
@@ -44,6 +46,9 @@ impl LogReader for LogFileReader {
             }
             if len < self.offset {
                 self.offset = 0;
+                if let Err(e) = self.file.seek(SeekFrom::Start(0)){
+                    warn!("Could not seek after reload: {}", e);
+                }
                 return LogState::Reload;
             }
         }

@@ -103,6 +103,14 @@ async fn int_main() {
                 for uri in uris {
                     let mut parts = uri.split("///");
                     if let Some(file) = parts.nth(1) {
+                        // Todo: on linux this check should be more sophisticated
+                        // for now it helps with unc paths..
+                        let file = if file.starts_with("/") {
+                            format!("/{}", file)
+                        }else {
+                            file.to_string()
+                        };
+
                         // Whitespaces are encoded in file path
                         let file = file.replace("%20", " ");
                         let file = PathBuf::from(file);
