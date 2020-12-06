@@ -68,6 +68,8 @@ pub enum LogTextViewMsg {
     Data(SearchResultData),
     Clear,
     CursorChanged,
+    ToggleBookmark(u16),
+    ScrollToBookmark(u16)
 }
 
 pub enum HighlighterViewMsg {

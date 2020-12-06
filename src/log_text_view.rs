@@ -5,7 +5,7 @@ use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data};
 use crate::model::{LogTextViewMsg, LogTextViewData, SearchResultMatch, LogReplacer};
 
-use sourceview::{ViewExt};
+use sourceview::{ViewExt, BufferExt, Mark};
 use regex::Regex;
 use std::collections::HashMap;
 use crate::highlighters::{SEARCH_ID, Highlighter};
@@ -25,9 +25,11 @@ pub struct LogTextView {
     result_map: HashMap<String, Vec<SearchResultMatch>>,
     current_result_selection: Option<(String, usize)>,
     result_match_cursor_pos: Option<usize>,
+    marker: HashMap<u16, (i32, Mark)>,
 }
 
 const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
+const MARKER_CATEGORY_BOOKMARK: &'static str = "BOOKMARK";
 
 impl LogTextView {
     pub fn start<T>(&mut self, data: LogTextViewData, sender: T, default_rules: Vec<Highlighter>)
@@ -43,6 +45,23 @@ impl LogTextView {
             let tx = sender.clone();
             self.text_view.connect_button_press_event(move |_,_|{
                 tx(LogTextViewMsg::CursorChanged);
+                gtk::Inhibit(false)
+            });
+        }
+
+        {
+            let tx = sender.clone();
+            self.text_view.connect_key_press_event(move |_, key| {
+                let modifier = key.get_state();
+                let key_code = key.get_keycode().unwrap_or(0);
+                if modifier & gdk::ModifierType::CONTROL_MASK == gdk::ModifierType::CONTROL_MASK {
+                    tx(LogTextViewMsg::ToggleBookmark(key_code));
+                }
+
+                if modifier & gdk::ModifierType::MOD1_MASK == gdk::ModifierType::MOD1_MASK {
+                    tx(LogTextViewMsg::ScrollToBookmark(key_code));
+                }
+
                 gtk::Inhibit(false)
             });
         }
@@ -85,6 +104,12 @@ impl LogTextView {
 
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));
         let tv = sourceview::View::new_with_buffer(&text_buffer);
+
+        let marker_attributes = sourceview::MarkAttributesBuilder::new()
+            .icon_name("pan-end-symbolic")
+            .build();
+        tv.set_mark_attributes(MARKER_CATEGORY_BOOKMARK, &marker_attributes, 10);
+
         tv.set_editable(false);
         tv.set_show_line_numbers(true);
         tv.set_child_visible(true);
@@ -132,6 +157,7 @@ impl LogTextView {
             active_rule: SEARCH_ID.to_string(),
             current_result_selection: None ,
             result_match_cursor_pos: None,
+            marker: HashMap::new(),
         }
     }
 
@@ -251,10 +277,41 @@ impl LogTextView {
                     }
                 }
             }
+            LogTextViewMsg::ScrollToBookmark(key) => {
+                if let Some((line, _)) = self.marker.get(&key) {
+                    if let Some(buffer) = self.text_view.get_buffer() {
+                        let mut iter = buffer.get_iter_at_line(*line);
+                        self.text_view.scroll_to_iter(&mut iter, 0.0, true, 0.5, 0.5);
+                    }
+                }
+            }
+            LogTextViewMsg::ToggleBookmark(key) => {
+                if let Some(buffer) = self.text_view.get_buffer() {
+                    let buffer = buffer.downcast::<sourceview::Buffer>().unwrap();
+                    let cursor_pos = buffer.get_property_cursor_position();
+                    let cursor_pos = buffer.get_iter_at_offset(cursor_pos);
+                    let cursor_line = cursor_pos.get_line();
+                    let line_pos = buffer.get_iter_at_line(cursor_line);
+                    let mut add_marker = true;
+                    if let Some((marker_line, existing)) = self.marker.remove(&key) {
+                        buffer.delete_mark(&existing);
+                        add_marker = marker_line != cursor_line;
+                    }
+
+                    if add_marker {
+                        let mark = buffer.create_source_mark(None, MARKER_CATEGORY_BOOKMARK, &line_pos).unwrap();
+                        self.marker.insert(key, (cursor_line, mark));
+                    }
+
+                    self.text_view.set_show_line_marks(self.marker.len() > 0);
+                }
+            }
             LogTextViewMsg::CursorChanged => {
+
                 if let Some(buffer) = self.text_view.get_buffer() {
                     let cursor_pos = buffer.get_property_cursor_position();
                     let cursor_pos = buffer.get_iter_at_offset(cursor_pos);
+
                     self.result_match_cursor_pos = self.get_next_from_pos(&cursor_pos, &self.active_rule);
                 }
             }
