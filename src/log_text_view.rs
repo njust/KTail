@@ -7,7 +7,7 @@ use crate::model::{LogTextViewMsg, LogTextViewData, SearchResultMatch, LogReplac
 
 use sourceview::{ViewExt, BufferExt, Mark};
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::{HashMap};
 use crate::highlighters::{SEARCH_ID, Highlighter};
 
 use log::{info, error, debug};
@@ -53,13 +53,26 @@ impl LogTextView {
             let tx = sender.clone();
             self.text_view.connect_key_press_event(move |_, key| {
                 let modifier = key.get_state();
-                let key_code = key.get_keycode().unwrap_or(0);
-                if modifier & gdk::ModifierType::CONTROL_MASK == gdk::ModifierType::CONTROL_MASK {
-                    tx(LogTextViewMsg::ToggleBookmark(key_code));
-                }
+                let key_val = key.get_keyval();
+                if key_val == gdk::keys::constants::_1
+                    || key_val == gdk::keys::constants::_2
+                    || key_val == gdk::keys::constants::_3
+                    || key_val == gdk::keys::constants::_4
+                    || key_val == gdk::keys::constants::_5
+                    || key_val == gdk::keys::constants::_6
+                    || key_val == gdk::keys::constants::_7
+                    || key_val == gdk::keys::constants::_8
+                    || key_val == gdk::keys::constants::_9
+                {
+                    if let Some(key_code) = key.get_keycode() {
+                        if modifier & gdk::ModifierType::CONTROL_MASK == gdk::ModifierType::CONTROL_MASK {
+                            tx(LogTextViewMsg::ToggleBookmark(key_code));
+                        }
 
-                if modifier & gdk::ModifierType::MOD1_MASK == gdk::ModifierType::MOD1_MASK {
-                    tx(LogTextViewMsg::ScrollToBookmark(key_code));
+                        if modifier & gdk::ModifierType::MOD1_MASK == gdk::ModifierType::MOD1_MASK {
+                            tx(LogTextViewMsg::ScrollToBookmark(key_code));
+                        }
+                    }
                 }
 
                 gtk::Inhibit(false)

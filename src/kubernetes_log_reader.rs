@@ -91,7 +91,7 @@ impl LogReader for KubernetesLogReader {
             if let Ok(log_stream) = c.logs(&pod, Some(
                 LogOptions {
                     follow: Some(true),
-                    since_seconds: Some(3600 * self.options.since),
+                    since_seconds: Some(self.options.since),
                 }
             )).await {
                 let (exit_tx, _exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();

@@ -11,6 +11,9 @@ use crate::model::{Msg, LogTextViewData, CreateKubeLogData};
 use std::error::Error;
 use std::collections::{HashSet};
 
+const UNIT_MINUTES: &'static str = "UNIT_MINUTES";
+const UNIT_HOURS: &'static str = "UNIT_HOURS";
+
 fn map_model(model: &TreeStore, iter: &TreeIter) -> Option<(String, bool)> {
     let name = model.get_value(iter, 0).get::<String>().unwrap_or(None)?;
     let active = model.get_value(iter, 1).get::<bool>().unwrap_or(None)?;
@@ -96,9 +99,16 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
     since_row.set_spacing(4);
     let adjustment = gtk::Adjustment::new(4.0, 1.0, 721.0, 1.0, 1.0, 1.0);
     let since_val = gtk::SpinButton::new(Some(&adjustment), 1.0, 0);
-    since_val.set_value(4.0);
-    since_row.add(&gtk::Label::new(Some("Since hours:")));
+    since_val.set_value(10.0);
+    since_row.add(&gtk::Label::new(Some("Since:")));
     since_row.add(&since_val);
+
+    let unit_selector = gtk::ComboBoxText::new();
+    unit_selector.append(Some(UNIT_MINUTES), "Minutes");
+    unit_selector.append(Some(UNIT_HOURS), "Hours");
+    unit_selector.set_active(Some(0));
+
+    since_row.add(&unit_selector);
     since_row.set_margin_top(8);
 
     content.add(&since_row);
@@ -120,7 +130,14 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
                 let res = dlg.run();
                 dlg.close();
                 let since = since_val.get_text().to_string();
-                let since = since.parse::<u32>().unwrap_or(4);
+                let active_unit = unit_selector.get_active_id().map(|s|s.to_string()).unwrap_or(UNIT_MINUTES.to_string());
+                let unit_multiplier = if active_unit.as_str() == UNIT_MINUTES {
+                    60
+                }else {
+                    60 * 60
+                };
+
+                let since = since.parse::<u32>().unwrap_or(10) * unit_multiplier;
                 let separate_tabs = log_separate_tab_checkbox.get_active();
 
                 if res == ResponseType::Accept {
