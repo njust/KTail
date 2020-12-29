@@ -3,7 +3,7 @@ use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::rc::Rc;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data};
-use crate::model::{LogTextViewMsg, LogTextViewData, SearchResultMatch, LogReplacer};
+use crate::model::{LogTextViewMsg, LogViewData, SearchResultMatch, LogReplacer};
 
 use sourceview::{ViewExt, BufferExt, Mark};
 use regex::Regex;
@@ -32,7 +32,7 @@ const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
 const MARKER_CATEGORY_BOOKMARK: &'static str = "BOOKMARK";
 
 impl LogTextView {
-    pub fn start<T>(&mut self, data: LogTextViewData, sender: T, default_rules: Vec<Highlighter>)
+    pub fn start<T>(&mut self, data: LogViewData, sender: T, default_rules: Vec<Highlighter>)
         where T : 'static + Send + Clone + Fn(LogTextViewMsg)
     {
         let (thread_action_sender, thread_action_receiver) =
@@ -88,7 +88,7 @@ impl LogTextView {
 
         let file_thread_tx = sender.clone();
         match data {
-            LogTextViewData::File(path) => {
+            LogViewData::File(path) => {
                 match LogFileReader::new(path) {
                     Ok(reader) => {
                         register_log_data_watcher(move |msg| {
@@ -100,7 +100,7 @@ impl LogTextView {
                     }
                 }
             }
-            LogTextViewData::Kube(data) => {
+            LogViewData::Kube(data) => {
                 let reader = KubernetesLogReader::new(data);
                 register_log_data_watcher(move |msg| {
                     file_thread_tx(msg);

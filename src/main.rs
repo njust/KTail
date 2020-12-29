@@ -24,13 +24,44 @@ use glib::Sender;
 use crate::pod_selection::create_open_kube_action;
 use std::collections::HashMap;
 use crate::log_view::LogView;
-use crate::model::{LogTextViewData, Msg};
+use crate::model::{LogViewData, Msg, CreateLogView};
+use crate::highlighters::{Highlighter, SEARCH_ID, RULE_TYPE_HIGHLIGHT};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-fn create_tab(data: LogTextViewData, tx: Sender<Msg>, id: Uuid, accelerators: &AccelGroup) -> (gtk::Box, LogView) {
+
+pub fn get_default_highlighters() -> Vec<Highlighter> {
+    vec![
+        Highlighter {
+            id: Uuid::parse_str(SEARCH_ID).unwrap(),
+            regex: None,
+            color: Some(String::from("rgba(188,150,0,1)")),
+            name: Some(String::from("Search")),
+            is_system: true,
+            rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
+        },
+        Highlighter {
+            id: Uuid::new_v4(),
+            regex: Some(r".*\s((?i)error|fatal|failed(?-i))\s.*".into()),
+            color: Some(String::from("rgba(239,41,41,1)")),
+            name: Some(String::from("Error")),
+            is_system: false,
+            rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
+        },
+        Highlighter {
+            id: Uuid::new_v4(),
+            regex: Some(r".*\s((?i)warn(?-i))\s.*".into()),
+            color: Some(String::from("rgba(207,111,57,1)")),
+            name: Some(String::from("Warning")),
+            is_system: false,
+            rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
+        }
+    ]
+}
+
+fn create_tab(data: CreateLogView, tx: Sender<Msg>, id: Uuid, accelerators: &AccelGroup) -> (gtk::Box, LogView) {
     let tx2 = tx.clone();
-    let tab_name = data.get_name();
+    let tab_name = data.data.get_name();
     let file_view = LogView::new(data, move |msg| {
         send_msg(&tx2, Msg::LogViewMsg(id, msg));
     }, accelerators);
@@ -61,7 +92,7 @@ fn create_open_file_dlg_action(tx: Sender<Msg>) -> SimpleAction {
         dialog.close();
         if res == ResponseType::Accept {
             if let Some(file_path) = dialog.get_filename() {
-                send_msg(&tx, Msg::CreateTab(LogTextViewData::File(file_path)));
+                send_msg(&tx, Msg::CreateTab(CreateLogView::new(LogViewData::File(file_path))));
             }
         }
     });
@@ -120,7 +151,7 @@ async fn int_main() {
                         let file = PathBuf::from(file);
                         if let Some(mime) = mime_guess::from_path(&file).first() {
                             if mime.type_() == mime_guess::mime::TEXT  {
-                                send_msg(&tx, Msg::CreateTab(LogTextViewData::File(file)));
+                                send_msg(&tx, Msg::CreateTab(CreateLogView::new(LogViewData::File(file))));
                             }
                         }
                     }
@@ -167,7 +198,7 @@ async fn int_main() {
             if std::path::Path::new(&open_with).exists() {
                 let tx = tx.clone();
                 let open_with = open_with.clone();
-                send_msg(&tx, Msg::CreateTab(LogTextViewData::File(std::path::PathBuf::from(open_with))));
+                send_msg(&tx, Msg::CreateTab(CreateLogView::new(LogViewData::File(std::path::PathBuf::from(open_with)))));
             }
         }
 

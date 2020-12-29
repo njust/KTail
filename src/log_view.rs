@@ -1,12 +1,12 @@
 use gtk::prelude::*;
 use crate::toolbar::LogViewToolbar;
 use gtk::{Orientation, WindowPosition, AccelGroup, HeaderBarBuilder};
-use crate::highlighters::{HighlighterListView, SEARCH_ID, Highlighter, RULE_TYPE_HIGHLIGHT};
+use crate::highlighters::{HighlighterListView, Highlighter, SEARCH_ID, RULE_TYPE_HIGHLIGHT};
 use crate::log_text_view::{LogTextView};
-use crate::model::{LogViewMsg, LogViewToolbarMsg, LogTextViewData, LogTextViewMsg, UNNAMED_RULE};
+use crate::model::{LogViewMsg, LogViewToolbarMsg, LogTextViewMsg, UNNAMED_RULE, CreateLogView};
 use std::rc::Rc;
-use uuid::Uuid;
 use crate::util::{SortedListCompare, CompareResult};
+use crate::get_default_highlighters;
 
 
 pub struct LogView {
@@ -21,40 +21,11 @@ pub struct LogView {
     sender: Rc<dyn Fn(LogViewMsg)>
 }
 
-pub fn get_default_highlighters() -> Vec<Highlighter> {
-    vec![
-        Highlighter {
-            id: Uuid::parse_str(SEARCH_ID).unwrap(),
-            regex: None,
-            color: Some(String::from("rgba(188,150,0,1)")),
-            name: Some(String::from("Search")),
-            is_system: true,
-            rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
-        },
-        Highlighter {
-            id: Uuid::new_v4(),
-            regex: Some(r".*\s((?i)error|fatal|failed(?-i))\s.*".into()),
-            color: Some(String::from("rgba(239,41,41,1)")),
-            name: Some(String::from("Error")),
-            is_system: false,
-            rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
-        },
-        Highlighter {
-            id: Uuid::new_v4(),
-            regex: Some(r".*\s((?i)warn(?-i))\s.*".into()),
-            color: Some(String::from("rgba(207,111,57,1)")),
-            name: Some(String::from("Warning")),
-            is_system: false,
-            rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
-        }
-    ]
-}
-
 impl LogView {
-    pub fn new<T>(data: LogTextViewData, sender: T, accelerators: &AccelGroup) -> Self
+    pub fn new<T>(mut data: CreateLogView, sender: T, accelerators: &AccelGroup) -> Self
         where T: 'static + Send + Clone + Fn(LogViewMsg)
     {
-        let default_rules = get_default_highlighters();
+        let default_rules = data.rules.take().unwrap_or(get_default_highlighters());
 
         let toolbar_msg = sender.clone();
         let toolbar = LogViewToolbar::new(move |msg| {
@@ -63,7 +34,7 @@ impl LogView {
 
         let file_tx = sender.clone();
         let mut file_view = LogTextView::new();
-        file_view.start(data, move |msg| {
+        file_view.start(data.data, move |msg| {
             file_tx(LogViewMsg::LogTextViewMsg(msg));
         }, default_rules.clone());
 
@@ -71,10 +42,7 @@ impl LogView {
         container.add(toolbar.view());
         container.add(file_view.view());
 
-        let rule_msg = sender.clone();
-        let mut rules_view = HighlighterListView::new(move |msg| {
-            rule_msg(LogViewMsg::HighlighterViewMsg(msg));
-        });
+        let rules_view = HighlighterListView::new();
         rules_view.add_highlighters(default_rules.clone());
 
         let mut rules = default_rules.clone();
@@ -177,9 +145,6 @@ impl LogView {
                     self.apply_rules(rules.clone());
                     self.log_text_view.apply_rules(rules);
                 }
-            }
-            LogViewMsg::HighlighterViewMsg(msg) => {
-                self.highlighters_view.update(msg);
             }
             LogViewMsg::LogTextViewMsg(msg) => {
                 if let LogTextViewMsg::Data(res) = &msg {

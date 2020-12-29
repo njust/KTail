@@ -7,9 +7,11 @@ use log::{error};
 use crate::util::{create_col, ColumnType};
 use glib::Sender;
 use k8s_client::{KubeConfig, KubeClient, Pod};
-use crate::model::{Msg, LogTextViewData, CreateKubeLogData};
+use crate::model::{Msg, LogViewData, CreateKubeLogData, CreateLogView};
 use std::error::Error;
 use std::collections::{HashSet};
+use crate::highlighters::HighlighterListView;
+use crate::get_default_highlighters;
 
 const UNIT_MINUTES: &'static str = "UNIT_MINUTES";
 const UNIT_HOURS: &'static str = "UNIT_HOURS";
@@ -65,7 +67,7 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
     let dlg = gtk::DialogBuilder::new()
         .window_position(WindowPosition::CenterOnParent)
         .default_width(450)
-        .default_height(400)
+        .default_height(600)
         .modal(true)
         .build();
 
@@ -119,8 +121,11 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
     unit_selector.set_active(Some(0));
 
     since_row.add(&unit_selector);
-
     content.add(&since_row);
+
+    let rules_view = HighlighterListView::new();
+    rules_view.add_highlighters(get_default_highlighters());
+    content.add(rules_view.view());
 
     dlg.connect_delete_event(move |dlg, _| {
         dlg.hide();
@@ -168,16 +173,16 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
 
                     if separate_tabs {
                         for model in models {
-                            tx.send(Msg::CreateTab(LogTextViewData::Kube(CreateKubeLogData {
+                            tx.send(Msg::CreateTab(CreateLogView::with_rules(LogViewData::Kube(CreateKubeLogData {
                                 pods: vec![model],
-                                since
-                            }))).expect("Could not send create tab msg");
+                                since,
+                            }), rules_view.get_highlighter().unwrap()))).expect("Could not send create tab msg");
                         }
                     }else {
-                        tx.send(Msg::CreateTab(LogTextViewData::Kube(CreateKubeLogData {
+                        tx.send(Msg::CreateTab(CreateLogView::with_rules(LogViewData::Kube(CreateKubeLogData {
                             pods: models,
-                            since
-                        }))).expect("Could not send create tab msg");
+                            since,
+                        }), rules_view.get_highlighter().unwrap()))).expect("Could not send create tab msg");
                     }
                 }
             }

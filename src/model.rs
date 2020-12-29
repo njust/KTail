@@ -13,16 +13,37 @@ pub struct CreateKubeLogData {
     pub since: u32,
 }
 
-pub enum LogTextViewData {
+pub struct CreateLogView {
+    pub rules: Option<Vec<Highlighter>>,
+    pub data: LogViewData,
+}
+
+impl CreateLogView {
+    pub fn new(data: LogViewData) -> Self {
+        Self {
+            data,
+            rules: None,
+        }
+    }
+
+    pub fn with_rules(data: LogViewData, rules: Vec<Highlighter>) -> Self {
+        Self {
+            data,
+            rules: Some(rules),
+        }
+    }
+}
+
+pub enum LogViewData {
     File(PathBuf),
     Kube(CreateKubeLogData)
 }
 
-impl LogTextViewData {
+impl LogViewData {
     pub fn get_name(&self) -> String {
         match self {
-            LogTextViewData::File(file_path) => file_path.file_name().unwrap().to_str().unwrap().to_string(),
-            LogTextViewData::Kube(data) => data.pods.join(",")
+            LogViewData::File(file_path) => file_path.file_name().unwrap().to_str().unwrap().to_string(),
+            LogViewData::Kube(data) => data.pods.join(",")
         }
     }
 }
@@ -37,7 +58,7 @@ pub struct SearchResultData {
 
 pub enum Msg {
     CloseTab(Uuid),
-    CreateTab(LogTextViewData),
+    CreateTab(CreateLogView),
     NextTab,
     PrevTab,
     CloseActiveTab,
@@ -48,7 +69,6 @@ pub enum Msg {
 pub enum LogViewMsg {
     ApplyRules,
     ToolbarMsg(LogViewToolbarMsg),
-    HighlighterViewMsg(HighlighterViewMsg),
     LogTextViewMsg(LogTextViewMsg)
 }
 
@@ -71,11 +91,6 @@ pub enum LogTextViewMsg {
     CursorChanged,
     ToggleBookmark(u16),
     ScrollToBookmark(u16)
-}
-
-pub enum HighlighterViewMsg {
-    AddRule(Highlighter),
-    DeleteRule(String),
 }
 
 #[derive(Debug, Clone)]

@@ -1,7 +1,6 @@
 use gtk::prelude::*;
 
 use gtk::{Orientation, WidgetExt, ContainerExt, ButtonExt, IconSize, ReliefStyle};
-use crate::model::{HighlighterViewMsg};
 use glib::bitflags::_core::cmp::Ordering;
 use uuid::Uuid;
 use std::collections::HashMap;
@@ -14,6 +13,7 @@ use glib_data_model_helper::{
 use gio::{ListStoreExt, ListModelExt};
 use glib::Object;
 use crate::Result;
+use std::rc::Rc;
 
 #[derive(Debug, Default, Clone)]
 pub struct Highlighter {
@@ -73,7 +73,7 @@ pub const RULE_TYPE_EXCLUDE: &'static str = "exclude";
 
 pub struct HighlighterListView {
     container: gtk::Box,
-    highlighter_list_data: gio::ListStore
+    highlighter_list_data: Rc<gio::ListStore>
 }
 
 data_model!(HighlighterData);
@@ -104,92 +104,99 @@ impl DataModelDescription for HighlighterData {
 }
 
 impl HighlighterListView {
-    pub fn new<T>(tx: T) -> Self
-        where T: 'static + Clone + Fn(HighlighterViewMsg)
-    {
-        let list = gio::ListStore::new(HighlighterData::static_type());
+    pub fn new<>() -> Self {
+        let list = Rc::new(gio::ListStore::new(HighlighterData::static_type()));
         let list_box = gtk::ListBox::new();
-        let tx2 = tx.clone();
-        list_box.bind_model(Some(&list), move |item| {
-            let row = gtk::ListBoxRow::new();
-            let container = gtk::Box::new(Orientation::Horizontal, 4);
-            let item = item.downcast_ref::<HighlighterData>().expect("Row data is of wrong type");
+        {
+            let list = list.clone();
+            list_box.bind_model(Some(&*list.clone()), move |item| {
+                let row = gtk::ListBoxRow::new();
+                let container = gtk::Box::new(Orientation::Horizontal, 4);
+                let item = item.downcast_ref::<HighlighterData>().expect("Row data is of wrong type");
 
-            let id = item.get_property(ID_PROP).ok()
-                .and_then(|id| id.get::<String>().ok())
-                .and_then(|id|id).unwrap();
+                let id = item.get_property(ID_PROP).ok()
+                    .and_then(|id| id.get::<String>().ok())
+                    .and_then(|id| id).unwrap();
 
-            let is_system = item.get_property(IS_SYSTEM_PROP).ok()
-                .and_then(|id| id.get::<bool>().ok())
-                .and_then(|id|id).unwrap();
+                let is_system = item.get_property(IS_SYSTEM_PROP).ok()
+                    .and_then(|id| id.get::<bool>().ok())
+                    .and_then(|id| id).unwrap();
 
-            let type_selector = gtk::ComboBoxTextBuilder::new()
-                .sensitive(!is_system)
-                .build();
+                let type_selector = gtk::ComboBoxTextBuilder::new()
+                    .sensitive(!is_system)
+                    .build();
 
-            type_selector.append(Some(RULE_TYPE_HIGHLIGHT), "Highlight");
-            type_selector.append(Some(RULE_TYPE_EXCLUDE), "Exclude");
-            // type_selector.append(Some("include"), "Include");
-            item.bind_property(RULE_TYPE, &type_selector, "active-id")
-                .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
+                type_selector.append(Some(RULE_TYPE_HIGHLIGHT), "Highlight");
+                type_selector.append(Some(RULE_TYPE_EXCLUDE), "Exclude");
+                // type_selector.append(Some("include"), "Include");
+                item.bind_property(RULE_TYPE, &type_selector, "active-id")
+                    .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
 
-            container.add(&type_selector);
+                container.add(&type_selector);
 
-            let name_entry = gtk::Entry::new();
-            item.bind_property(NAME_PROP, &name_entry, "text")
-                .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
-            container.add(&name_entry);
+                let name_entry = gtk::Entry::new();
+                item.bind_property(NAME_PROP, &name_entry, "text")
+                    .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
+                container.add(&name_entry);
 
-            let regex_entry = gtk::Entry::new();
-            item.bind_property(REGEX_PROP, &regex_entry, "text")
-                .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
-            container.add(&regex_entry);
+                let regex_entry = gtk::Entry::new();
+                item.bind_property(REGEX_PROP, &regex_entry, "text")
+                    .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
+                container.add(&regex_entry);
 
-            let color_button = gtk::ColorButton::new();
-            item.bind_property(COLOR_PROP, &color_button, "rgba")
-                .transform_to(|_, value| {
-                    let rgba =
-                        value.get::<String>().ok()
-                            .and_then(|c|c)
-                            .and_then(|c|c.parse::<RGBA>().ok())
-                            .unwrap_or(RGBA::black());
+                let color_button = gtk::ColorButton::new();
+                item.bind_property(COLOR_PROP, &color_button, "rgba")
+                    .transform_to(|_, value| {
+                        let rgba =
+                            value.get::<String>().ok()
+                                .and_then(|c| c)
+                                .and_then(|c| c.parse::<RGBA>().ok())
+                                .unwrap_or(RGBA::black());
 
-                    Some(glib::Value::from(Some(&rgba)))
-                })
-                .transform_from(|_,value| {
-                    let data = value.get::<RGBA>().unwrap().unwrap();
-                    Some(glib::Value::from(&data.to_string()))
-                })
-                .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
-            container.add(&color_button);
+                        Some(glib::Value::from(Some(&rgba)))
+                    })
+                    .transform_from(|_, value| {
+                        let data = value.get::<RGBA>().unwrap().unwrap();
+                        Some(glib::Value::from(&data.to_string()))
+                    })
+                    .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
+                container.add(&color_button);
 
-            let btn = gtk::ButtonBuilder::new()
-                .image(&gtk::Image::from_icon_name(Some("edit-delete-symbolic"), IconSize::Button))
-                .sensitive(!is_system)
-                .relief(ReliefStyle::None)
-                .build();
-            {
-                let tx = tx2.clone();
-                btn.connect_clicked(move |_| {
-                    tx(HighlighterViewMsg::DeleteRule(id.clone()));
-                });
-                container.add(&btn);
-            }
+                let btn = gtk::ButtonBuilder::new()
+                    .image(&gtk::Image::from_icon_name(Some("edit-delete-symbolic"), IconSize::Button))
+                    .sensitive(!is_system)
+                    .relief(ReliefStyle::None)
+                    .build();
+                {
+                    let list = list.clone();
+                    btn.connect_clicked(move |_| {
+                        if let Some(idx) = Self::get_highlighter_idx(&id.to_string(), list.clone()) {
+                            list.remove(idx);
+                        }
+                    });
+                    container.add(&btn);
+                }
 
-            row.add(&container);
-            row.show_all();
-            row.upcast::<gtk::Widget>()
-        });
+                row.add(&container);
+                row.show_all();
+                row.upcast::<gtk::Widget>()
+            });
+        }
 
         let toolbar = gtk::Box::new(Orientation::Horizontal, 0);
         toolbar.set_margin_bottom(4);
 
-        let add_btn = gtk::Button::from_icon_name(Some("list-add-symbolic"), IconSize::Button); {
-            add_btn.set_relief(ReliefStyle::None);
-            let tx = tx.clone();
+        let add_btn = gtk::ButtonBuilder::new()
+            .label("Add Rule")
+            .image(&gtk::Image::from_icon_name(Some("list-add-symbolic"), IconSize::Button))
+            .relief(ReliefStyle::None)
+            .always_show_image(true)
+            .build();
+        {
+            let list = list.clone();
             add_btn.connect_clicked(move |_| {
                 let rule_data = Highlighter::new(RULE_TYPE_HIGHLIGHT);
-                tx(HighlighterViewMsg::AddRule(rule_data));
+                Self::add(rule_data, list.clone());
             });
             toolbar.add(&add_btn);
         }
@@ -204,14 +211,18 @@ impl HighlighterListView {
         }
     }
 
-    pub fn add_highlighters(&mut self, data: Vec<Highlighter>) {
+    pub fn add_highlighters(&self, data: Vec<Highlighter>) {
         for rule in data {
             self.add_highlighter(rule);
         }
     }
 
-    pub fn add_highlighter(&mut self, data: Highlighter) {
-        self.highlighter_list_data.append(&HighlighterData::new(&[
+    pub fn add_highlighter(&self, data: Highlighter) {
+        Self::add(data, self.highlighter_list_data.clone());
+    }
+
+    fn add(data: Highlighter, highlighter_list_data: Rc<gio::ListStore>) {
+        highlighter_list_data.append(&HighlighterData::new(&[
             (ID_PROP, &data.id.to_string()),
             (NAME_PROP, &data.name.unwrap_or_default()),
             (REGEX_PROP, &data.regex.unwrap_or_default()),
@@ -247,41 +258,28 @@ impl HighlighterListView {
     }
 
     pub fn set_regex(&mut self, id: &str, regex: &String) {
-        if let Some(o) = self.get_highlighter_by_id(id) {
-            if let Err(e) = o.set_property("regex", &regex) {
+        if let Some(o) = Self::get_highlighter_by_id(id, self.highlighter_list_data.clone()) {
+            if let Err(e) = o.set_property(REGEX_PROP, &regex) {
                 error!("Could not set regex: {}", e);
             }
         }
     }
 
-    fn get_highlighter_by_id(&self, rid: &str) -> Option<Object> {
-        self.get_highlighter_idx(rid).and_then(|idx|self.highlighter_list_data.get_object(idx))
+    fn get_highlighter_by_id(rid: &str, highlighter_list_data: Rc<gio::ListStore>) -> Option<Object> {
+        Self::get_highlighter_idx(rid, highlighter_list_data.clone()).and_then(|idx|highlighter_list_data.get_object(idx))
     }
 
-    fn get_highlighter_idx(&self, sid: &str) -> Option<u32> {
-        let cnt = self.highlighter_list_data.get_n_items();
+    fn get_highlighter_idx(sid: &str, highlighter_list_data: Rc<gio::ListStore>) -> Option<u32> {
+        let cnt = highlighter_list_data.get_n_items();
         for i in 0..cnt {
-            if let Some(o) = self.highlighter_list_data.get_object(i) {
-                let id = o.get_property("id").unwrap().get::<String>().unwrap().unwrap();
+            if let Some(o) = highlighter_list_data.get_object(i) {
+                let id = o.get_property(ID_PROP).unwrap().get::<String>().unwrap().unwrap();
                 if id == sid {
                     return Some(i)
                 }
             }
         }
         None
-    }
-
-    pub fn update(&mut self, msg: HighlighterViewMsg) {
-        match msg {
-            HighlighterViewMsg::AddRule(rule) => {
-                self.add_highlighter(rule.clone());
-            }
-            HighlighterViewMsg::DeleteRule(id) => {
-                if let Some(idx) = self.get_highlighter_idx(&id.to_string()) {
-                    self.highlighter_list_data.remove(idx);
-                }
-            }
-        }
     }
 
     pub fn view(&self) -> &gtk::Box {
