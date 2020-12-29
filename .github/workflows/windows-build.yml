@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - name: Install Windows GNU Toolchain
-      run: rustup toolchain install stable-x86_64-pc-windows-gnu
+      run: rustup default stable-x86_64-pc-windows-gnu
     - name: Refresh env
       run: refreshenv
     - uses: msys2/setup-msys2@v2
@@ -35,7 +35,7 @@ jobs:
           target
         key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
-      run: cargo build --target x86_64-pc-windows-gnu --release --verbose
+      run: cargo build --release --verbose
     - uses: actions/upload-artifact@v2
       with:
         name: kTail
