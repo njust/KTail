@@ -22,11 +22,10 @@ jobs:
         update: true
         path-type: inherit
         install: >-
+          mingw-w64-x86_64-toolchain
           base-devel
           mingw-w64-x86_64-gtk3
           mingw-w64-x86_64-gtksourceview3
-          openssl-devel
-          pkg-config
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
