@@ -15,14 +15,17 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Install msys2
-      run: choco install -y msys2 --params "/NoUpdate /InstallDir:C:\msys2"
     - name: Install Windows GNU Toolchain
       run: rustup toolchain install stable-x86_64-pc-windows-gnu
     - name: Refresh env
       run: refreshenv
-    - name: Install gtk prerequsites
-      run: c:\msys2\mingw64.exe pacman --noconfirm -S mingw-w64-x86_64-toolchain base-devel mingw-w64-x86_64-gtk3 mingw-w64-x86_64-gtksourceview3 | Out-String
+    - uses: msys2/setup-msys2@v2
+      with:
+        update: true
+        install: >-
+          base-devel
+          mingw-w64-x86_64-gtk3
+          mingw-w64-x86_64-gtksourceview3
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
