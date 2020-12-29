@@ -35,7 +35,7 @@ jobs:
         key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
     - uses: msys2/setup-msys2@v2
-      run: msys2 -c 'cargo build --release --verbose'
+    - run: msys2 -c 'cargo build --release --verbose'
     - uses: actions/upload-artifact@v2
       with:
         name: kTail
