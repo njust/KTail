@@ -27,7 +27,6 @@ jobs:
         key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
       run: cargo build --release --verbose
-    - name: Publish
     - uses: actions/upload-artifact@v2
       with:
         name: kTail
