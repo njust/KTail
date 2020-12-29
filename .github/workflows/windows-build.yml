@@ -15,8 +15,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Install gtk prerequsites
+    - name: Install msys2
       run: choco install -y msys2 --params "/NoUpdate /InstallDir:C:\msys2"
+    - name: Install gtk prerequsites
+      run: mingw64 pacman --noconfirm -S mingw-w64-x86_64-toolchain base-devel mingw-w64-x86_64-gtk3 mingw-w64-x86_64-gtksourceview3
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
@@ -30,4 +32,4 @@ jobs:
     - uses: actions/upload-artifact@v2
       with:
         name: kTail
-        path: target/release/ktail
+        path: target/release/ktail.exe
