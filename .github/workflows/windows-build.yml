@@ -17,9 +17,11 @@ jobs:
     steps:
     - name: Install msys2
       run: choco install -y msys2 --params "/NoUpdate /InstallDir:C:\msys2"
+    - name: Install Windows GNU Toolchain
+      run: rustup toolchain install x86_64-pc-windows-gnu
     - name: Install gtk prerequsites
       run: mingw64.exe pacman --noconfirm -S mingw-w64-x86_64-toolchain base-devel mingw-w64-x86_64-gtk3 mingw-w64-x86_64-gtksourceview3
-      working-directory: C:/msys2/
+      working-directory: C:\\msys2\\
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
@@ -29,7 +31,7 @@ jobs:
           target
         key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
-      run: cargo build --release --verbose
+      run: cargo build --target x86_64-pc-windows-gnu --release --verbose
     - uses: actions/upload-artifact@v2
       with:
         name: kTail
