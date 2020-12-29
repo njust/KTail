@@ -15,7 +15,7 @@ mod highlighters;
 
 use gtk::prelude::*;
 use gio::prelude::*;
-use gtk::{Application, ApplicationWindow, Button, HeaderBar, Notebook, MenuButton, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, AccelGroup};
+use gtk::{Application, ApplicationWindow, Button, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, AccelGroup, MenuButtonBuilder, HeaderBarBuilder, NotebookBuilder};
 use gio::{SimpleAction};
 use log::{error, info};
 use uuid::Uuid;
@@ -93,7 +93,11 @@ async fn int_main() {
     application.connect_activate(move |app| {
         let menu_model = gio::Menu::new();
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
-        let notebook = Notebook::new();
+        let notebook = NotebookBuilder::new()
+            .hexpand(true)
+            .vexpand(true)
+            .build();
+
         {
             let tx = tx.clone();
             let te = gtk::TargetEntry::new("text/uri-list", gtk::TargetFlags::OTHER_APP, 129);
@@ -190,9 +194,6 @@ async fn int_main() {
         let window = ApplicationWindow::new(app);
         let ag = AccelGroup::new();
         window.add_accel_group(&ag);
-
-        notebook.set_hexpand(true);
-        notebook.set_vexpand(true);
         window.add(&notebook);
 
         let tx = tx.clone();
@@ -261,15 +262,17 @@ async fn int_main() {
         menu_model.append_item(&gio::MenuItem::new(Some("Open"), Some("app.open")));
         menu_model.append_item(&gio::MenuItem::new(Some("Quit"), Some("app.quit")));
 
-        let menu_button = MenuButton::new();
-        menu_button.set_relief(ReliefStyle::None);
-        menu_button.set_popup(Some(&gtk::Menu::from_model(&menu_model)));
-        menu_button.set_image(Some(&gtk::Image::from_icon_name(Some("open-menu-symbolic"), IconSize::Menu)));
+        let menu_button = MenuButtonBuilder::new()
+            .relief(ReliefStyle::None)
+            .popup(&gtk::Menu::from_model(&menu_model))
+            .image(&gtk::Image::from_icon_name(Some("open-menu-symbolic"), IconSize::Menu))
+            .build();
 
-        let header_bar = HeaderBar::new();
+        let header_bar = HeaderBarBuilder::new()
+            .show_close_button(true)
+            .title("Log viewer")
+            .build();
         header_bar.pack_end(&menu_button);
-        header_bar.set_show_close_button(true);
-        header_bar.set_title(Some("Log viewer"));
 
         window.set_titlebar(Some(&header_bar));
         window.show_all();

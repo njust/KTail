@@ -110,8 +110,11 @@ impl LogTextView {
     }
     pub fn new() -> Self {
         let tag_table = TextTagTable::new();
-        let current_cursor_tag = gtk::TextTag::new(Some(CURRENT_CURSOR_TAG));
-        current_cursor_tag.set_property_background(Some("rgba(114,159,207,1)"));
+        let current_cursor_tag = gtk::TextTagBuilder::new()
+            .name(CURRENT_CURSOR_TAG)
+            .background("rgba(114,159,207,1)")
+            .build();
+
         tag_table.add(&current_cursor_tag);
         current_cursor_tag.set_priority(tag_table.get_size() - 1);
 

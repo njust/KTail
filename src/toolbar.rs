@@ -1,6 +1,6 @@
 use gtk::prelude::*;
 use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, AccelFlags, AccelGroup, TreeIter};
-use crate::model::{LogViewToolbarMsg, SearchResultMatch};
+use crate::model::{LogViewToolbarMsg, SearchResultMatch, UNNAMED_RULE};
 use crate::highlighters::Highlighter;
 use std::collections::HashMap;
 
@@ -60,20 +60,23 @@ impl LogViewToolbar {
         }
 
         let rules_data = gtk::ListStore::new(&[glib::Type::String, glib::Type::String, glib::Type::I32, glib::Type::String]);
-        let default_name = String::from("Unamed rule");
+        let default_name = String::from(UNNAMED_RULE);
         for rule in init_rules {
             let name = rule.name.as_ref().unwrap_or(&default_name);
             let id = rule.id.to_string();
             rules_data.insert_with_values(None, &[0, 1, 2, 3], &[&id, &name, &0, &name]);
         }
 
-        let rule_selector = gtk::ComboBox::with_model(&rules_data);
+        let rule_selector = gtk::ComboBoxBuilder::new()
+            .model(&rules_data)
+            .width_request(70)
+            .id_column(0)
+            .active(0)
+            .build();
+
         let renderer =  gtk::CellRendererText::new();
         rule_selector.pack_start(&renderer, true);
         rule_selector.add_attribute(&renderer, "text", 3);
-        rule_selector.set_property_width_request(70);
-        rule_selector.set_id_column(0);
-        rule_selector.set_active(Some(0));
         toolbar.add(&rule_selector);
         {
             let tx = tx.clone();
@@ -198,7 +201,7 @@ impl LogViewToolbar {
     }
 
     pub fn add_rule(&mut self, rule: &Highlighter) {
-        let default_name = String::from("Unamed rule");
+        let default_name = String::from(UNNAMED_RULE);
         let name = rule.name.as_ref().unwrap_or(&default_name);
         let id = rule.id.to_string();
         self.rules_selector_data.insert_with_values(None, &[0, 1, 2, 3], &[&id, &name, &0, &name]);

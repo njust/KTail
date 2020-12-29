@@ -1,9 +1,9 @@
 use gtk::prelude::*;
 use crate::toolbar::LogViewToolbar;
-use gtk::{Orientation, WindowPosition, HeaderBar, AccelGroup};
+use gtk::{Orientation, WindowPosition, AccelGroup, HeaderBarBuilder};
 use crate::highlighters::{HighlighterListView, SEARCH_ID, Highlighter, RULE_TYPE_HIGHLIGHT};
 use crate::log_text_view::{LogTextView};
-use crate::model::{LogViewMsg, LogViewToolbarMsg, LogTextViewData, LogTextViewMsg};
+use crate::model::{LogViewMsg, LogViewToolbarMsg, LogTextViewData, LogTextViewMsg, UNNAMED_RULE};
 use std::rc::Rc;
 use uuid::Uuid;
 use crate::util::{SortedListCompare, CompareResult};
@@ -113,7 +113,7 @@ impl LogView {
                         }
 
                         if left.name != right.name {
-                            let default = String::from("Unamed rule");
+                            let default = String::from(UNNAMED_RULE);
                             let name = right.name.as_ref().unwrap_or(&default);
                             self.toolbar.update_rule(&iter, &name);
                         }
@@ -200,14 +200,18 @@ impl LogView {
 
     pub fn show_dlg(&mut self) {
         if self.highlighters_dlg.is_none() {
-            let dlg = gtk::Dialog::new();
-            dlg.set_position(WindowPosition::CenterOnParent);
-            dlg.set_default_size(400, 200);
-            let header_bar = HeaderBar::new();
-            header_bar.set_show_close_button(true);
-            header_bar.set_title(Some("Highlighters"));
+            let header_bar = HeaderBarBuilder::new()
+                .show_close_button(true)
+                .title("Highlighters")
+                .build();
+
+            let dlg = gtk::DialogBuilder::new()
+                .window_position(WindowPosition::CenterOnParent)
+                .default_width(400)
+                .default_height(200)
+                .modal(true)
+                .build();
             dlg.set_titlebar(Some(&header_bar));
-            dlg.set_modal(true);
 
             let content = dlg.get_content_area();
             content.add(self.highlighters_view.view());
@@ -218,6 +222,7 @@ impl LogView {
                 dlg.hide();
                 gtk::Inhibit(true)
             });
+
             self.highlighters_dlg = Some(dlg);
         }
 

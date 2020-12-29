@@ -123,15 +123,17 @@ impl HighlighterListView {
                 .and_then(|id| id.get::<bool>().ok())
                 .and_then(|id|id).unwrap();
 
-            let type_selector = gtk::ComboBoxText::new();
+            let type_selector = gtk::ComboBoxTextBuilder::new()
+                .sensitive(!is_system)
+                .build();
+
             type_selector.append(Some(RULE_TYPE_HIGHLIGHT), "Highlight");
             type_selector.append(Some(RULE_TYPE_EXCLUDE), "Exclude");
             // type_selector.append(Some("include"), "Include");
             item.bind_property(RULE_TYPE, &type_selector, "active-id")
                 .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
-            type_selector.set_sensitive(!is_system);
-            container.add(&type_selector);
 
+            container.add(&type_selector);
 
             let name_entry = gtk::Entry::new();
             item.bind_property(NAME_PROP, &name_entry, "text")
@@ -161,13 +163,16 @@ impl HighlighterListView {
                 .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
             container.add(&color_button);
 
-            let btn = gtk::Button::from_icon_name(Some("edit-delete-symbolic"), IconSize::Button); {
-                btn.set_relief(ReliefStyle::None);
+            let btn = gtk::ButtonBuilder::new()
+                .image(&gtk::Image::from_icon_name(Some("edit-delete-symbolic"), IconSize::Button))
+                .sensitive(!is_system)
+                .relief(ReliefStyle::None)
+                .build();
+            {
                 let tx = tx2.clone();
                 btn.connect_clicked(move |_| {
                     tx(HighlighterViewMsg::DeleteRule(id.clone()));
                 });
-                btn.set_sensitive(!is_system);
                 container.add(&btn);
             }
 
