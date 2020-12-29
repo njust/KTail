@@ -22,8 +22,7 @@ jobs:
     - name: Refresh env
       run: refreshenv
     - name: Install gtk prerequsites
-      run: mingw64.exe pacman --noconfirm -S mingw-w64-x86_64-toolchain base-devel mingw-w64-x86_64-gtk3 mingw-w64-x86_64-gtksourceview3
-      working-directory: C:\\msys2\\
+      run: c:\msys2\mingw64.exe pacman --noconfirm -S mingw-w64-x86_64-toolchain base-devel mingw-w64-x86_64-gtk3 mingw-w64-x86_64-gtksourceview3 | Out-String
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
