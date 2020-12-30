@@ -28,8 +28,6 @@ jobs:
           mingw-w64-x86_64-gtksourceview3
     - name: Test
       run: msys2 -c 'where pacman'
-    - name: Dir files
-      run: dir D:\\a\\_temp\\msys\\ /s
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
