@@ -4,6 +4,8 @@ mkdir ktail\config\
 copy target\release\ktail.exe .\ktail
 copy config\log4rs.yaml .\ktail\config
 
+xcopy assets\icons .\ktail\share\icons /E /I
+
 pushd ktail
 mkdir libs
 $root = "D:\a\_temp\msys\msys64\mingw64"
@@ -21,24 +23,5 @@ copy $root\lib\gdk-pixbuf-2.0\2.10.0\loaders.cache .\lib\gdk-pixbuf-2.0\2.10.0
 
 mkdir share\glib-2.0\schemas
 copy $root\share\glib-2.0\schemas\* .\share\glib-2.0\schemas\
-
-mkdir share\icons\Adwaita
-copy $root\share\icons\Adwaita\icon-theme.cache .\share\icons\Adwaita
-copy $root\share\icons\Adwaita\index.theme .\share\icons\Adwaita
-
-mkdir share\icons\Adwaita\scalable\actions
-copy $root\share\icons\Adwaita\scalable\actions\* .\share\icons\Adwaita\scalable\actions
-
-mkdir share\icons\Adwaita\16x16\devices
-copy $root\share\icons\Adwaita\16x16\devices\* .\share\icons\Adwaita\16x16\devices
-
-mkdir share\icons\Adwaita\16x16\places
-copy $root\share\icons\Adwaita\16x16\places\* .\share\icons\Adwaita\16x16\places
-
-mkdir share\icons\Adwaita\scalable\ui
-copy $root\share\icons\Adwaita\scalable\ui\* .\share\icons\Adwaita\scalable\ui
-
-mkdir share\icons\Adwaita\16x16\mimetypes
-copy $root\share\icons\Adwaita\16x16\mimetypes\* .\share\icons\Adwaita\16x16\mimetypes
 
 popd

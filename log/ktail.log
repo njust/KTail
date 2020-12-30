@@ -1,0 +1,1151 @@
+2020-09-12T14:19:36.176154067+02:00 - Logger initialized
+2020-09-12T14:23:51.351287288+02:00 - Logger initialized
+2020-09-12T14:25:02.918294532+02:00 - Logger initialized
+2020-09-12T14:26:09.823116735+02:00 - Exit stdout reader thread with error: Custom { kind: TimedOut, error: "timed out" }
+2020-09-13T23:13:13.059836618+02:00 - Logger initialized
+2020-09-13T23:14:35.521021301+02:00 - Exit stdout reader thread with error: Custom { kind: TimedOut, error: "timed out" }
+2020-09-13T23:22:40.557400969+02:00 - Logger initialized
+2020-09-13T23:30:48.165818090+02:00 - Logger initialized
+2020-09-13T23:33:57.864493440+02:00 - Logger initialized
+2020-09-14T21:10:04.359635350+02:00 - Logger initialized
+2020-09-14T21:11:16.616092779+02:00 - Logger initialized
+2020-09-14T21:24:03.638816848+02:00 - Logger initialized
+2020-09-14T21:25:06.915697834+02:00 - Logger initialized
+2020-09-14T21:39:10.884571020+02:00 - Logger initialized
+2020-09-14T21:39:52.953656788+02:00 - Logger initialized
+2020-09-14T22:05:41.648232960+02:00 - Logger initialized
+2020-09-14T22:15:45.513902191+02:00 - Logger initialized
+2020-09-14T22:28:49.574668317+02:00 - Logger initialized
+2020-09-14T22:31:17.994757839+02:00 - Logger initialized
+2020-09-14T22:32:43.785016896+02:00 - Logger initialized
+2020-09-14T22:33:10.222896732+02:00 - Logger initialized
+2020-09-14T22:39:22.963292343+02:00 - Logger initialized
+2020-09-14T23:18:06.647580225+02:00 - Logger initialized
+2020-09-14T23:21:34.729923171+02:00 - Logger initialized
+2020-09-14T23:25:02.121008629+02:00 - Logger initialized
+2020-09-14T23:30:51.188065551+02:00 - Logger initialized
+2020-09-19T14:55:39.710948865+02:00 - Logger initialized
+2020-09-19T15:01:31.066288736+02:00 - Logger initialized
+2020-09-19T15:12:07.026377326+02:00 - Logger initialized
+2020-09-19T15:19:24.332124465+02:00 - Logger initialized
+2020-09-19T15:21:45.728030407+02:00 - Logger initialized
+2020-09-19T15:23:02.303457913+02:00 - Logger initialized
+2020-09-19T15:47:57.295257994+02:00 - Logger initialized
+2020-09-19T15:54:19.172288899+02:00 - Logger initialized
+2020-09-19T15:54:50.592036778+02:00 - Logger initialized
+2020-09-19T16:17:42.536688280+02:00 - Logger initialized
+2020-09-19T16:19:17.668160787+02:00 - Logger initialized
+2020-09-19T22:41:22.907782488+02:00 - Logger initialized
+2020-09-19T22:42:17.110257475+02:00 - Logger initialized
+2020-09-19T22:50:52.188399241+02:00 - Logger initialized
+2020-09-19T22:51:32.254531687+02:00 - Logger initialized
+2020-09-19T22:55:25.397352085+02:00 - Logger initialized
+2020-09-19T22:56:04.666059572+02:00 - Logger initialized
+2020-09-19T22:58:31.118117182+02:00 - Logger initialized
+2020-09-19T23:06:24.353100130+02:00 - Logger initialized
+2020-09-19T23:07:51.082883627+02:00 - Logger initialized
+2020-09-19T23:09:13.848513186+02:00 - Logger initialized
+2020-09-19T23:10:43.001294455+02:00 - Logger initialized
+2020-09-19T23:11:35.274566031+02:00 - Logger initialized
+2020-09-19T23:12:18.040270791+02:00 - Logger initialized
+2020-09-19T23:17:20.731626676+02:00 - Logger initialized
+2020-09-20T00:08:57.965795133+02:00 - Logger initialized
+2020-09-20T00:12:36.782151829+02:00 - Logger initialized
+2020-09-20T20:59:43.994490460+02:00 - Logger initialized
+2020-09-20T21:12:37.724556017+02:00 - Logger initialized
+2020-09-20T21:13:33.203685227+02:00 - Logger initialized
+2020-09-20T21:15:04.593655616+02:00 - Logger initialized
+2020-09-20T21:25:46.655674283+02:00 - Logger initialized
+2020-09-20T21:29:48.737074223+02:00 - Logger initialized
+2020-09-20T21:46:25.006089218+02:00 - Logger initialized
+2020-09-20T21:47:28.295735915+02:00 - Logger initialized
+2020-09-20T21:51:14.127082448+02:00 - Logger initialized
+2020-09-20T21:53:40.825142656+02:00 - Logger initialized
+2020-09-20T21:55:07.252969787+02:00 - Logger initialized
+2020-09-20T21:58:21.756146627+02:00 - Logger initialized
+2020-09-20T22:00:53.317747884+02:00 - Logger initialized
+2020-09-20T22:02:02.999354222+02:00 - Logger initialized
+2020-09-20T22:10:50.632831992+02:00 - Logger initialized
+2020-09-20T22:11:46.966909172+02:00 - Logger initialized
+2020-09-20T22:16:34.928143038+02:00 - Logger initialized
+2020-09-20T22:17:44.924274374+02:00 - Logger initialized
+2020-09-20T22:18:57.139520795+02:00 - Logger initialized
+2020-09-20T22:20:48.346125344+02:00 - Logger initialized
+2020-09-20T22:22:54.681275656+02:00 - Logger initialized
+2020-09-20T22:32:56.084507028+02:00 - Logger initialized
+2020-09-20T22:58:36.315945652+02:00 - Logger initialized
+2020-09-21T18:26:10.463885884+02:00 - Logger initialized
+2020-09-28T20:52:52.402480784+02:00 - Logger initialized
+2020-09-28T20:52:57.563660354+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T20:57:57.920333928+02:00 - Logger initialized
+2020-09-28T20:58:03.355589467+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:01:40.240253014+02:00 - Logger initialized
+2020-09-28T21:01:48.219117325+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:04:29.064451115+02:00 - Logger initialized
+2020-09-28T21:04:33.981093952+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:07:01.355018488+02:00 - Logger initialized
+2020-09-28T21:07:09.676688589+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:17:10.154933590+02:00 - Logger initialized
+2020-09-28T21:17:14.923408329+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:17:44.653533013+02:00 - Logger initialized
+2020-09-28T21:20:09.580319450+02:00 - Logger initialized
+2020-09-28T21:23:45.920021975+02:00 - Logger initialized
+2020-09-28T21:25:32.496459371+02:00 - Logger initialized
+2020-09-28T21:25:42.629794469+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:29:36.637797945+02:00 - Logger initialized
+2020-09-28T21:29:45.195668638+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:31:20.983639842+02:00 - Logger initialized
+2020-09-28T21:31:25.661094767+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:34:13.337256252+02:00 - Logger initialized
+2020-09-28T21:34:18.066215302+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:42:24.878507927+02:00 - Logger initialized
+2020-09-28T21:42:35.841038012+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:48:32.720561011+02:00 - Logger initialized
+2020-09-28T21:48:38.811534824+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:52:31.137072055+02:00 - Logger initialized
+2020-09-28T21:52:35.464836872+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:53:15.459513966+02:00 - Logger initialized
+2020-09-28T21:53:21.157467493+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:56:16.750979695+02:00 - Logger initialized
+2020-09-28T21:56:21.194056520+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T21:57:16.884605619+02:00 - Logger initialized
+2020-09-28T21:57:22.164718249+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T22:09:38.503159092+02:00 - Logger initialized
+2020-09-28T22:09:43.186874636+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T22:10:36.611823112+02:00 - Logger initialized
+2020-09-28T22:23:58.254308711+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T22:25:06.930277071+02:00 - Logger initialized
+2020-09-28T22:25:14.881062734+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T22:35:03.111686302+02:00 - Logger initialized
+2020-09-28T22:35:08.230940281+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T22:53:27.358499271+02:00 - Logger initialized
+2020-09-28T22:53:32.605326743+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T22:55:16.442894358+02:00 - Logger initialized
+2020-09-28T22:55:22.053982424+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T22:57:16.710162716+02:00 - Logger initialized
+2020-09-28T22:57:25.529430550+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T22:59:57.394055407+02:00 - Logger initialized
+2020-09-28T23:00:07.879556491+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T23:00:41.409857425+02:00 - Logger initialized
+2020-09-28T23:00:49.338769113+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T23:01:45.409080435+02:00 - Logger initialized
+2020-09-28T23:01:54.406845907+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T23:08:13.882958382+02:00 - Logger initialized
+2020-09-28T23:08:18.523409057+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T23:24:26.330180178+02:00 - Logger initialized
+2020-09-28T23:24:38.321889451+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-28T23:33:30.931122513+02:00 - Logger initialized
+2020-09-28T23:33:51.582036221+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-29T22:13:45.174329435+02:00 - Logger initialized
+2020-09-29T22:13:49.947169152+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-29T22:17:03.059488664+02:00 - Logger initialized
+2020-09-29T22:17:09.634049990+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-29T22:24:51.202908441+02:00 - Logger initialized
+2020-09-29T22:24:55.888483157+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-29T22:46:09.638611611+02:00 - Logger initialized
+2020-09-29T22:46:14.824277679+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-29T22:48:16.371709886+02:00 - Logger initialized
+2020-09-29T22:48:21.968058527+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-29T22:49:36.573928812+02:00 - Logger initialized
+2020-09-29T22:49:42.651633365+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-29T22:56:38.160379296+02:00 - Logger initialized
+2020-09-29T22:56:42.746116134+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-29T23:04:08.449682588+02:00 - Logger initialized
+2020-09-29T23:04:15.202299508+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-29T23:14:41.772337309+02:00 - Logger initialized
+2020-09-29T23:14:47.648023023+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-09-30T10:16:36.843703736+02:00 - Logger initialized
+2020-09-30T10:16:42.236515323+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:06:07.813722607+02:00 - Logger initialized
+2020-10-03T11:07:44.335575619+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:08:10.240914683+02:00 - Logger initialized
+2020-10-03T11:08:17.233817277+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:09:59.542201112+02:00 - Logger initialized
+2020-10-03T11:10:04.756879438+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:11:22.916794509+02:00 - Logger initialized
+2020-10-03T11:11:27.218256183+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:25:24.890086237+02:00 - Logger initialized
+2020-10-03T11:25:30.622740364+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:28:51.099004057+02:00 - Logger initialized
+2020-10-03T11:28:57.078483835+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:30:13.820015866+02:00 - Logger initialized
+2020-10-03T11:30:17.845590450+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:35:12.065662189+02:00 - Logger initialized
+2020-10-03T11:35:16.915628540+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:36:08.218617354+02:00 - Logger initialized
+2020-10-03T11:36:12.179495109+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:38:53.503076711+02:00 - Logger initialized
+2020-10-03T11:38:59.299429492+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:40:44.270001596+02:00 - Logger initialized
+2020-10-03T11:40:50.492957325+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:45:19.236898753+02:00 - Logger initialized
+2020-10-03T11:45:25.838518943+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T11:47:08.204929360+02:00 - Could not send exit trigger: Trigger(Some(Sender { shared: (Weak) }))
+2020-10-03T11:47:08.205703010+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' ended
+2020-10-03T11:47:08.205881154+02:00 - Could not send kubernetes re init msg: channel closed
+2020-10-03T11:47:12.457119561+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:22:43.697584783+02:00 - Logger initialized
+2020-10-03T13:23:07.093528541+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:24:28.545738544+02:00 - Logger initialized
+2020-10-03T13:24:48.324542744+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:28:09.741511966+02:00 - Logger initialized
+2020-10-03T13:28:16.429946603+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-03T13:28:26.459776066+02:00 - Could not send exit trigger: Trigger(Some(Sender { shared: (Weak) }))
+2020-10-03T13:28:26.460571147+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' ended
+2020-10-03T13:28:26.460904973+02:00 - Could not send kubernetes re init msg: channel closed
+2020-10-03T13:28:31.682786048+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:34:02.464475426+02:00 - Logger initialized
+2020-10-03T13:34:11.952601278+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:35:50.209255120+02:00 - Logger initialized
+2020-10-03T13:35:56.975033805+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:38:14.191624186+02:00 - Logger initialized
+2020-10-03T13:38:19.571435391+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:39:08.667329458+02:00 - Logger initialized
+2020-10-03T13:39:13.588499344+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:40:26.160024335+02:00 - Logger initialized
+2020-10-03T13:40:30.954301165+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:43:09.107162807+02:00 - Logger initialized
+2020-10-03T13:43:13.942182004+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:44:35.222895392+02:00 - Logger initialized
+2020-10-03T13:44:39.570016072+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T13:57:51.665551360+02:00 - Logger initialized
+2020-10-03T14:02:09.525097102+02:00 - Logger initialized
+2020-10-03T15:03:26.041303586+02:00 - Logger initialized
+2020-10-03T15:03:51.875489006+02:00 - Logger initialized
+2020-10-03T15:04:01.496311756+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T15:10:26.539012204+02:00 - Logger initialized
+2020-10-03T15:10:32.159559458+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-03T15:11:17.250797594+02:00 - Logger initialized
+2020-10-03T15:11:22.041654999+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T20:59:30.137408751+02:00 - Logger initialized
+2020-10-08T21:11:14.182085711+02:00 - Logger initialized
+2020-10-08T21:11:41.474554663+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T21:11:41.482688493+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' started
+2020-10-08T21:11:43.370320949+02:00 - Drop workbench
+2020-10-08T21:11:43.498774349+02:00 - File watcher stopped
+2020-10-08T21:11:43.499472784+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' ended
+2020-10-08T21:11:44.314009567+02:00 - Drop workbench
+2020-10-08T21:11:44.502335634+02:00 - File watcher stopped
+2020-10-08T21:11:44.503150701+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' ended
+2020-10-08T21:13:32.021809266+02:00 - Logger initialized
+2020-10-08T21:13:41.915480109+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T21:13:41.969527100+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' started
+2020-10-08T21:13:41.985354788+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T21:13:44.686381704+02:00 - Drop workbench
+2020-10-08T21:13:44.946219649+02:00 - File watcher stopped
+2020-10-08T21:13:44.947068514+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' ended
+2020-10-08T21:13:48.371573411+02:00 - Drop workbench
+2020-10-08T21:13:48.518495998+02:00 - File watcher stopped
+2020-10-08T21:13:48.519196482+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' ended
+2020-10-08T21:13:49.617339382+02:00 - Drop workbench
+2020-10-08T21:13:49.996803078+02:00 - File watcher stopped
+2020-10-08T21:13:49.997453135+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' ended
+2020-10-08T21:59:21.951733484+02:00 - Logger initialized
+2020-10-08T22:03:26.122589481+02:00 - Logger initialized
+2020-10-08T22:03:31.924236672+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:03:31.947921050+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-08T22:03:31.963140296+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' started
+2020-10-08T22:03:43.033394352+02:00 - Drop workbench
+2020-10-08T22:03:43.036932550+02:00 - Drop workbench
+2020-10-08T22:03:43.038694082+02:00 - Drop workbench
+2020-10-08T22:04:23.038598134+02:00 - Logger initialized
+2020-10-08T22:04:32.688063900+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T22:04:32.703494621+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:04:32.753938085+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-08T22:04:37.986089335+02:00 - Drop workbench
+2020-10-08T22:04:37.989493544+02:00 - Drop workbench
+2020-10-08T22:04:37.992168208+02:00 - Drop workbench
+2020-10-08T22:05:07.518352368+02:00 - Logger initialized
+2020-10-08T22:05:13.846456379+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T22:05:13.889526047+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-08T22:05:13.905083384+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:05:19.833973853+02:00 - Drop workbench
+2020-10-08T22:05:19.837582646+02:00 - Drop workbench
+2020-10-08T22:05:19.840402809+02:00 - Drop workbench
+2020-10-08T22:08:43.987078540+02:00 - Logger initialized
+2020-10-08T22:08:51.013735407+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T22:08:51.056382181+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-08T22:08:51.072483468+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:10:34.117640107+02:00 - Logger initialized
+2020-10-08T22:10:41.308737705+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T22:10:41.332645870+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:10:41.377640110+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' started
+2020-10-08T22:10:41.395323952+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-08T22:11:26.942766480+02:00 - Drop workbench
+2020-10-08T22:11:26.944499075+02:00 - Drop workbench
+2020-10-08T22:11:26.945673980+02:00 - Drop workbench
+2020-10-08T22:11:26.946863872+02:00 - Drop workbench
+2020-10-08T22:12:19.225758875+02:00 - Logger initialized
+2020-10-08T22:12:26.342283886+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T22:12:26.358475318+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' started
+2020-10-08T22:12:51.272589087+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:12:51.375308807+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' started
+2020-10-08T22:12:55.937497312+02:00 - Drop workbench
+2020-10-08T22:12:56.399975565+02:00 - File watcher stopped
+2020-10-08T22:12:56.401644091+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' ended
+2020-10-08T22:12:57.264494531+02:00 - Drop workbench
+2020-10-08T22:12:57.403397145+02:00 - File watcher stopped
+2020-10-08T22:12:57.404076607+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' ended
+2020-10-08T22:12:58.655813823+02:00 - Drop workbench
+2020-10-08T22:12:58.808972840+02:00 - File watcher stopped
+2020-10-08T22:12:58.809650691+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' ended
+2020-10-08T22:12:59.602652491+02:00 - Drop workbench
+2020-10-08T22:12:59.900870741+02:00 - File watcher stopped
+2020-10-08T22:12:59.902266698+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' ended
+2020-10-08T22:13:15.440972686+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T22:13:15.521469488+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-08T22:13:15.540879827+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:13:15.662499213+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' started
+2020-10-08T22:13:15.663578490+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' started
+2020-10-08T22:13:17.181584844+02:00 - Drop workbench
+2020-10-08T22:13:17.466890603+02:00 - File watcher stopped
+2020-10-08T22:13:17.467637668+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' ended
+2020-10-08T22:13:19.334842627+02:00 - Drop workbench
+2020-10-08T22:13:19.564508018+02:00 - File watcher stopped
+2020-10-08T22:13:19.565261898+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' ended
+2020-10-08T22:13:24.146883729+02:00 - Drop workbench
+2020-10-08T22:13:24.550748293+02:00 - File watcher stopped
+2020-10-08T22:13:24.551362930+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' ended
+2020-10-08T22:13:27.551350130+02:00 - Drop workbench
+2020-10-08T22:13:27.699264327+02:00 - File watcher stopped
+2020-10-08T22:13:27.699922257+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' ended
+2020-10-08T22:13:28.358323545+02:00 - Drop workbench
+2020-10-08T22:13:28.702753528+02:00 - File watcher stopped
+2020-10-08T22:13:28.703601455+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' ended
+2020-10-08T22:15:03.167911614+02:00 - Logger initialized
+2020-10-08T22:15:12.362379071+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-08T22:15:12.372197044+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T22:15:12.388518270+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' started
+2020-10-08T22:15:12.388778200+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:15:20.647827842+02:00 - Drop workbench
+2020-10-08T22:15:20.910582981+02:00 - File watcher stopped
+2020-10-08T22:15:20.911364153+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' ended
+2020-10-08T22:15:32.530248615+02:00 - Drop workbench
+2020-10-08T22:15:32.952903121+02:00 - File watcher stopped
+2020-10-08T22:15:32.953657698+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' ended
+2020-10-08T22:15:50.460013043+02:00 - File watcher stopped
+2020-10-08T22:15:50.460921559+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' ended
+2020-10-08T22:15:50.462090579+02:00 - Drop workbench
+2020-10-08T22:16:11.031492092+02:00 - File watcher stopped
+2020-10-08T22:16:11.031707987+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' ended
+2020-10-08T22:16:11.032288262+02:00 - Drop workbench
+2020-10-08T22:16:25.681317550+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T22:16:25.728347761+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-08T22:16:25.740360944+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' started
+2020-10-08T22:16:25.742836792+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:16:25.743667769+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' started
+2020-10-08T22:16:33.589187456+02:00 - Drop workbench
+2020-10-08T22:16:33.727568257+02:00 - File watcher stopped
+2020-10-08T22:16:33.728308735+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' ended
+2020-10-08T22:16:52.475577933+02:00 - Drop workbench
+2020-10-08T22:16:52.818034612+02:00 - File watcher stopped
+2020-10-08T22:16:52.818734841+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' ended
+2020-10-08T22:16:56.524308769+02:00 - Drop workbench
+2020-10-08T22:16:56.831779895+02:00 - File watcher stopped
+2020-10-08T22:16:56.832450502+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' ended
+2020-10-08T22:20:45.916342308+02:00 - Drop workbench
+2020-10-08T22:20:46.414940285+02:00 - File watcher stopped
+2020-10-08T22:20:46.415313832+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' ended
+2020-10-08T22:20:52.943681648+02:00 - Drop workbench
+2020-10-08T22:20:53.443613574+02:00 - File watcher stopped
+2020-10-08T22:20:53.443795595+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' ended
+2020-10-08T22:21:04.361953117+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T22:21:04.405468639+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-08T22:21:04.427883304+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:21:04.428883099+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' started
+2020-10-08T22:21:04.441796037+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' started
+2020-10-08T22:21:43.009844805+02:00 - Drop workbench
+2020-10-08T22:21:43.510761946+02:00 - File watcher stopped
+2020-10-08T22:21:43.511504132+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' ended
+2020-10-08T22:22:04.223938330+02:00 - Drop workbench
+2020-10-08T22:22:04.724277973+02:00 - File watcher stopped
+2020-10-08T22:22:04.724528225+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' ended
+2020-10-08T22:23:21.353361252+02:00 - Logger initialized
+2020-10-08T22:23:28.388327831+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-08T22:23:28.438218321+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-08T22:23:28.451624479+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' started
+2020-10-08T22:23:28.468896383+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-08T22:23:28.470033568+02:00 - Stream for pod 'njust-web-d6d8b9dd7-65hgw' started
+2020-10-08T22:23:58.608845899+02:00 - Drop workbench
+2020-10-08T22:23:58.609827996+02:00 - Drop workbench
+2020-10-08T22:23:58.610664057+02:00 - Drop workbench
+2020-10-08T22:23:58.611406270+02:00 - Drop workbench
+2020-10-08T22:23:58.612124188+02:00 - Drop workbench
+2020-10-10T21:10:05.002824653+02:00 - Logger initialized
+2020-10-10T21:10:14.147864113+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-10T21:12:36.146675041+02:00 - Drop workbench
+2020-10-10T22:11:35.906296741+02:00 - Logger initialized
+2020-10-10T22:11:45.443499684+02:00 - Drop workbench
+2020-10-10T22:11:45.567125399+02:00 - File watcher stopped
+2020-10-10T22:12:33.284060641+02:00 - Logger initialized
+2020-10-10T22:21:34.465431814+02:00 - Logger initialized
+2020-10-10T23:06:41.959324109+02:00 - Logger initialized
+2020-10-10T23:06:49.869209731+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-11T13:46:46.135054768+02:00 - Logger initialized
+2020-10-11T13:46:52.623516172+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-12T23:10:31.753512466+02:00 - Logger initialized
+2020-10-12T23:12:12.175006472+02:00 - Logger initialized
+2020-10-12T23:12:18.794904576+02:00 - Stream for pod 'njust-web-7bdc9d97f5-99gtl' started
+2020-10-12T23:12:18.795316242+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-12T23:12:18.795791474+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-12T23:12:18.796639991+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' started
+2020-10-12T23:12:22.312482881+02:00 - File watcher stopped
+2020-10-12T23:12:22.313302991+02:00 - Stream for pod 'njust-web-7bdc9d97f5-99gtl' ended
+2020-10-12T23:12:24.315273725+02:00 - File watcher stopped
+2020-10-12T23:12:24.316155253+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' ended
+2020-10-12T23:12:25.324700228+02:00 - File watcher stopped
+2020-10-12T23:12:25.325711965+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' ended
+2020-10-12T23:12:25.819911893+02:00 - File watcher stopped
+2020-10-12T23:12:25.820842874+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' ended
+2020-10-12T23:12:33.740548808+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' started
+2020-10-12T23:12:33.760952461+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' started
+2020-10-12T23:12:33.762136773+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' started
+2020-10-12T23:12:33.798448354+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' started
+2020-10-12T23:12:33.798966+02:00 - Stream for pod 'njust-web-7bdc9d97f5-99gtl' started
+2020-10-12T23:12:38.322555218+02:00 - File watcher stopped
+2020-10-12T23:12:38.323622057+02:00 - Stream for pod 'njust-web-7bdc9d97f5-99gtl' ended
+2020-10-12T23:12:40.310881751+02:00 - File watcher stopped
+2020-10-12T23:12:40.311887441+02:00 - Stream for pod 'nginx-ingress-controller-9ddbbb8dd-mpmvl' ended
+2020-10-12T23:12:41.319705324+02:00 - File watcher stopped
+2020-10-12T23:12:41.320582334+02:00 - Stream for pod 'tagesmutter-69c7857545-gpp77' ended
+2020-10-12T23:12:42.267552628+02:00 - File watcher stopped
+2020-10-12T23:12:42.268433200+02:00 - Stream for pod 'mqtt-d69c9dd6c-5v6k8' ended
+2020-10-12T23:12:42.789595448+02:00 - File watcher stopped
+2020-10-12T23:12:42.790362749+02:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtn95' ended
+2020-10-14T20:26:52.966824368+02:00 - Logger initialized
+2020-10-14T20:26:52.967272957+02:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-10-14T21:05:01.227505327+02:00 - Logger initialized
+2020-10-14T21:05:01.227574881+02:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-10-14T21:06:06.622147704+02:00 - Logger initialized
+2020-10-14T21:06:06.622233251+02:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-10-14T21:06:49.409800125+02:00 - Logger initialized
+2020-10-14T21:06:49.409891237+02:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-10-14T21:08:22.678970580+02:00 - Logger initialized
+2020-10-14T21:08:22.679042757+02:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-10-17T12:03:45.198266272+02:00 - Logger initialized
+2020-10-17T12:03:45.198682317+02:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-10-17T12:03:55.806863847+02:00 - Stream for pod 'njust-web-5f8d857459-58sx8' started
+2020-10-17T12:04:26.989642721+02:00 - Stream for pod 'njust-web-5f8d857459-58sx8' ended
+2020-10-17T12:04:28.081063177+02:00 - Stream for pod 'njust-web-7cbdb8d49f-jfhmj' started
+2020-10-17T12:05:09.588716301+02:00 - Stream for pod 'njust-web-7cbdb8d49f-jfhmj' ended
+2020-10-17T12:05:10.697616268+02:00 - Stream for pod 'njust-web-67f685974d-67z98' started
+2020-10-17T12:06:13.689138324+02:00 - Stream for pod 'njust-web-67f685974d-67z98' ended
+2020-10-17T12:06:14.767422595+02:00 - Stream for pod 'njust-web-75467455f8-r2fqd' started
+2020-10-17T12:06:14.876179264+02:00 - Stream for pod 'njust-web-75467455f8-sjqgl' started
+2020-10-17T12:06:22.979577187+02:00 - File watcher stopped
+2020-10-17T12:06:22.979644249+02:00 - Stream for pod 'njust-web-75467455f8-sjqgl' ended
+2020-10-17T12:06:22.980110924+02:00 - Stream for pod 'njust-web-75467455f8-r2fqd' ended
+2020-10-17T12:06:27.869586152+02:00 - Stream for pod 'njust-web-75467455f8-r2fqd' started
+2020-10-17T12:06:28.006690441+02:00 - Stream for pod 'njust-web-75467455f8-sjqgl' started
+2020-10-17T12:07:55.092269634+02:00 - Logger initialized
+2020-10-17T12:07:55.092424683+02:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-10-17T12:08:03.330655114+02:00 - Stream for pod 'njust-web-75467455f8-r2fqd' started
+2020-10-17T12:08:03.450290+02:00 - Stream for pod 'njust-web-75467455f8-sjqgl' started
+2020-10-17T12:08:14.930607663+02:00 - Stream for pod 'njust-web-75467455f8-r2fqd' ended
+2020-10-17T12:08:15.683927586+02:00 - Stream for pod 'njust-web-77956566fb-8d4lm' started
+2020-10-17T12:08:17.132996579+02:00 - Stream for pod 'njust-web-77956566fb-jk9ft' started
+2020-10-17T12:08:18.001496618+02:00 - Stream for pod 'njust-web-75467455f8-sjqgl' ended
+2020-11-09T11:42:20.336082724+01:00 - Logger initialized
+2020-11-09T11:42:20.336507053+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T11:42:26.099431658+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T11:44:24.268444189+01:00 - Logger initialized
+2020-11-09T11:44:24.268512660+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T11:44:29.933498586+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T11:47:30.415811199+01:00 - Logger initialized
+2020-11-09T11:47:30.415874662+01:00 - Started with args: Args { inner: ["target/debug/ktail"] }
+2020-11-09T11:47:36.415004348+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T11:51:22.036680642+01:00 - Logger initialized
+2020-11-09T11:51:22.036767039+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T11:51:29.082779113+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T11:53:05.036390178+01:00 - Logger initialized
+2020-11-09T11:53:05.036455424+01:00 - Started with args: Args { inner: ["target/debug/ktail"] }
+2020-11-09T11:53:41.421628490+01:00 - Logger initialized
+2020-11-09T11:53:41.421712627+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T11:53:48.129852332+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T11:54:46.235476527+01:00 - Logger initialized
+2020-11-09T11:54:46.235545598+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T11:54:52.202301837+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T11:58:38.325471935+01:00 - Logger initialized
+2020-11-09T11:58:38.325535950+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T11:58:43.958100838+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T14:22:10.106234065+01:00 - Logger initialized
+2020-11-09T14:22:10.106354197+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T14:22:16.614686187+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T14:24:02.710840965+01:00 - Logger initialized
+2020-11-09T14:24:02.710913405+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T14:24:07.625129388+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T14:24:29.867791729+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-09T14:27:23.285762102+01:00 - Logger initialized
+2020-11-09T14:27:23.285835335+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T14:27:30.358181986+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T14:27:39.060931549+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-09T14:30:04.916398913+01:00 - Logger initialized
+2020-11-09T14:30:04.916508612+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T14:30:20.857088131+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T14:35:26.532046709+01:00 - Logger initialized
+2020-11-09T14:35:26.532117367+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T14:35:35.113662919+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T14:37:07.097427409+01:00 - Logger initialized
+2020-11-09T14:37:07.097497236+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T14:37:12.955878129+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T14:40:44.839092015+01:00 - Logger initialized
+2020-11-09T14:40:44.839180663+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T14:40:50.897282243+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T14:56:19.419445931+01:00 - Logger initialized
+2020-11-09T14:56:19.419508473+01:00 - Started with args: Args { inner: ["target/debug/ktail"] }
+2020-11-09T14:59:25.420725742+01:00 - Logger initialized
+2020-11-09T14:59:25.420796228+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T14:59:30.454448572+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T15:00:09.107033589+01:00 - Logger initialized
+2020-11-09T15:00:09.107104464+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T15:00:14.763687460+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T15:00:49.621020889+01:00 - Logger initialized
+2020-11-09T15:00:49.621104070+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T15:00:54.208025486+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T15:45:55.387319628+01:00 - Logger initialized
+2020-11-09T15:45:55.387390575+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T15:46:01.092378503+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T15:48:46.172879432+01:00 - Logger initialized
+2020-11-09T15:48:46.172954479+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T15:48:51.636442446+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T16:07:22.054545868+01:00 - Logger initialized
+2020-11-09T16:07:22.054618676+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T16:07:29.090833408+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T16:11:06.542629037+01:00 - Logger initialized
+2020-11-09T16:11:06.542702980+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T16:11:11.591232697+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T16:13:52.383898077+01:00 - Logger initialized
+2020-11-09T16:13:52.383980558+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T16:13:59.470232985+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T16:19:37.780432151+01:00 - Logger initialized
+2020-11-09T16:19:37.780520858+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T16:21:19.606702153+01:00 - Logger initialized
+2020-11-09T16:21:19.606795506+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T16:22:18.866122992+01:00 - Logger initialized
+2020-11-09T16:22:18.866198645+01:00 - Started with args: Args { inner: ["target/debug/ktail"] }
+2020-11-09T16:22:24.089855240+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T16:25:01.877317082+01:00 - Logger initialized
+2020-11-09T16:25:01.877413711+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-09T16:25:09.492545400+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T16:27:15.928561441+01:00 - File watcher stopped
+2020-11-09T16:27:15.929453360+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-09T16:27:46.265840926+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-09T16:37:54.102669469+01:00 - Logger initialized
+2020-11-09T16:37:54.102742095+01:00 - Started with args: Args { inner: ["target/debug/ktail"] }
+2020-11-09T16:37:59.784807433+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T11:25:26.960497842+01:00 - Logger initialized
+2020-11-10T11:25:26.960886231+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T11:25:39.539280414+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T11:44:19.008460169+01:00 - Logger initialized
+2020-11-10T11:44:19.008530674+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T11:44:25.042218555+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T11:54:00.045180128+01:00 - Logger initialized
+2020-11-10T11:54:00.045263388+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T11:54:05.814045325+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T11:54:54.231189929+01:00 - Logger initialized
+2020-11-10T11:54:54.231268626+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T11:54:58.764127126+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T11:58:57.563062321+01:00 - Logger initialized
+2020-11-10T11:58:57.563132186+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T11:59:02.896418790+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:00:49.342455568+01:00 - Logger initialized
+2020-11-10T12:00:49.342525265+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:01:11.118631663+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:19:43.678386584+01:00 - Logger initialized
+2020-11-10T12:19:43.678481795+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:20:29.852119013+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:21:45.148405846+01:00 - Logger initialized
+2020-11-10T12:21:45.148475751+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:21:50.710824369+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:24:47.907919841+01:00 - Logger initialized
+2020-11-10T12:24:47.908019732+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:24:53.326884352+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:26:31.721100249+01:00 - Logger initialized
+2020-11-10T12:26:31.721169160+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:26:36.750288528+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:32:54.705970306+01:00 - Logger initialized
+2020-11-10T12:32:54.706046821+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:33:04.985956324+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:34:31.746926978+01:00 - Logger initialized
+2020-11-10T12:34:31.747000096+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:34:36.147356964+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:35:10.116637454+01:00 - Logger initialized
+2020-11-10T12:35:10.116706125+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:35:15.426448438+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:37:49.712926140+01:00 - Logger initialized
+2020-11-10T12:37:49.713000458+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:37:55.844233687+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:46:04.324918435+01:00 - Logger initialized
+2020-11-10T12:46:04.324994466+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:46:09.081358510+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:51:49.940286531+01:00 - Logger initialized
+2020-11-10T12:51:49.940352624+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:51:54.906144099+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:52:48.629861001+01:00 - Logger initialized
+2020-11-10T12:52:48.629930520+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:52:53.734126512+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T12:57:01.186511731+01:00 - Logger initialized
+2020-11-10T12:57:01.186593372+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T12:57:07.254565808+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T13:39:48.061190407+01:00 - Logger initialized
+2020-11-10T13:39:48.061259729+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T13:39:53.952208324+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T13:42:24.591138205+01:00 - Logger initialized
+2020-11-10T13:42:24.591234643+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T13:42:31.842782710+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T13:44:32.142617633+01:00 - Logger initialized
+2020-11-10T13:44:32.142702877+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T13:45:04.617603455+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T13:50:55.004972255+01:00 - Logger initialized
+2020-11-10T13:50:55.005042605+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T13:51:00.564883891+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T13:55:47.280779857+01:00 - Logger initialized
+2020-11-10T13:55:47.280852264+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T13:55:52.030016056+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T14:00:08.211267914+01:00 - Logger initialized
+2020-11-10T14:00:08.211342755+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:00:14.337096885+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T14:09:11.534979816+01:00 - Logger initialized
+2020-11-10T14:09:11.535066841+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:09:16.859851074+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T14:26:15.271556800+01:00 - Logger initialized
+2020-11-10T14:26:15.271623773+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:26:20.388621268+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T14:28:56.292070001+01:00 - Logger initialized
+2020-11-10T14:28:56.292140841+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:29:02.699396087+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T14:30:47.719864150+01:00 - Logger initialized
+2020-11-10T14:30:47.719934532+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:30:53.823843008+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T14:32:51.570310949+01:00 - Logger initialized
+2020-11-10T14:32:51.570379925+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:33:28.135712189+01:00 - Logger initialized
+2020-11-10T14:33:28.135781408+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:33:33.185961941+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T14:34:51.885056265+01:00 - Logger initialized
+2020-11-10T14:34:51.885132560+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:34:57.363243722+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T14:54:16.323120157+01:00 - Logger initialized
+2020-11-10T14:54:16.323255043+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:54:22.249829612+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T14:56:37.190407880+01:00 - Logger initialized
+2020-11-10T14:56:37.190493838+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:56:43.548412702+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T14:59:41.771310966+01:00 - Logger initialized
+2020-11-10T14:59:41.771377002+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T14:59:47.706515122+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T15:00:48.723209552+01:00 - Logger initialized
+2020-11-10T15:00:48.723278852+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T15:00:53.628786200+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T15:01:47.865585344+01:00 - Logger initialized
+2020-11-10T15:01:47.865653726+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T15:01:57.666519117+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T15:03:47.406888685+01:00 - Logger initialized
+2020-11-10T15:03:47.406958102+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T15:03:52.256775072+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T15:13:44.529854950+01:00 - Logger initialized
+2020-11-10T15:13:44.529923025+01:00 - Started with args: Args { inner: ["target/debug/ktail"] }
+2020-11-10T15:13:50.101342825+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T15:16:07.186937576+01:00 - Logger initialized
+2020-11-10T15:16:07.187008915+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T15:16:14.205639778+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T15:18:19.202924642+01:00 - Logger initialized
+2020-11-10T15:18:19.202997676+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T15:18:24.057641357+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T15:40:33.487701521+01:00 - Logger initialized
+2020-11-10T15:40:33.487789027+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T15:40:38.838949870+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T15:46:18.811052471+01:00 - Logger initialized
+2020-11-10T15:46:18.811160736+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T15:46:30.839906149+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-10T15:59:28.367936366+01:00 - Logger initialized
+2020-11-10T15:59:28.368010461+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T15:59:54.599409592+01:00 - Logger initialized
+2020-11-10T15:59:54.599478241+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-10T16:00:01.185378806+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T19:28:19.989366855+01:00 - Logger initialized
+2020-11-11T19:28:19.989743921+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T19:28:30.948249120+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T19:29:00.033741702+01:00 - File watcher stopped
+2020-11-11T19:29:00.034283919+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-11T22:40:43.578596507+01:00 - Logger initialized
+2020-11-11T22:40:43.578665777+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T22:45:35.692139380+01:00 - Logger initialized
+2020-11-11T22:45:35.692207542+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T22:51:05.270161996+01:00 - Logger initialized
+2020-11-11T22:51:05.270243055+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T22:52:53.864926388+01:00 - Logger initialized
+2020-11-11T22:52:53.865002089+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T22:53:19.679046212+01:00 - Logger initialized
+2020-11-11T22:53:19.679111008+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:01:13.224684192+01:00 - Logger initialized
+2020-11-11T23:01:13.224751761+01:00 - Started with args: Args { inner: ["target/debug/ktail"] }
+2020-11-11T23:02:37.091194882+01:00 - Logger initialized
+2020-11-11T23:02:37.091268362+01:00 - Started with args: Args { inner: ["target/debug/ktail"] }
+2020-11-11T23:07:31.251480474+01:00 - Logger initialized
+2020-11-11T23:07:31.251572028+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:10:45.607235815+01:00 - Logger initialized
+2020-11-11T23:10:45.607316840+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:15:00.511127437+01:00 - Logger initialized
+2020-11-11T23:15:00.511203241+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:15:35.942435914+01:00 - Logger initialized
+2020-11-11T23:15:35.942513941+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:19:12.772178125+01:00 - Logger initialized
+2020-11-11T23:19:12.772252719+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:20:09.774845216+01:00 - Logger initialized
+2020-11-11T23:20:09.774933932+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:20:42.604016670+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:23:48.634733996+01:00 - File watcher stopped
+2020-11-11T23:23:48.635255701+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-11T23:23:56.702506684+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:24:04.886910434+01:00 - File watcher stopped
+2020-11-11T23:24:04.887717303+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-11T23:24:52.238441793+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:45:34.491115607+01:00 - Logger initialized
+2020-11-11T23:45:34.491195652+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:45:41.576981246+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:46:32.402344502+01:00 - Logger initialized
+2020-11-11T23:46:32.402449663+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:46:38.211830776+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:47:23.372063423+01:00 - Logger initialized
+2020-11-11T23:47:23.372143421+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:47:28.693286790+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:47:34.720539852+01:00 - File watcher stopped
+2020-11-11T23:47:34.721483153+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-11T23:47:39.364168796+01:00 - Stream for pod 'njust-web-7b4b8bb7c4-ffs8k' started
+2020-11-11T23:47:46.418980251+01:00 - File watcher stopped
+2020-11-11T23:47:46.419932354+01:00 - Stream for pod 'njust-web-7b4b8bb7c4-ffs8k' ended
+2020-11-11T23:47:53.965413791+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:47:56.479299170+01:00 - File watcher stopped
+2020-11-11T23:47:56.480192458+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-11T23:48:37.245451511+01:00 - Logger initialized
+2020-11-11T23:48:37.245539992+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-11T23:48:47.587060918+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:48:50.102757445+01:00 - File watcher stopped
+2020-11-11T23:48:50.103433151+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-11T23:48:59.618206529+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:49:02.805967193+01:00 - File watcher stopped
+2020-11-11T23:49:02.806826840+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-11T23:49:08.441998527+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:49:18.932572350+01:00 - Stream for pod 'njust-web-7b4b8bb7c4-ffs8k' started
+2020-11-11T23:49:20.452539108+01:00 - File watcher stopped
+2020-11-11T23:49:20.453830494+01:00 - Stream for pod 'njust-web-7b4b8bb7c4-ffs8k' ended
+2020-11-11T23:49:26.070279602+01:00 - Stream for pod 'njust-web-7b4b8bb7c4-ffs8k' started
+2020-11-11T23:49:26.095483153+01:00 - Stream for pod 'tagesmutter-69c7857545-88nzv' started
+2020-11-11T23:49:28.100650941+01:00 - File watcher stopped
+2020-11-11T23:49:28.101486088+01:00 - Stream for pod 'tagesmutter-69c7857545-88nzv' ended
+2020-11-11T23:49:28.587312326+01:00 - File watcher stopped
+2020-11-11T23:49:28.587741805+01:00 - Stream for pod 'njust-web-7b4b8bb7c4-ffs8k' ended
+2020-11-11T23:49:31.166639201+01:00 - File watcher stopped
+2020-11-11T23:49:31.167880476+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-11T23:49:35.224374049+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:49:40.396760011+01:00 - File watcher stopped
+2020-11-11T23:49:40.397674334+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-11T23:49:44.244392211+01:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtc5j' started
+2020-11-11T23:49:55.277203387+01:00 - File watcher stopped
+2020-11-11T23:49:55.278105485+01:00 - Stream for pod 'nginx-ingress-default-backend-5b967cf596-jtc5j' ended
+2020-11-11T23:49:59.022777176+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:50:26.771101119+01:00 - File watcher stopped
+2020-11-11T23:50:26.772174013+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-11T23:51:17.892997682+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' started
+2020-11-11T23:52:35.754968038+01:00 - File watcher stopped
+2020-11-11T23:52:35.755986905+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-6h8m9' ended
+2020-11-16T22:07:37.310598882+01:00 - Logger initialized
+2020-11-16T22:07:37.311187688+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-29T19:40:09.626545967+01:00 - Logger initialized
+2020-11-29T19:40:09.627004236+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-11-29T19:49:42.625097209+01:00 - Stream for pod 'njust-web-59cbb96cbf-82w29' started
+2020-12-05T17:36:03.037450428+01:00 - Logger initialized
+2020-12-05T17:36:03.037757706+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-05T17:36:13.592673887+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-05T17:36:39.354996405+01:00 - File watcher stopped
+2020-12-05T17:36:39.355969621+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' ended
+2020-12-05T17:36:59.651908709+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-05T17:37:09.746376376+01:00 - File watcher stopped
+2020-12-05T17:37:09.747302540+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' ended
+2020-12-05T23:32:24.827581854+01:00 - Logger initialized
+2020-12-05T23:32:24.827685+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-05T23:32:31.757510127+01:00 - Stream for pod 'mqtt-d69c9dd6c-6gncg' started
+2020-12-05T23:32:33.762092010+01:00 - File watcher stopped
+2020-12-05T23:32:33.762915885+01:00 - Stream for pod 'mqtt-d69c9dd6c-6gncg' ended
+2020-12-05T23:33:00.452658410+01:00 - Stream for pod 'mqtt-d69c9dd6c-6gncg' started
+2020-12-05T23:44:28.315725515+01:00 - File watcher stopped
+2020-12-05T23:44:28.316902475+01:00 - Stream for pod 'mqtt-d69c9dd6c-6gncg' ended
+2020-12-05T23:45:19.168896196+01:00 - Stream for pod 'njust-web-64ddf7bb69-94cl8' started
+2020-12-05T23:46:11.309578125+01:00 - File watcher stopped
+2020-12-05T23:46:11.310355217+01:00 - Stream for pod 'njust-web-64ddf7bb69-94cl8' ended
+2020-12-05T23:48:41.702834832+01:00 - Stream for pod 'tagesmutter-69c7857545-tbc76' started
+2020-12-05T23:48:41.704346094+01:00 - Stream for pod 'njust-web-64ddf7bb69-94cl8' started
+2020-12-05T23:48:53.758296530+01:00 - File watcher stopped
+2020-12-05T23:48:53.758947067+01:00 - Stream for pod 'njust-web-64ddf7bb69-94cl8' ended
+2020-12-05T23:48:57.744534727+01:00 - File watcher stopped
+2020-12-05T23:48:57.745107541+01:00 - Stream for pod 'tagesmutter-69c7857545-tbc76' ended
+2020-12-05T23:50:37.742028786+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-05T23:52:53.626298059+01:00 - File watcher stopped
+2020-12-05T23:52:53.626917724+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' ended
+2020-12-05T23:53:00.630845061+01:00 - Stream for pod 'tagesmutter-69c7857545-tbc76' started
+2020-12-05T23:53:00.631130262+01:00 - Stream for pod 'njust-web-64ddf7bb69-94cl8' started
+2020-12-05T23:53:04.154111037+01:00 - File watcher stopped
+2020-12-05T23:53:04.154527509+01:00 - Stream for pod 'njust-web-64ddf7bb69-94cl8' ended
+2020-12-05T23:53:04.642401212+01:00 - File watcher stopped
+2020-12-05T23:53:04.643207461+01:00 - Stream for pod 'tagesmutter-69c7857545-tbc76' ended
+2020-12-06T12:17:24.352307839+01:00 - Logger initialized
+2020-12-06T12:17:24.352793528+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:17:33.475775655+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T12:23:28.236325630+01:00 - Logger initialized
+2020-12-06T12:23:28.236402448+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:23:35.218799664+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T12:30:59.999456581+01:00 - Logger initialized
+2020-12-06T12:30:59.999545920+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:31:05.833491827+01:00 - Stream for pod 'njust-web-64ddf7bb69-94cl8' started
+2020-12-06T12:31:09.844735207+01:00 - File watcher stopped
+2020-12-06T12:31:09.845563909+01:00 - Stream for pod 'njust-web-64ddf7bb69-94cl8' ended
+2020-12-06T12:31:17.687054376+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T12:32:36.350860250+01:00 - Logger initialized
+2020-12-06T12:32:36.350952059+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:32:48.837188034+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T12:36:27.669749974+01:00 - Logger initialized
+2020-12-06T12:36:27.669818384+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:36:34.495977885+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T12:38:20.485989202+01:00 - Logger initialized
+2020-12-06T12:38:20.486061792+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:38:28.905395805+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T12:41:26.782509052+01:00 - Logger initialized
+2020-12-06T12:41:26.782580369+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:41:33.558377132+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T12:48:48.866688869+01:00 - Logger initialized
+2020-12-06T12:48:48.866765466+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:48:56.466713437+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T12:49:31.605161138+01:00 - Logger initialized
+2020-12-06T12:49:31.605239155+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:49:47.202688199+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T12:50:51.956505723+01:00 - Logger initialized
+2020-12-06T12:50:51.956589307+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:51:01.725367414+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T12:56:34.288964367+01:00 - Logger initialized
+2020-12-06T12:56:34.289047714+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T12:56:45.889821580+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T13:02:14.808015714+01:00 - Logger initialized
+2020-12-06T13:02:14.808089461+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T13:02:20.083556754+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T13:05:07.343161767+01:00 - Logger initialized
+2020-12-06T13:05:07.343250770+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T13:05:16.836337136+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T13:06:53.345793236+01:00 - Logger initialized
+2020-12-06T13:06:53.345865126+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T13:07:00.073514368+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T13:09:12.726169924+01:00 - Logger initialized
+2020-12-06T13:09:12.726245788+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T13:09:20.700804200+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T13:10:46.811820872+01:00 - Logger initialized
+2020-12-06T13:10:46.811906704+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T13:10:53.343818596+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T17:31:25.025538901+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' ended
+2020-12-06T17:31:26.455514943+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T18:11:41.475091518+01:00 - Logger initialized
+2020-12-06T18:11:41.475156716+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T18:11:46.661473047+01:00 - Stream for pod 'njust-web-64ddf7bb69-94cl8' started
+2020-12-06T18:11:49.168689006+01:00 - File watcher stopped
+2020-12-06T18:11:49.169481798+01:00 - Stream for pod 'njust-web-64ddf7bb69-94cl8' ended
+2020-12-06T18:11:53.950297774+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T20:23:02.533959443+01:00 - Logger initialized
+2020-12-06T20:23:02.534065381+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T20:23:18.183789500+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T20:29:43.158323919+01:00 - Logger initialized
+2020-12-06T20:29:43.158466066+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T20:30:03.768569683+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T20:31:14.881754756+01:00 - Logger initialized
+2020-12-06T20:31:14.881878175+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T20:33:03.446347531+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T20:44:09.836240909+01:00 - Logger initialized
+2020-12-06T20:44:09.836325554+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T20:44:21.940845825+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T20:55:43.977593754+01:00 - Logger initialized
+2020-12-06T20:55:43.977705116+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T20:55:53.520945075+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:03:18.464514306+01:00 - Logger initialized
+2020-12-06T21:03:18.464598298+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:03:35.784575027+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:05:20.905492488+01:00 - Logger initialized
+2020-12-06T21:05:20.905623015+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:05:59.129813132+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:13:06.272813830+01:00 - Logger initialized
+2020-12-06T21:13:06.272924541+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:13:16.697930887+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:26:53.915874965+01:00 - Logger initialized
+2020-12-06T21:26:53.915964526+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:27:00.959602855+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:28:51.021789415+01:00 - Logger initialized
+2020-12-06T21:28:51.021857888+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:28:57.444242041+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:29:39.642183915+01:00 - Logger initialized
+2020-12-06T21:29:39.642264999+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:29:46.682662007+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:38:04.886553548+01:00 - Logger initialized
+2020-12-06T21:38:04.886628594+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:38:33.941905931+01:00 - Logger initialized
+2020-12-06T21:38:33.941973552+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:38:41.998657207+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:40:20.460163791+01:00 - Logger initialized
+2020-12-06T21:40:20.460233376+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:40:26.849330333+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:42:57.321204370+01:00 - Logger initialized
+2020-12-06T21:42:57.321278293+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:43:03.975762109+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:45:30.640348486+01:00 - Logger initialized
+2020-12-06T21:45:30.640417860+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:45:44.198039253+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:46:26.916007419+01:00 - Logger initialized
+2020-12-06T21:46:26.916079854+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:46:32.485210307+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:47:43.096422515+01:00 - Logger initialized
+2020-12-06T21:47:43.096493868+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:47:51.177552106+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:48:40.797689737+01:00 - Logger initialized
+2020-12-06T21:48:40.797762961+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:48:48.251084358+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:50:21.785181215+01:00 - Logger initialized
+2020-12-06T21:50:21.785272226+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:50:28.016074752+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:52:25.829794667+01:00 - Logger initialized
+2020-12-06T21:52:25.829870504+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:52:32.304055843+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T21:54:37.796656302+01:00 - Logger initialized
+2020-12-06T21:54:37.796733741+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T21:54:43.217677160+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:02:34.493882616+01:00 - Logger initialized
+2020-12-06T22:02:34.493969751+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:02:39.263424291+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:02:43.290969065+01:00 - File watcher stopped
+2020-12-06T22:02:43.291825751+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' ended
+2020-12-06T22:02:50.693818045+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:03:25.963289252+01:00 - Logger initialized
+2020-12-06T22:03:25.963388959+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:03:45.892241867+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:06:35.710519650+01:00 - Logger initialized
+2020-12-06T22:06:35.710607185+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:06:41.294362188+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:07:21.009703556+01:00 - Logger initialized
+2020-12-06T22:07:21.009816845+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:07:29.636603824+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:08:25.199988833+01:00 - Logger initialized
+2020-12-06T22:08:25.200073583+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:08:30.286250511+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:08:40.838705001+01:00 - File watcher stopped
+2020-12-06T22:08:40.839632384+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' ended
+2020-12-06T22:08:46.367444895+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:11:31.626316611+01:00 - Logger initialized
+2020-12-06T22:11:31.626386804+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:11:42.995834201+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:16:17.618775475+01:00 - Logger initialized
+2020-12-06T22:16:17.618889361+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:16:28.464631939+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:17:29.628986407+01:00 - Logger initialized
+2020-12-06T22:17:29.629057660+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:17:38.773874226+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:20:35.235844894+01:00 - Logger initialized
+2020-12-06T22:20:35.235962526+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:20:45.796182248+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:49:56.322335963+01:00 - Logger initialized
+2020-12-06T22:49:56.322401410+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:52:05.722344847+01:00 - Logger initialized
+2020-12-06T22:52:05.722417960+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:52:27.017421590+01:00 - Logger initialized
+2020-12-06T22:52:27.017507726+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-06T22:52:34.250379668+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-06T22:52:37.785622184+01:00 - File watcher stopped
+2020-12-06T22:52:37.786469127+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' ended
+2020-12-06T22:52:43.462882007+01:00 - Stream for pod 'nginx-ingress-controller-f7b789587-cvwxw' started
+2020-12-07T21:56:01.666091070+01:00 - Logger initialized
+2020-12-07T21:56:01.666552932+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-07T21:56:04.173526743+01:00 - Could not get pods: clusters: invalid type: unit value, expected a sequence at line 2 column 11
+2020-12-07T21:56:11.525365687+01:00 - Could not get pods: clusters: invalid type: unit value, expected a sequence at line 2 column 11
+2020-12-07T21:56:37.565334466+01:00 - File watcher stopped
+2020-12-08T17:48:24.498734430+01:00 - Logger initialized
+2020-12-08T17:48:24.499152740+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T21:58:57.888069974+01:00 - Logger initialized
+2020-12-08T21:58:57.888378514+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T22:02:49.935584604+01:00 - Logger initialized
+2020-12-08T22:02:49.935650851+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T22:04:57.358287649+01:00 - Logger initialized
+2020-12-08T22:04:57.358405778+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T22:10:46.490614400+01:00 - Logger initialized
+2020-12-08T22:10:46.490704281+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T22:10:54.780638432+01:00 - Stream for pod 'des-service-5955b49857-rzq6r' started
+2020-12-08T22:11:11.857126686+01:00 - File watcher stopped
+2020-12-08T22:11:11.858081822+01:00 - Stream for pod 'des-service-5955b49857-rzq6r' ended
+2020-12-08T22:12:06.669575184+01:00 - Stream for pod 'des-service-5955b49857-rzq6r' started
+2020-12-08T22:12:14.216391790+01:00 - File watcher stopped
+2020-12-08T22:12:14.217406843+01:00 - Stream for pod 'des-service-5955b49857-rzq6r' ended
+2020-12-08T22:12:32.958419835+01:00 - Stream for pod 'dev-service-5958887c4f-7clbg' started
+2020-12-08T22:12:40.479842339+01:00 - File watcher stopped
+2020-12-08T22:12:40.480718440+01:00 - Stream for pod 'dev-service-5958887c4f-7clbg' ended
+2020-12-08T22:19:13.834848669+01:00 - Logger initialized
+2020-12-08T22:19:13.834932110+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T22:19:19.895324390+01:00 - Stream for pod 'des-service-5955b49857-rzq6r' started
+2020-12-08T22:46:20.888401143+01:00 - Logger initialized
+2020-12-08T22:46:20.888497294+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T22:46:45.776321720+01:00 - Logger initialized
+2020-12-08T22:46:45.776404772+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T22:46:51.698868316+01:00 - Stream for pod 'des-service-5955b49857-rzq6r' started
+2020-12-08T22:48:17.590448644+01:00 - Logger initialized
+2020-12-08T22:48:17.590522017+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T22:48:23.510443640+01:00 - Stream for pod 'des-service-5955b49857-rzq6r' started
+2020-12-08T22:53:03.030738521+01:00 - Logger initialized
+2020-12-08T22:53:03.030809373+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T22:53:07.913945122+01:00 - Stream for pod 'des-service-5955b49857-rzq6r' started
+2020-12-08T22:54:33.690139984+01:00 - Logger initialized
+2020-12-08T22:54:33.690215449+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-08T22:54:41.053101255+01:00 - Stream for pod 'des-service-5955b49857-rzq6r' started
+2020-12-09T21:11:36.781020611+01:00 - Logger initialized
+2020-12-09T21:11:36.781102673+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-09T21:30:37.615991391+01:00 - Logger initialized
+2020-12-09T21:30:37.616058509+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-09T21:30:49.444803538+01:00 - Stream for pod 'des-service-7d95fdc99b-cmzhn' started
+2020-12-09T21:31:01.486290623+01:00 - File watcher stopped
+2020-12-09T21:31:01.487241849+01:00 - Stream for pod 'des-service-7d95fdc99b-cmzhn' ended
+2020-12-09T21:31:05.882764792+01:00 - Stream for pod 'des-service-7d95fdc99b-cmzhn' started
+2020-12-09T21:31:47.214332269+01:00 - Logger initialized
+2020-12-09T21:31:47.214404143+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-09T21:31:54.705250365+01:00 - Stream for pod 'des-service-7d95fdc99b-cmzhn' started
+2020-12-09T21:36:02.015856587+01:00 - Logger initialized
+2020-12-09T21:36:02.015933179+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-09T21:36:24.297206521+01:00 - Stream for pod 'des-service-7d95fdc99b-cmzhn' started
+2020-12-09T21:59:37.779050545+01:00 - Logger initialized
+2020-12-09T21:59:37.779112638+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-09T21:59:46.771448003+01:00 - Stream for pod 'des-service-7d95fdc99b-cmzhn' started
+2020-12-09T22:01:24.434051158+01:00 - Logger initialized
+2020-12-09T22:01:24.434130331+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-09T22:01:33.996487925+01:00 - Stream for pod 'des-service-7d95fdc99b-cmzhn' started
+2020-12-29T00:44:15.317384372+01:00 - Logger initialized
+2020-12-29T00:44:15.317815980+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T00:44:21.306846695+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T11:30:34.549078486+01:00 - Logger initialized
+2020-12-29T11:30:34.549553955+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T11:30:43.437188851+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T11:32:10.396681017+01:00 - Logger initialized
+2020-12-29T11:32:10.396754280+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T11:32:15.841050072+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T11:32:20.887905969+01:00 - File watcher stopped
+2020-12-29T11:32:20.888789021+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T11:43:57.738650497+01:00 - Logger initialized
+2020-12-29T11:43:57.738717964+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T11:44:04.576318527+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T11:46:27.008214209+01:00 - Logger initialized
+2020-12-29T11:46:27.008276757+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T11:46:33.650390451+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T11:48:38.856302145+01:00 - Logger initialized
+2020-12-29T11:48:38.856365145+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T11:48:44.240995154+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T11:49:24.374176579+01:00 - Logger initialized
+2020-12-29T11:49:24.374237234+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T11:49:30.011954281+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T11:51:04.464439370+01:00 - Logger initialized
+2020-12-29T11:51:04.464559663+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T11:51:12.804844782+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T11:52:18.431806881+01:00 - Logger initialized
+2020-12-29T11:52:18.431871023+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T12:03:47.020049589+01:00 - Logger initialized
+2020-12-29T12:03:47.020120754+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T12:03:56.455203111+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T12:04:42.445548737+01:00 - Logger initialized
+2020-12-29T12:04:42.445612024+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T12:04:49.021469871+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T12:05:29.157800419+01:00 - File watcher stopped
+2020-12-29T12:05:29.158822545+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T12:05:36.966671756+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T12:16:35.038755557+01:00 - Logger initialized
+2020-12-29T12:16:35.038841206+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T12:32:24.871764141+01:00 - Logger initialized
+2020-12-29T12:32:24.872232395+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T14:13:24.205849840+01:00 - Logger initialized
+2020-12-29T14:13:24.205918498+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T14:13:47.063640873+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T14:15:07.313044646+01:00 - File watcher stopped
+2020-12-29T14:15:07.314263407+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T14:20:02.606295920+01:00 - Logger initialized
+2020-12-29T14:20:02.606360223+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T14:20:09.012952203+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T14:27:11.091887547+01:00 - Logger initialized
+2020-12-29T14:27:11.091953554+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T14:31:17.827866873+01:00 - Logger initialized
+2020-12-29T14:31:17.827943154+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T14:46:35.427841959+01:00 - Logger initialized
+2020-12-29T14:46:35.427925600+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T14:46:59.595744510+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T14:47:08.655597801+01:00 - File watcher stopped
+2020-12-29T14:47:08.656610911+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T14:47:35.210922612+01:00 - Logger initialized
+2020-12-29T14:47:35.210986654+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T14:48:00.931671440+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T14:48:48.026006980+01:00 - Logger initialized
+2020-12-29T14:48:48.026074083+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T14:48:56.920779627+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T14:49:14.678919917+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T14:49:20.348881165+01:00 - File watcher stopped
+2020-12-29T14:49:20.349976692+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T14:49:21.083388841+01:00 - File watcher stopped
+2020-12-29T14:49:21.084370946+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T14:49:30.488874400+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T14:54:18.812465859+01:00 - Logger initialized
+2020-12-29T14:54:18.812531733+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T14:54:35.976929642+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T14:56:02.419186298+01:00 - File watcher stopped
+2020-12-29T14:56:02.420382642+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T14:56:21.906777171+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T14:57:05.389227302+01:00 - File watcher stopped
+2020-12-29T14:57:08.699998327+01:00 - File watcher stopped
+2020-12-29T14:57:08.701079971+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T14:57:15.399768112+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T15:01:37.661282595+01:00 - Logger initialized
+2020-12-29T15:01:37.661353917+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T15:02:41.945113149+01:00 - Logger initialized
+2020-12-29T15:02:41.945190557+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T15:03:20.698869448+01:00 - Logger initialized
+2020-12-29T15:03:20.698933619+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T15:04:02.404406845+01:00 - Logger initialized
+2020-12-29T15:04:02.404470134+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T15:04:15.792227765+01:00 - Stream for pod 'aux-service-5d5b75ddc8-cd8vg' started
+2020-12-29T15:04:15.795795070+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T15:04:16.119751259+01:00 - Stream for pod 'aux-service-5d5b75ddc8-r65qp' started
+2020-12-29T15:41:45.317877910+01:00 - Logger initialized
+2020-12-29T15:41:45.317961623+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T15:41:57.575756043+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T15:42:05.633272387+01:00 - File watcher stopped
+2020-12-29T15:42:05.634114337+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T15:44:37.162377468+01:00 - Logger initialized
+2020-12-29T15:44:37.162445253+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T15:45:06.247779472+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T15:46:49.471485122+01:00 - Logger initialized
+2020-12-29T15:46:49.471562381+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T15:47:19.627150237+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T15:47:33.692522968+01:00 - File watcher stopped
+2020-12-29T15:47:33.693282248+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T15:47:47.104424360+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T15:48:30.676879483+01:00 - Logger initialized
+2020-12-29T15:48:30.676948759+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T15:49:36.000404015+01:00 - Logger initialized
+2020-12-29T15:49:36.000466627+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T15:50:22.017419686+01:00 - Logger initialized
+2020-12-29T15:50:22.017483373+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T16:15:28.078780448+01:00 - Logger initialized
+2020-12-29T16:15:28.078847779+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T16:16:54.773499486+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T16:17:06.058085719+01:00 - File watcher stopped
+2020-12-29T16:17:06.058995413+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T16:17:11.891230901+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T18:07:05.016911425+01:00 - Logger initialized
+2020-12-29T18:07:05.016983352+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T18:07:42.935994966+01:00 - Logger initialized
+2020-12-29T18:07:42.936057228+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }
+2020-12-29T18:08:10.594646288+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T18:08:28.469736909+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T18:08:43.584244163+01:00 - File watcher stopped
+2020-12-29T18:08:43.585157591+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T18:08:44.774727418+01:00 - File watcher stopped
+2020-12-29T18:08:44.775630416+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T18:08:58.974249788+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' started
+2020-12-29T18:10:59.436843878+01:00 - File watcher stopped
+2020-12-29T18:10:59.437720926+01:00 - Stream for pod 'des-service-7bf747c5f8-kgngg' ended
+2020-12-29T18:23:36.692691173+01:00 - Logger initialized
+2020-12-29T18:23:36.692754826+01:00 - Started with args: Args { inner: ["/home/nico/dev/projects/ktail/target/debug/ktail"] }

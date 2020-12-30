@@ -26,7 +26,7 @@ jobs:
           base-devel
           mingw-w64-x86_64-gtk3
           mingw-w64-x86_64-gtksourceview3
-    - name: Test
+    - name: Pacman location
       run: msys2 -c 'where pacman'
     - name: List files
       run: Get-ChildItem -Recurse "D:\a\_temp\msys\msys64\mingw64"
@@ -40,10 +40,6 @@ jobs:
         key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
       run: msys2 -c 'cargo build --release --verbose'
-    - uses: actions/upload-artifact@v2
-      with:
-        name: kTail
-        path: target/release/ktail.exe
     - name: Generate Bundle
       run: .\generate-bundle.ps1
       shell: powershell
