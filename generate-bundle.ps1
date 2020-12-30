@@ -2,7 +2,7 @@
 mkdir ktail\config\
 
 copy target\release\ktail.exe .\ktail
-copy config\log4rs.yaml .\config
+copy config\log4rs.yaml .\ktail\config
 
 pushd ktail
 mkdir libs
