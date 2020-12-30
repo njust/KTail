@@ -1,5 +1,8 @@
 # rm -r ktail
 mkdir ktail
+
+copy target\release\ktail.exe .\ktail
+
 pushd ktail
 mkdir libs
 $root = "D:\a\_temp\msys\msys64\mingw64"
@@ -10,8 +13,6 @@ foreach($lib in $libs)
 {
     copy $libSrc\$lib .\
 }
-
-copy target\release\ktail.exe .\
 
 mkdir config
 copy config\log4rs.yaml .\config
