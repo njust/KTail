@@ -26,8 +26,8 @@ mkdir share\icons\Adwaita
 copy $root\share\icons\Adwaita\icon-theme.cache .\share\icons\Adwaita
 copy $root\share\icons\Adwaita\index.theme .\share\icons\Adwaita
 
-mkdir share\icons\Adwaita\16x16\actions
-copy $root\share\icons\Adwaita\16x16\actions\* .\share\icons\Adwaita\16x16\actions
+mkdir share\icons\Adwaita\scalable\actions
+copy $root\share\icons\Adwaita\scalable\actions\* .\share\icons\Adwaita\scalable\actions
 
 mkdir share\icons\Adwaita\16x16\devices
 copy $root\share\icons\Adwaita\16x16\devices\* .\share\icons\Adwaita\16x16\devices
@@ -35,8 +35,8 @@ copy $root\share\icons\Adwaita\16x16\devices\* .\share\icons\Adwaita\16x16\devic
 mkdir share\icons\Adwaita\16x16\places
 copy $root\share\icons\Adwaita\16x16\places\* .\share\icons\Adwaita\16x16\places
 
-mkdir share\icons\Adwaita\16x16\ui
-copy $root\share\icons\Adwaita\16x16\ui\* .\share\icons\Adwaita\16x16\ui
+mkdir share\icons\Adwaita\scalable\ui
+copy $root\share\icons\Adwaita\scalable\ui\* .\share\icons\Adwaita\scalable\ui
 
 mkdir share\icons\Adwaita\16x16\mimetypes
 copy $root\share\icons\Adwaita\16x16\mimetypes\* .\share\icons\Adwaita\16x16\mimetypes
