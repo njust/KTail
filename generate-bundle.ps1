@@ -22,4 +22,20 @@ copy $root\lib\gdk-pixbuf-2.0\2.10.0\loaders.cache .\lib\gdk-pixbuf-2.0\2.10.0
 mkdir share\glib-2.0\schemas
 copy $root\share\glib-2.0\schemas\* .\share\glib-2.0\schemas\
 
+mkdir share\icons\Adwaita\16x16\
+copy $root\share\icons\icon-theme.cache .\share\icons\Adwaita\
+copy $root\share\icons\index.theme .\share\icons\Adwaita\index.theme
+
+mkdir share\icons\Adwaita\16x16\actions
+copy $root\share\icons\Adwaita\16x16\actions\* .\share\icons\Adwaita\16x16\actions
+
+mkdir share\icons\Adwaita\16x16\devices
+copy $root\share\icons\Adwaita\16x16\devices\* .\share\icons\Adwaita\16x16\devices
+
+mkdir share\icons\Adwaita\16x16\places
+copy $root\share\icons\Adwaita\16x16\places\* .\share\icons\Adwaita\16x16\places
+
+mkdir share\icons\Adwaita\16x16\ui
+copy $root\share\icons\Adwaita\16x16\ui\* .\share\icons\Adwaita\16x16\ui
+
 popd
