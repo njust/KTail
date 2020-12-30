@@ -15,8 +15,6 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Test
-      run: msys2 -c 'where pacman'
     - name: Install Windows GNU Toolchain
       run: rustup default stable-x86_64-pc-windows-gnu
     - uses: msys2/setup-msys2@v2
@@ -28,6 +26,8 @@ jobs:
           base-devel
           mingw-w64-x86_64-gtk3
           mingw-w64-x86_64-gtksourceview3
+    - name: Test
+      run: msys2 -c 'where pacman'
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
