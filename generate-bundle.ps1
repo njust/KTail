@@ -19,7 +19,7 @@ mkdir lib\gdk-pixbuf-2.0\2.10.0\loaders
 copy $root\lib\gdk-pixbuf-2.0\2.10.0\loaders\libpixbufloader-png.dll .\lib\gdk-pixbuf-2.0\2.10.0\loaders
 copy $root\lib\gdk-pixbuf-2.0\2.10.0\loaders.cache .\lib\gdk-pixbuf-2.0\2.10.0
 
-mkdir share\glib-2.0\
-xcopy /E /I $root\share\glib-2.0\schemas\ .\share\glib-2.0\
+mkdir share\glib-2.0\schemas
+copy $root\share\glib-2.0\schemas\* .\share\glib-2.0\schemas\
 
 popd
