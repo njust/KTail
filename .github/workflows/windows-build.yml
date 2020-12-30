@@ -43,7 +43,8 @@ jobs:
         name: kTail
         path: target/release/ktail.exe
     - name: Generate Bundle
-      run: generate-bundle.ps1
+      run: .\generate-bundle.ps1
+      shell: powershell
     - uses: actions/upload-artifact@v2
       with:
         name: bundle
