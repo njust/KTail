@@ -1,7 +1,8 @@
 # rm -r ktail
-mkdir ktail
+mkdir ktail\config\
 
 copy target\release\ktail.exe .\ktail
+copy config\log4rs.yaml .\config
 
 pushd ktail
 mkdir libs
@@ -13,9 +14,6 @@ foreach($lib in $libs)
 {
     copy $libSrc\$lib .\
 }
-
-mkdir config
-copy config\log4rs.yaml .\config
 
 mkdir lib\gdk-pixbuf-2.0\2.10.0\loaders
 copy $root\lib\gdk-pixbuf-2.0\2.10.0\loaders\libpixbufloader-png.dll .\lib\gdk-pixbuf-2.0\2.10.0\loaders
