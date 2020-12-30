@@ -45,5 +45,5 @@ jobs:
       shell: powershell
     - uses: actions/upload-artifact@v2
       with:
-        name: bundle
+        name: kTail
         path: ktail
