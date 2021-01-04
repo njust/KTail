@@ -9,7 +9,7 @@ use glib::bitflags::_core::cmp::Ordering;
 
 
 use std::collections::{HashMap};
-use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore};
+use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore, Widget};
 use std::rc::Rc;
 use crate::model::{ActiveRule, SearchResultData, SearchResultMatch, LogReplacer};
 
@@ -219,4 +219,16 @@ impl<'a, 'b, T:PartialOrd> SortedListCompare<'a, 'b, T> {
             rhi: 0
         }
     }
+}
+
+pub fn add_css<T: IsA<Widget>>(w: &T, css: &str) {
+    let sc = w.get_style_context();
+    let css_provider = gtk::CssProvider::new();
+    css_provider.load_from_data(css.as_bytes()).expect("Could not load css from bytes");
+    sc.add_provider(&css_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+}
+
+pub fn add_css_with_name<T: IsA<Widget>>(w: &T, widget_name: &str, css: &str) {
+    w.set_widget_name(widget_name);
+    add_css(w, css);
 }

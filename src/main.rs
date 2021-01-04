@@ -92,7 +92,7 @@ fn create_open_file_dlg_action(tx: Sender<Msg>) -> SimpleAction {
         dialog.close();
         if res == ResponseType::Accept {
             if let Some(file_path) = dialog.get_filename() {
-                send_msg(&tx, Msg::CreateTab(CreateLogView::new(LogViewData::File(file_path))));
+                send_msg(&tx, CreateLogView::new(LogViewData::File(file_path)));
             }
         }
     });
@@ -103,7 +103,7 @@ fn main() {
     let mut rt = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .enable_all()
-        .build().unwrap();
+        .build().expect("Could not init scheduler");
     rt.block_on(async move {
         int_main().await;
     })
@@ -151,7 +151,7 @@ async fn int_main() {
                         let file = PathBuf::from(file);
                         if let Some(mime) = mime_guess::from_path(&file).first() {
                             if mime.type_() == mime_guess::mime::TEXT  {
-                                send_msg(&tx, Msg::CreateTab(CreateLogView::new(LogViewData::File(file))));
+                                send_msg(&tx, CreateLogView::new(LogViewData::File(file)));
                             }
                         }
                     }
@@ -198,11 +198,11 @@ async fn int_main() {
             if std::path::Path::new(&open_with).exists() {
                 let tx = tx.clone();
                 let open_with = open_with.clone();
-                send_msg(&tx, Msg::CreateTab(CreateLogView::new(LogViewData::File(std::path::PathBuf::from(open_with)))));
+                send_msg(&tx, CreateLogView::new(LogViewData::File(std::path::PathBuf::from(open_with))));
             }
         }
 
-        if let Some(kube_action) = create_open_kube_action(tx.clone()) {
+        if let Ok(kube_action) = create_open_kube_action(tx.clone()) {
             app.add_action(&kube_action);
             app.set_accels_for_action("app.kube", &["<Primary>K"]);
             menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));

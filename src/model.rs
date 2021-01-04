@@ -19,18 +19,19 @@ pub struct CreateLogView {
 }
 
 impl CreateLogView {
-    pub fn new(data: LogViewData) -> Self {
-        Self {
+    pub fn new(data: LogViewData) -> Msg {
+        Msg::CreateTab(Self {
             data,
             rules: None,
-        }
+        })
     }
 
-    pub fn with_rules(data: LogViewData, rules: Vec<Highlighter>) -> Self {
+    pub fn with_rules(data: LogViewData, rules: Vec<Highlighter>) -> Msg {
+        Msg::CreateTab(
         Self {
             data,
             rules: Some(rules),
-        }
+        })
     }
 }
 

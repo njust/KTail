@@ -2,7 +2,7 @@ use gtk::{prelude::*, TextIter, TextBuffer};
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::rc::Rc;
 use glib::{SignalHandlerId};
-use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data};
+use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data, add_css_with_name};
 use crate::model::{LogTextViewMsg, LogViewData, SearchResultMatch, LogReplacer};
 
 use sourceview::{ViewExt, BufferExt, Mark};
@@ -138,18 +138,12 @@ impl LogTextView {
             .highlight_current_line(true)
             .build();
 
-        minimap.set_widget_name("minimap");
-        let css = r##"
+        add_css_with_name(&minimap, "minimap",r##"
             #minimap {
                   font: 1px "Monospace";
                   color: rgba(1,1,1,0.5);
             }
-        "##;
-        let css_provider = gtk::CssProvider::new();
-        if let Ok(_) = css_provider.load_from_data(css.as_bytes()) {
-            let sc = minimap.get_style_context();
-            sc.add_provider(&css_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
-        }
+        "##);
 
         let text_view = Rc::new(tv);
         let scroll_wnd = ScrolledWindow::new(text_view.get_hadjustment().as_ref(), text_view.get_vadjustment().as_ref());

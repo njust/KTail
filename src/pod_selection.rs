@@ -1,10 +1,10 @@
 use gtk::prelude::*;
-use gtk::{ApplicationWindow, ResponseType, Orientation, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, ScrolledWindow, DialogFlags, MessageType, ButtonsType, HeaderBarBuilder, BoxBuilder};
+use gtk::{ApplicationWindow, ResponseType, Orientation, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, DialogFlags, MessageType, ButtonsType, HeaderBarBuilder, BoxBuilder, Align, ScrolledWindowBuilder};
 use std::rc::Rc;
 use gio::{SimpleAction};
 use log::{error};
 
-use crate::util::{create_col, ColumnType};
+use crate::util::{create_col, ColumnType, add_css_with_name};
 use glib::Sender;
 use k8s_client::{KubeConfig, KubeClient, Pod};
 use crate::model::{Msg, LogViewData, CreateKubeLogData, CreateLogView};
@@ -52,9 +52,9 @@ fn set_pods(pod_model: &TreeStore, pods: Vec<Pod>, include_replicas: bool) {
     }
 }
 
-pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
+pub fn create_open_kube_action(tx: Sender<Msg>) -> anyhow::Result<SimpleAction> {
     if !KubeConfig::default_path().exists() {
-        return None;
+        return Err(anyhow::Error::msg("No kube config"));
     }
 
     let kube_action = SimpleAction::new("kube", None);
@@ -66,8 +66,8 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
 
     let dlg = gtk::DialogBuilder::new()
         .window_position(WindowPosition::CenterOnParent)
-        .default_width(450)
-        .default_height(600)
+        .default_width(540)
+        .default_height(550)
         .modal(true)
         .build();
 
@@ -81,10 +81,35 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
     list.append_column(&create_col(Some("Pod"), 0, ColumnType::String, service_model.clone()));
 
     let content = dlg.get_content_area();
-    let scroll_wnd = ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
-    scroll_wnd.set_property_expand(true);
+    let scroll_wnd = ScrolledWindowBuilder::new()
+        .expand(true)
+        .build();
+
     scroll_wnd.add(&list);
     content.add(&scroll_wnd);
+
+    let rules_view = HighlighterListView::new();
+    rules_view.add_highlighters(get_default_highlighters());
+
+    let sw = ScrolledWindowBuilder::new()
+        .expand(true)
+        .build();
+    sw.add(rules_view.view());
+    let lbl = gtk::LabelBuilder::new()
+        .label("Rules")
+        .halign(Align::Start)
+        .build();
+
+    add_css_with_name(&lbl, "rules", r##"
+        #rules {
+            font-size: 20px;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    "##);
+
+    content.add(&lbl);
+    content.add(&sw);
 
     let log_separate_tab_checkbox = gtk::CheckButton::with_label("Logs in separate tab");
     log_separate_tab_checkbox.set_active(true);
@@ -102,8 +127,9 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
         content.add(&include_replicas);
     }
 
-    let adjustment = gtk::Adjustment::new(4.0, 1.0, 721.0, 1.0, 1.0, 1.0);
-    let since_val = gtk::SpinButton::new(Some(&adjustment), 1.0, 0);
+    let since_val = gtk::SpinButton::new(
+        Some(&gtk::Adjustment::new(4.0, 1.0, 721.0, 1.0, 1.0, 1.0))
+        , 1.0, 0);
     since_val.set_value(10.0);
 
     let since_row = BoxBuilder::new()
@@ -122,10 +148,6 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
 
     since_row.add(&unit_selector);
     content.add(&since_row);
-
-    let rules_view = HighlighterListView::new();
-    rules_view.add_highlighters(get_default_highlighters());
-    content.add(rules_view.view());
 
     dlg.connect_delete_event(move |dlg, _| {
         dlg.hide();
@@ -171,18 +193,19 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
                         }
                     }
 
+                    let highlighters = rules_view.get_highlighter().unwrap_or_default();
                     if separate_tabs {
                         for model in models {
-                            tx.send(Msg::CreateTab(CreateLogView::with_rules(LogViewData::Kube(CreateKubeLogData {
+                            tx.send(CreateLogView::with_rules(LogViewData::Kube(CreateKubeLogData {
                                 pods: vec![model],
                                 since,
-                            }), rules_view.get_highlighter().unwrap()))).expect("Could not send create tab msg");
+                            }), highlighters.clone())).expect("Could not send create tab msg");
                         }
-                    }else {
-                        tx.send(Msg::CreateTab(CreateLogView::with_rules(LogViewData::Kube(CreateKubeLogData {
+                    } else {
+                        tx.send(CreateLogView::with_rules(LogViewData::Kube(CreateKubeLogData {
                             pods: models,
                             since,
-                        }), rules_view.get_highlighter().unwrap()))).expect("Could not send create tab msg");
+                        }), highlighters)).expect("Could not send create tab msg");
                     }
                 }
             }
@@ -199,5 +222,5 @@ pub fn create_open_kube_action(tx: Sender<Msg>) -> Option<SimpleAction> {
             }
         }
     });
-    Some(kube_action)
+    Ok(kube_action)
 }
