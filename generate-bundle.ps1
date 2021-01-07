@@ -6,7 +6,7 @@ copy config\log4rs.yaml .\ktail\config
 
 xcopy assets\icons .\ktail\share\icons /E /I
 xcopy assets\gtk-3.0 .\ktail\share\gtk-3.0 /E /I
-xcopy assets\themes .\ktail\share\themes /E /I
+xcopy assets\themes\Mint-Y-Grey .\ktail\share\themes\Mint-Y-Grey\gtk-3.0 /E /I
 
 pushd ktail
 mkdir libs
