@@ -167,7 +167,7 @@ impl LogView {
         if self.highlighters_dlg.is_none() {
             let header_bar = HeaderBarBuilder::new()
                 .show_close_button(true)
-                .title("Highlighters")
+                .title("Rules")
                 .build();
 
             let dlg = gtk::DialogBuilder::new()
