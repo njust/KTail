@@ -10,6 +10,8 @@ pub const UNNAMED_RULE: &'static str = "Unnamed rule";
 
 pub struct CreateKubeLogData {
     pub pods: Vec<String>,
+    pub cluster: String,
+    pub namespace: String,
     pub since: u32,
 }
 
@@ -44,7 +46,9 @@ impl LogViewData {
     pub fn get_name(&self) -> String {
         match self {
             LogViewData::File(file_path) => file_path.file_name().unwrap().to_str().unwrap().to_string(),
-            LogViewData::Kube(data) => data.pods.join(",")
+            LogViewData::Kube(data) => {
+                format!("{} > {} > {}", data.cluster, data.namespace, data.pods.join(","))
+            }
         }
     }
 }
@@ -57,6 +61,18 @@ pub struct SearchResultData {
     pub matches: HashMap<String, Vec<SearchResultMatch>>,
 }
 
+pub enum PodSelectorMsg {
+    Show,
+    ToggleIncludeReplicas(bool),
+    ToggleSeparateTabs(bool),
+    SinceUnitChanged(String),
+    SinceChanged(u32),
+    ClusterChanged(String),
+    NamespaceChanged(String),
+    Ok,
+    Close,
+}
+
 pub enum Msg {
     CloseTab(Uuid),
     CreateTab(CreateLogView),
@@ -64,6 +80,7 @@ pub enum Msg {
     PrevTab,
     CloseActiveTab,
     LogViewMsg(Uuid, LogViewMsg),
+    PodSelectorMsg(PodSelectorMsg),
     Exit
 }
 

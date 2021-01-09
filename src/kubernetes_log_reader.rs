@@ -1,7 +1,7 @@
 use crate::model::{CreateKubeLogData};
 use std::collections::HashMap;
 use std::error::Error;
-use k8s_client::{KubeClient, LogOptions};
+use k8s_client::{KubeClient, LogOptions, KubeConfig};
 use stream_cancel::{Valved, Trigger};
 use tokio::sync::oneshot::Sender;
 use async_trait::async_trait;
@@ -58,11 +58,12 @@ impl LogReader for KubernetesLogReader {
             return;
         }
         self.is_initialized = true;
-
-        let c = KubeClient::load_conf(None).unwrap();
+        let config = KubeConfig::load_default().unwrap();
+        let ctx = config.context(&self.options.cluster).unwrap();
+        let c = KubeClient::new(&ctx).unwrap();
         let mut pod_list = vec![];
 
-        if let Ok(pods) = c.pods().await {
+        if let Ok(pods) = c.pods(&self.options.namespace).await {
             for pod in pods {
                 if let Some(name) = pod.metadata.name {
                     for pod_name in &self.options.pods {
@@ -88,7 +89,7 @@ impl LogReader for KubernetesLogReader {
                 continue;
             }
 
-            if let Ok(log_stream) = c.logs(&pod, Some(
+            if let Ok(log_stream) = c.logs("default", &pod, Some(
                 LogOptions {
                     follow: Some(true),
                     since_seconds: Some(self.options.since),

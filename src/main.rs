@@ -5,7 +5,7 @@ extern crate glib;
 
 mod model;
 mod util;
-mod pod_selection;
+mod pod_selector;
 mod log_view;
 mod toolbar;
 mod log_text_view;
@@ -21,10 +21,10 @@ use log::{error, info};
 use uuid::Uuid;
 use std::path::PathBuf;
 use glib::Sender;
-use crate::pod_selection::create_open_kube_action;
+use crate::pod_selector::{PodSelector};
 use std::collections::HashMap;
 use crate::log_view::LogView;
-use crate::model::{LogViewData, Msg, CreateLogView};
+use crate::model::{LogViewData, Msg, CreateLogView, PodSelectorMsg};
 use crate::highlighters::{Highlighter, SEARCH_ID, RULE_TYPE_HIGHLIGHT};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -202,11 +202,23 @@ async fn int_main() {
             }
         }
 
-        if let Ok(kube_action) = create_open_kube_action(tx.clone()) {
-            app.add_action(&kube_action);
-            app.set_accels_for_action("app.kube", &["<Primary>K"]);
-            menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));
-        }
+        let pod_selector_tx = tx.clone();
+        let pod_selector_tx2 = tx.clone();
+        let mut pod_selector = PodSelector::new(move |msg| {
+            if let Err(e) = pod_selector_tx.send(Msg::PodSelectorMsg(msg)) {
+                error!("Could not send msg: {}", e);
+            }
+        }, pod_selector_tx2);
+
+        let kube_action = SimpleAction::new("kube", None);
+        app.add_action(&kube_action);
+        let pod_selector_tx = tx.clone();
+        kube_action.connect_activate(move |_,_| {
+            pod_selector_tx.send(Msg::PodSelectorMsg(PodSelectorMsg::Show));
+        });
+
+        app.set_accels_for_action("app.kube", &["<Primary>K"]);
+        menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));
 
         let tx2 = tx.clone();
         app.connect_shutdown(move|_| {
@@ -281,6 +293,9 @@ async fn int_main() {
                             }
                         }
                     }
+                }
+                Msg::PodSelectorMsg(msg) => {
+                    pod_selector.update(msg)
                 }
             }
             glib::Continue(true)
