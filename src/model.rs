@@ -47,7 +47,7 @@ impl LogViewData {
         match self {
             LogViewData::File(file_path) => file_path.file_name().unwrap().to_str().unwrap().to_string(),
             LogViewData::Kube(data) => {
-                format!("{} > {} > {}", data.cluster, data.namespace, data.pods.join(","))
+                format!("{} > {} > {}", data.cluster, data.namespace, data.pods.join(", "))
             }
         }
     }

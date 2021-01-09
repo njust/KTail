@@ -1,14 +1,15 @@
 use gtk::prelude::*;
-use gtk::{ApplicationWindow, ResponseType, Orientation, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, DialogFlags, MessageType, ButtonsType, HeaderBarBuilder, BoxBuilder, Align, ScrolledWindowBuilder, Dialog, ComboBoxTextBuilder, ComboBoxText};
+use gtk::{Orientation, TreeStore, WindowPosition, TreeIter, SortColumn, SortType, HeaderBarBuilder, BoxBuilder, Align, ScrolledWindowBuilder, Dialog, ComboBoxTextBuilder, ComboBoxText};
 use std::rc::Rc;
 use log::{error, info};
 
-use crate::util::{create_col, ColumnType, add_css_with_name};
+use crate::util::{create_col, ColumnType, add_css_with_name, show_error_msg};
 use glib::Sender;
-use k8s_client::{KubeConfig, KubeClient, Pod, Namespace};
+use k8s_client::{KubeConfig, KubeClient, Pod, Namespace, ClientOptions};
 use crate::model::{Msg, LogViewData, CreateKubeLogData, CreateLogView, PodSelectorMsg};
 use std::error::Error;
 use std::collections::{HashSet};
+use std::time::Duration;
 use crate::highlighters::HighlighterListView;
 use crate::get_default_highlighters;
 
@@ -219,6 +220,7 @@ impl PodSelector {
 
         let ok_btn = gtk::ButtonBuilder::new()
             .label("Ok")
+            .width_request(80)
             .build();
         {
             let tx = tx.clone();
@@ -230,6 +232,7 @@ impl PodSelector {
 
         let close_btn = gtk::ButtonBuilder::new()
             .label("Close")
+            .width_request(80)
             .build();
         {
             let tx = tx.clone();
@@ -259,14 +262,14 @@ impl PodSelector {
 
     fn load_clusters(&mut self) {
         self.cluster_selector.remove_all();
-        let cfg = KubeConfig::load_default().unwrap();
-        let ctx = cfg.current_context().unwrap();
-        self.kube_client = Some(KubeClient::new(&ctx).unwrap());
+        if let Ok(cfg) = KubeConfig::load_default() {
+            for context in &cfg.contexts {
+                self.cluster_selector.append(Some(&context.name), &context.name);
+            }
 
-        for context in &cfg.contexts {
-            self.cluster_selector.append(Some(&context.name), &context.name);
+            let cluster_to_select = self.selected_cluster.as_ref().unwrap_or(&cfg.current_context);
+            self.cluster_selector.set_active_id(Some(&cluster_to_select));
         }
-        self.cluster_selector.set_active_id(Some(&cfg.current_context));
     }
 
     fn load_pods(&mut self) {
@@ -294,14 +297,14 @@ impl PodSelector {
     }
 
     fn get_namespaces(&self) -> Result<Vec<Namespace>, Box<dyn Error>> {
-        let c = self.kube_client.as_ref().unwrap().clone();
+        let client= self.kube_client.as_ref().ok_or(anyhow::Error::msg("No k8s client"))?.clone();
         glib::MainContext::default().block_on(async move  {
-            c.namespaces().await
+            client.namespaces().await
         })
     }
 
     fn get_pods(&self) -> Result<Vec<Pod>, Box<dyn Error>> {
-        let client = self.kube_client.as_ref().unwrap().clone();
+        let client = self.kube_client.as_ref().ok_or(anyhow::Error::msg("No k8s client"))?.clone();
         let default_namespace = "default".to_string();
         let namespace = self.selected_namespace.as_ref().unwrap_or(&default_namespace);
         info!("Loading pods for namespace: {}", namespace);
@@ -339,25 +342,25 @@ impl PodSelector {
 
                 let highlighters = self.rules_view.get_highlighter().unwrap_or_default();
                 let since = self.since * self.since_multiplier;
-                let selected_namespace = self.selected_namespace.as_ref().unwrap();
-                let selected_cluster = self.selected_cluster.as_ref().unwrap();
 
-                if self.separate_tabs {
-                    for model in models {
+                if let (Some(selected_cluster), Some(selected_namespace)) = (self.selected_cluster.as_ref(), self.selected_namespace.as_ref()) {
+                    if self.separate_tabs {
+                        for model in models {
+                            self.msg.send(CreateLogView::with_rules(LogViewData::Kube(CreateKubeLogData {
+                                pods: vec![model],
+                                cluster: selected_cluster.clone(),
+                                namespace: selected_namespace.clone(),
+                                since,
+                            }), highlighters.clone())).expect("Could not send create tab msg");
+                        }
+                    } else {
                         self.msg.send(CreateLogView::with_rules(LogViewData::Kube(CreateKubeLogData {
-                            pods: vec![model],
+                            pods: models,
                             cluster: selected_cluster.clone(),
                             namespace: selected_namespace.clone(),
                             since,
-                        }), highlighters.clone())).expect("Could not send create tab msg");
+                        }), highlighters)).expect("Could not send create tab msg");
                     }
-                } else {
-                    self.msg.send(CreateLogView::with_rules(LogViewData::Kube(CreateKubeLogData {
-                        pods: models,
-                        cluster: selected_cluster.clone(),
-                        namespace: selected_namespace.clone(),
-                        since,
-                    }), highlighters)).expect("Could not send create tab msg");
                 }
             },
             PodSelectorMsg::ToggleIncludeReplicas(include) => {
@@ -378,25 +381,33 @@ impl PodSelector {
                 self.since = since;
             }
             PodSelectorMsg::ClusterChanged(cluster) => {
-                self.selected_cluster.replace(cluster.clone());
-                let cfg = KubeConfig::load_default().unwrap();
-                let ctx = cfg.context(&cluster).unwrap();
-                let kube_client = KubeClient::new(&ctx).unwrap();
-                self.kube_client.replace(kube_client);
-                self.namespace_model.clear();
+                if self.selected_cluster.as_ref() != Some(&cluster) {
+                    self.selected_cluster.replace(cluster.clone());
+                    match KubeConfig::load_default()
+                        .and_then(|cfg| cfg.context(&cluster))
+                        .and_then(|ctx| KubeClient::with_options(&ctx, Some(ClientOptions {timeout: Some(Duration::from_secs(5))}))) {
+                        Ok(kube_client) => {
+                            self.kube_client.replace(kube_client);
+                            self.namespace_model.clear();
 
-                match self.get_namespaces() {
-                    Ok(namespaces) => {
-                        println!("Cluster: {}",cluster);
-                        for namespace in namespaces {
-                            let name = namespace.metadata.name.unwrap();
-                            println!("{}",name);
-                            self.namespace_model.insert_with_values(None, &[0], &[&name]);
+                            match self.get_namespaces() {
+                                Ok(namespaces) => {
+                                    for namespace in namespaces {
+                                        let name = namespace.metadata.name.unwrap();
+                                        self.namespace_model.insert_with_values(None, &[0], &[&name]);
+                                    }
+                                    self.namespace_selector.set_active_id(Some("default"));
+                                }
+                                Err(e) => {
+                                    error!("Could not get namespaces for {}: {}", cluster, e);
+                                    show_error_msg(&e.to_string());
+                                }
+                            }
                         }
-                        self.namespace_selector.set_active_id(Some("default"));
-                    }
-                    Err(e) => {
-                        error!("Could not get namespaces for {}: {}", cluster, e);
+                        Err(e) => {
+                            error!("Could not get k8s client: {}", e);
+                            show_error_msg(&e.to_string());
+                        }
                     }
                 }
             }

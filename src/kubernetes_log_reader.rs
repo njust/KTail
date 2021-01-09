@@ -57,13 +57,22 @@ impl LogReader for KubernetesLogReader {
         if self.is_initialized || self.is_stopping {
             return;
         }
-        self.is_initialized = true;
-        let config = KubeConfig::load_default().unwrap();
-        let ctx = config.context(&self.options.cluster).unwrap();
-        let c = KubeClient::new(&ctx).unwrap();
-        let mut pod_list = vec![];
 
-        if let Ok(pods) = c.pods(&self.options.namespace).await {
+        let client = match KubeConfig::load_default()
+            .and_then(|config| config.context(&self.options.cluster))
+            .and_then(|ctx| KubeClient::new(&ctx)) {
+            Ok(client) => {
+                self.is_initialized = true;
+                client
+            },
+            Err(e) => {
+                error!("Could not init k8s client: {}", e);
+                return;
+            }
+        };
+
+        let mut pod_list = vec![];
+        if let Ok(pods) = client.pods(&self.options.namespace).await {
             for pod in pods {
                 if let Some(name) = pod.metadata.name {
                     for pod_name in &self.options.pods {
@@ -89,7 +98,7 @@ impl LogReader for KubernetesLogReader {
                 continue;
             }
 
-            if let Ok(log_stream) = c.logs("default", &pod, Some(
+            if let Ok(log_stream) = client.logs(&self.options.namespace, &pod, Some(
                 LogOptions {
                     follow: Some(true),
                     since_seconds: Some(self.options.since),

@@ -9,7 +9,7 @@ use glib::bitflags::_core::cmp::Ordering;
 
 
 use std::collections::{HashMap};
-use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore, Widget};
+use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore, Widget, ApplicationWindow, DialogFlags, MessageType, ButtonsType};
 use std::rc::Rc;
 use crate::model::{ActiveRule, SearchResultData, SearchResultMatch, LogReplacer};
 
@@ -231,4 +231,15 @@ pub fn add_css<T: IsA<Widget>>(w: &T, css: &str) {
 pub fn add_css_with_name<T: IsA<Widget>>(w: &T, widget_name: &str, css: &str) {
     w.set_widget_name(widget_name);
     add_css(w, css);
+}
+
+pub fn show_error_msg(msg: &str) {
+    let dlg = gtk::MessageDialog::new::<ApplicationWindow>(
+        None,
+        DialogFlags::MODAL,
+        MessageType::Error,
+        ButtonsType::Ok,
+        msg );
+    dlg.run();
+    dlg.close();
 }

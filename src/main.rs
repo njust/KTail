@@ -26,6 +26,7 @@ use std::collections::HashMap;
 use crate::log_view::LogView;
 use crate::model::{LogViewData, Msg, CreateLogView, PodSelectorMsg};
 use crate::highlighters::{Highlighter, SEARCH_ID, RULE_TYPE_HIGHLIGHT};
+use k8s_client::KubeConfig;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -210,15 +211,17 @@ async fn int_main() {
             }
         }, pod_selector_tx2);
 
-        let kube_action = SimpleAction::new("kube", None);
-        app.add_action(&kube_action);
-        let pod_selector_tx = tx.clone();
-        kube_action.connect_activate(move |_,_| {
-            pod_selector_tx.send(Msg::PodSelectorMsg(PodSelectorMsg::Show));
-        });
+        if std::path::Path::new(&KubeConfig::default_path()).exists() {
+            let kube_action = SimpleAction::new("kube", None);
+            app.add_action(&kube_action);
+            let pod_selector_tx = tx.clone();
+            kube_action.connect_activate(move |_,_| {
+                pod_selector_tx.send(Msg::PodSelectorMsg(PodSelectorMsg::Show)).expect("Could not send pod selector msg");
+            });
 
-        app.set_accels_for_action("app.kube", &["<Primary>K"]);
-        menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));
+            app.set_accels_for_action("app.kube", &["<Primary>K"]);
+            menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));
+        }
 
         let tx2 = tx.clone();
         app.connect_shutdown(move|_| {
