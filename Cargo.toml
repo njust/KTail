@@ -4,6 +4,7 @@ version = "0.2.5"
 authors = ["nico.just <nico.just@gmail.com>"]
 description = "Kubernetes Logviewer"
 edition = "2018"
+license = "Copyright © 2020 Nico Just"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -44,6 +45,8 @@ LegalCopyright = "Copyright © 2020 Nico Just"
 # winres project
 winres = {git = "https://github.com/njust/winres.git"}
 
+[package.metadata.deb]
+depends = "libc6, libgtk-3-0 (>= 3.16)"
 
 [profile.release]
 opt-level = 'z' # Optimize for size.

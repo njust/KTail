@@ -17,6 +17,8 @@ jobs:
     steps:
     - name: Install gtk prerequsites
       run: sudo apt-get install libgtksourceviewmm-3.0-dev
+    - name: Install cargo-deb
+      run: cargo install cargo-deb
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
@@ -26,8 +28,8 @@ jobs:
           target
         key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
-      run: cargo build --release --verbose
+      run: cargo deb -o ./target/release/ktail.deb
     - uses: actions/upload-artifact@v2
       with:
         name: kTail
-        path: target/release/ktail
+        path: target/release/ktail.deb
