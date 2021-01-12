@@ -3,7 +3,7 @@ fn main() {
     use std::io::Write;
     if std::env::var("PROFILE").unwrap() == "release" {
         let mut res = winres::WindowsResource::new();
-        res.set_icon("kubernetes.ico");
+        res.set_icon("./assets/ktail.ico");
         match res.compile() {
             Err(e) => {
                 write!(std::io::stderr(), "{}", e).unwrap();
