@@ -29,6 +29,8 @@ jobs:
         key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
       run: cargo-bundle bundle --release --format osx
+    - name: Generate Bundle
+      run: ./generate-macos-bundle.sh
     - uses: actions/upload-artifact@v2
       with:
         name: kTail
