@@ -1,0 +1,35 @@
+name: MacOS Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: macOS-latest
+
+    steps:
+    - name: Install gtk prerequsites
+      run: brew install gtk+3 gtksourceview3 adwaita-icon-theme
+    - name: Install cargo-bundle
+      run: cargo cargo-bundle
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+    - name: Build
+      run: cargo-bundle bundle --release --format osx
+    - uses: actions/upload-artifact@v2
+      with:
+        name: kTail
+        path: target/release/bundle/osx/ktail.app

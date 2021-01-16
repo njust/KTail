@@ -965,7 +965,7 @@ dependencies = [
 [[package]]
 name = "k8s_client"
 version = "0.1.0"
-source = "git+https://github.com/njust/k8s_client.git?rev=d7a6198#d7a6198c8be99b5cbc05c475b1c0067636ebe440"
+source = "git+https://github.com/njust/k8s_client.git?rev=6150bd4#6150bd4af2101b1858349acb836703aedc135a44"
 dependencies = [
  "base64 0.6.0",
  "bytes 0.5.6",

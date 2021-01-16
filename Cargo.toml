@@ -20,7 +20,7 @@ log = "0.4.11"
 regex = "1.3.9"
 uuid = {version = "0.8.1", features = ["v4"]}
 stream-cancel = "0.6.1"
-k8s_client = {git = "https://github.com/njust/k8s_client.git", rev = "d7a6198"}
+k8s_client = {git = "https://github.com/njust/k8s_client.git", rev = "6150bd4"}
 glib_data_model_helper = {git = "https://github.com/njust/glib_data_model_helper.git"}
 tokio = { version = "0.2", features = ["full"] }
 async-trait = "0.1.40"
@@ -46,7 +46,7 @@ LegalCopyright = "Copyright © 2020 Nico Just"
 winres = {git = "https://github.com/njust/winres.git"}
 
 [package.metadata.deb]
-depends = "libc6, libgtk-3-0 (>= 3.16)"
+depends = "libc6, libgtk-3-0 (>= 3.16), libgtksourceview-3.0-1"
 assets = [
     ["target/release/ktail", "usr/bin/", "755"],
     ["assets/ktail.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
