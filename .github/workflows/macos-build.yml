@@ -16,13 +16,22 @@ jobs:
 
     steps:
     - name: Install gtk prerequsites
-      run: brew install gtk+3 gtksourceview3 adwaita-icon-theme
+      run: brew install gtk+3 gtksourceview3
     - name: Install cargo-bundle
       run: cargo install cargo-bundle
     - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
-      run: cargo-bundle bundle --release --format osx
+      run: cargo build --release
     - name: Generate Bundle
+      run: cargo-bundle bundle --release --format osx
+    - name: Copy assets to bundle
       run: ./generate-macos-bundle.sh
     - uses: actions/upload-artifact@v2
       with:
