@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - name: Install cargo-bundle
-      run: cp ./assets/MacOS/cargo-bundle ~/.cargo/bin
+      run: cp ./assets/MacOS/cargo-bundle /usr/local/bin
     - name: Install gtk prerequsites
       run: brew install gtk+3 gtksourceview3
     - uses: actions/checkout@v2
