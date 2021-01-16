@@ -18,7 +18,7 @@ jobs:
     - name: Install gtk prerequsites
       run: brew install gtk+3 gtksourceview3 adwaita-icon-theme
     - name: Install cargo-bundle
-      run: cargo cargo-bundle
+      run: cargo install cargo-bundle
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
