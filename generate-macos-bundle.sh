@@ -11,3 +11,6 @@ chmod +x ./target/release/bundle/osx/ktail.app/Contents/MacOS/gdk-pixbuf-query-l
 
 cp -R ./assets/MacOS/Resources ./target/release/bundle/osx/ktail.app/Contents/
 cp -R ./assets/MacOS/lib ./target/release/bundle/osx/ktail.app/Contents/MacOS/
+
+cd ./target/release/bundle/osx/
+tar -cf ktail.tar ktail.app

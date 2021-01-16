@@ -27,4 +27,4 @@ jobs:
     - uses: actions/upload-artifact@v2
       with:
         name: kTail
-        path: target/release/bundle/osx
+        path: target/release/bundle/osx/ktail.tar
