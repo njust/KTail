@@ -18,7 +18,7 @@ jobs:
     - name: Install gtk prerequsites
       run: brew install gtk+3 gtksourceview3
     - name: Install cargo-bundle
-      run: cargo install cargo-bundle
+      run: cp ./assets/cargo-bundle ~/.cargo/bin
     - uses: actions/checkout@v2
     - name: Build
       run: cargo-bundle bundle --release --format osx
