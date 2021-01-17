@@ -56,6 +56,7 @@ assets = [
 [package.metadata.bundle]
 identifier="de.ktail"
 icon = ["./assets/128x128.png"]
+name = "KTail"
 
 [profile.release]
 opt-level = 'z' # Optimize for size.

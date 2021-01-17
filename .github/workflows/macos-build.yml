@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - name: Install gtk prerequsites
-      run: brew install gtk+3 gtksourceview3 create-dmg
+      run: brew install gtk+3 gtksourceview3
     - name: Install cargo-bundle
       run: cargo install cargo-bundle
     - uses: actions/checkout@v2
