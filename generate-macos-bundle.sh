@@ -12,5 +12,7 @@ chmod +x ./target/release/bundle/osx/ktail.app/Contents/MacOS/gdk-pixbuf-query-l
 cp -R ./assets/MacOS/Resources ./target/release/bundle/osx/ktail.app/Contents/
 cp -R ./assets/MacOS/lib ./target/release/bundle/osx/ktail.app/Contents/MacOS/
 
+cp ./assets/icons/Adwaita/icon-theme.cache ./target/release/bundle/osx/ktail.app/Contents/Resources/icons/Adwaita/
+
 cd ./target/release/bundle/osx/
 create-dmg --volname "KTail Installer" ktail.dmg ktail.app
