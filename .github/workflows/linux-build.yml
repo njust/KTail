@@ -31,5 +31,9 @@ jobs:
       run: cargo deb -o ./target/release/ktail.deb
     - uses: actions/upload-artifact@v2
       with:
-        name: kTail
+        name: Ubuntu
         path: target/release/ktail.deb
+    - uses: actions/upload-artifact@v2
+      with:
+        name: KTail
+        path: target/release/ktail
