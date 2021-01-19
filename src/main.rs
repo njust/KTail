@@ -15,7 +15,7 @@ mod highlighters;
 
 use gtk::prelude::*;
 use gio::prelude::*;
-use gtk::{Application, ApplicationWindow, Button, FileChooserDialog, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, AccelGroup, MenuButtonBuilder, HeaderBarBuilder, NotebookBuilder};
+use gtk::{Application, ApplicationWindow, Button, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, AccelGroup, NotebookBuilder, FileChooserDialogBuilder};
 use gio::{SimpleAction};
 use log::{error, info};
 use uuid::Uuid;
@@ -29,6 +29,8 @@ use crate::highlighters::{Highlighter, SEARCH_ID, RULE_TYPE_HIGHLIGHT};
 use k8s_client::KubeConfig;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+pub const APP_ICON_BUFFER: &'static [u8] = include_bytes!("../assets/app-icon/512x512.png");
 
 
 pub fn get_default_highlighters() -> Vec<Highlighter> {
@@ -86,7 +88,12 @@ fn create_tab(data: CreateLogView, tx: Sender<Msg>, id: Uuid, accelerators: &Acc
 fn create_open_file_dlg_action(tx: Sender<Msg>) -> SimpleAction {
     let open_action = SimpleAction::new("open", None);
     open_action.connect_activate(move |_a, _b| {
-        let dialog = FileChooserDialog::new::<ApplicationWindow>(Some("Open File"), None, FileChooserAction::Open);
+        let dialog = FileChooserDialogBuilder::new()
+            .title("Open File")
+            .action(FileChooserAction::Open)
+            .icon(&get_app_icon())
+            .build();
+
         dialog.add_button("_Cancel", ResponseType::Cancel);
         dialog.add_button("_Open", ResponseType::Accept);
         let res = dialog.run();
@@ -123,7 +130,14 @@ async fn int_main() {
     ).expect("failed to initialize GTK application");
 
     application.connect_activate(move |app| {
-        let menu_model = gio::Menu::new();
+
+        let menu_bar = gtk::MenuBar::new();
+        let file_menu_item = gtk::MenuItem::with_label("File");
+        menu_bar.append(&file_menu_item);
+
+        let file_menu = gtk::Menu::new();
+        file_menu_item.set_submenu(Some(&file_menu));
+
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
         let notebook = NotebookBuilder::new()
             .hexpand(true)
@@ -220,7 +234,9 @@ async fn int_main() {
             });
 
             app.set_accels_for_action("app.kube", &["<Primary>K"]);
-            menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));
+            let kube_menu_item = gtk::MenuItem::with_label("Kubernetes");
+            kube_menu_item.set_action_name(Some("app.kube"));
+            file_menu.append(&kube_menu_item);
         }
 
         let tx2 = tx.clone();
@@ -238,9 +254,13 @@ async fn int_main() {
 
         let mut file_views = HashMap::<Uuid, LogView>::new();
         let window = ApplicationWindow::new(app);
+
         let ag = AccelGroup::new();
         window.add_accel_group(&ag);
-        window.add(&notebook);
+        let main = gtk::Box::new(Orientation::Vertical, 0);
+        window.add(&main);
+        main.add(&menu_bar);
+        main.add(&notebook);
 
         let tx = tx.clone();
         rx.attach(None, move |msg| {
@@ -308,36 +328,33 @@ async fn int_main() {
         window.set_default_size(1280, 600);
 
         app.set_accels_for_action("app.open", &["<Primary>O"]);
-        menu_model.append_item(&gio::MenuItem::new(Some("Open"), Some("app.open")));
-        menu_model.append_item(&gio::MenuItem::new(Some("Quit"), Some("app.quit")));
+        let open_menu_item = gtk::MenuItem::with_label("Open");
+        open_menu_item.set_action_name(Some("app.open"));
+        file_menu.append(&open_menu_item);
 
-        let menu_button = MenuButtonBuilder::new()
-            .relief(ReliefStyle::None)
-            .popup(&gtk::Menu::from_model(&menu_model))
-            .image(&gtk::Image::from_icon_name(Some("open-menu-symbolic"), IconSize::Menu))
-            .build();
+        let quit_menu_item = gtk::MenuItem::with_label("Quit");
+        quit_menu_item.set_action_name(Some("app.quit"));
+        file_menu.append(&quit_menu_item);
 
-        let header_bar = HeaderBarBuilder::new()
-            .show_close_button(true)
-            .title("Log viewer")
-            .build();
-        header_bar.pack_end(&menu_button);
-
-        window.set_titlebar(Some(&header_bar));
-
-        let mut app_icon_data = image::load_from_memory_with_format(
-            include_bytes!("../assets/app-icon/512x512.png"),
-            image::ImageFormat::Png,
-        ).expect("Could not load app icon")
-            .to_rgba8();
-
+        let icon = get_app_icon();
         window.set_icon(
-            Some(&gdk_pixbuf::Pixbuf::from_mut_slice(&mut *app_icon_data, gdk_pixbuf::Colorspace::Rgb, true, 8, 512, 512, 512*4))
+            Some(&icon)
         );
+
         window.show_all();
     });
 
     application.run(&[]);
+}
+
+fn get_app_icon() -> gdk_pixbuf::Pixbuf {
+    let app_icon_data = image::load_from_memory_with_format(
+        APP_ICON_BUFFER,
+        image::ImageFormat::Png,
+    ).expect("Could not load app icon")
+        .to_rgba8();
+
+    gdk_pixbuf::Pixbuf::from_bytes(&glib::Bytes::from(app_icon_data.as_raw()), gdk_pixbuf::Colorspace::Rgb, true, 8, 512, 512, 512*4)
 }
 
 fn send_msg(tx: &Sender<Msg>, msg: Msg) {
