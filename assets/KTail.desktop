@@ -5,5 +5,5 @@ Comment=Kubernetes Log viewer
 Categories=Utility
 Terminal=false
 Type=Application
-Exec=/usr/bin/ktail
+Exec=/usr/bin/ktail %u
 Icon=/usr/share/icons/hicolor/scalable/apps/ktail.svg

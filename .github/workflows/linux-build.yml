@@ -29,11 +29,13 @@ jobs:
         key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
       run: cargo deb -o ./target/release/ktail.deb
+    - name: Bundle AppImage
+      run: ./pkg2appimage app-img.yml
     - uses: actions/upload-artifact@v2
       with:
         name: Ubuntu
         path: target/release/ktail.deb
     - uses: actions/upload-artifact@v2
       with:
-        name: KTail
-        path: target/release/ktail
+        name: AppImage
+        path: out

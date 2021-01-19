@@ -1,0 +1,7 @@
+app: KTail
+ingredients:
+  dist: xenial
+  sources:
+    - deb http://us.archive.ubuntu.com/ubuntu/ xenial main universe
+  debs:
+    - ../target/release/ktail.deb

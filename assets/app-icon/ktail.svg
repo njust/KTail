@@ -13,10 +13,10 @@
    id="svg2"
    version="1.1"
    inkscape:version="0.92.5 (2060ec1f9f, 2020-04-08)"
-   sodipodi:docname="kubernetes.svg"
-   inkscape:export-filename="/home/thockin/src/kubernetes/new.png"
-   inkscape:export-xdpi="460.95001"
-   inkscape:export-ydpi="460.95001">
+   sodipodi:docname="ktail.svg"
+   inkscape:export-filename="/home/nico/dev/projects/ktail/assets/48x48.png"
+   inkscape:export-xdpi="6.2965779"
+   inkscape:export-ydpi="6.2965779">
   <defs
      id="defs4">
     <linearGradient
@@ -284,8 +284,8 @@
      inkscape:current-layer="layer5"
      showgrid="false"
      inkscape:window-width="1920"
-     inkscape:window-height="1056"
-     inkscape:window-x="3840"
+     inkscape:window-height="1026"
+     inkscape:window-x="1920"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
      inkscape:snap-global="false"

@@ -324,6 +324,16 @@ async fn int_main() {
         header_bar.pack_end(&menu_button);
 
         window.set_titlebar(Some(&header_bar));
+
+        let mut app_icon_data = image::load_from_memory_with_format(
+            include_bytes!("../assets/app-icon/512x512.png"),
+            image::ImageFormat::Png,
+        ).expect("Could not load app icon")
+            .to_rgba8();
+
+        window.set_icon(
+            Some(&gdk_pixbuf::Pixbuf::from_mut_slice(&mut *app_icon_data, gdk_pixbuf::Colorspace::Rgb, true, 8, 512, 512, 512*4))
+        );
         window.show_all();
     });
 
