@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - name: Install gtk prerequsites
-      run: sudo apt-get install libgtksourceviewmm-3.0-dev
+      run: sudo apt-get install libgtksourceviewmm-3.0-dev desktop-file-utils
     - name: Install cargo-deb
       run: cargo install cargo-deb
     - uses: actions/checkout@v2
