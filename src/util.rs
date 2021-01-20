@@ -1,17 +1,20 @@
 use gtk::prelude::*;
-use glib::{SignalHandlerId, Value};
+use glib::{SignalHandlerId, Value, Sender};
 
 use std::io::{BufReader, Read, BufRead};
 use std::error::Error;
 use encoding::all::{UTF_8};
 use encoding::{DecoderTrap, Encoding};
 use glib::bitflags::_core::cmp::Ordering;
-
+use log::{error};
 
 use std::collections::{HashMap};
 use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore, Widget, ApplicationWindow, DialogFlags, MessageType, ButtonsType};
 use std::rc::Rc;
-use crate::model::{ActiveRule, SearchResultData, SearchResultMatch, LogReplacer};
+use crate::model::{ActiveRule, SearchResultData, SearchResultMatch, LogReplacer, Msg};
+
+pub const APP_ICON_BUFFER: &'static [u8] = include_bytes!("../assets/app-icon/512x512.png");
+
 
 pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     text_view.connect_size_allocate(|tv, _b| {
@@ -242,4 +245,20 @@ pub fn show_error_msg(msg: &str) {
         msg );
     dlg.run();
     dlg.close();
+}
+
+pub fn send_msg(tx: &Sender<Msg>, msg: Msg) {
+    if let Err(e) = tx.send(msg) {
+        error!("Could not send msg: {}", e);
+    }
+}
+
+pub fn get_app_icon() -> gdk_pixbuf::Pixbuf {
+    let app_icon_data = image::load_from_memory_with_format(
+        APP_ICON_BUFFER,
+        image::ImageFormat::Png,
+    ).expect("Could not load app icon")
+        .to_rgba8();
+
+    gdk_pixbuf::Pixbuf::from_bytes(&glib::Bytes::from(app_icon_data.as_raw()), gdk_pixbuf::Colorspace::Rgb, true, 8, 512, 512, 512*4)
 }

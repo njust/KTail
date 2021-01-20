@@ -12,10 +12,11 @@ mod log_text_view;
 mod log_file_reader;
 mod kubernetes_log_reader;
 mod highlighters;
+mod menu;
 
 use gtk::prelude::*;
 use gio::prelude::*;
-use gtk::{Application, ApplicationWindow, Button, FileChooserAction, ResponseType, Orientation, Label, IconSize, ReliefStyle, AccelGroup, NotebookBuilder, FileChooserDialogBuilder};
+use gtk::{Application, ApplicationWindow, Button,  Orientation, Label, IconSize, ReliefStyle, AccelGroup, NotebookBuilder};
 use gio::{SimpleAction};
 use log::{error, info};
 use uuid::Uuid;
@@ -24,14 +25,14 @@ use glib::Sender;
 use crate::pod_selector::{PodSelector};
 use std::collections::HashMap;
 use crate::log_view::LogView;
-use crate::model::{LogViewData, Msg, CreateLogView, PodSelectorMsg};
+use crate::model::{LogViewData, Msg, CreateLogView};
 use crate::highlighters::{Highlighter, SEARCH_ID, RULE_TYPE_HIGHLIGHT};
-use k8s_client::KubeConfig;
+use util::{get_app_icon, send_msg};
+
+use menu::configure_menu;
+use crate::menu::create_open_file_dlg_action;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
-pub const APP_ICON_BUFFER: &'static [u8] = include_bytes!("../assets/app-icon/512x512.png");
-
 
 pub fn get_default_highlighters() -> Vec<Highlighter> {
     vec![
@@ -85,28 +86,6 @@ fn create_tab(data: CreateLogView, tx: Sender<Msg>, id: Uuid, accelerators: &Acc
     (tab_header, file_view)
 }
 
-fn create_open_file_dlg_action(tx: Sender<Msg>) -> SimpleAction {
-    let open_action = SimpleAction::new("open", None);
-    open_action.connect_activate(move |_a, _b| {
-        let dialog = FileChooserDialogBuilder::new()
-            .title("Open File")
-            .action(FileChooserAction::Open)
-            .icon(&get_app_icon())
-            .build();
-
-        dialog.add_button("_Cancel", ResponseType::Cancel);
-        dialog.add_button("_Open", ResponseType::Accept);
-        let res = dialog.run();
-        dialog.close();
-        if res == ResponseType::Accept {
-            if let Some(file_path) = dialog.get_filename() {
-                send_msg(&tx, CreateLogView::new(LogViewData::File(file_path)));
-            }
-        }
-    });
-    open_action
-}
-
 fn main() {
     let mut rt = tokio::runtime::Builder::new()
         .threaded_scheduler()
@@ -130,13 +109,6 @@ async fn int_main() {
     ).expect("failed to initialize GTK application");
 
     application.connect_activate(move |app| {
-
-        let menu_bar = gtk::MenuBar::new();
-        let file_menu_item = gtk::MenuItem::with_label("File");
-        menu_bar.append(&file_menu_item);
-
-        let file_menu = gtk::Menu::new();
-        file_menu_item.set_submenu(Some(&file_menu));
 
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
         let notebook = NotebookBuilder::new()
@@ -225,20 +197,6 @@ async fn int_main() {
             }
         }, pod_selector_tx2);
 
-        if std::path::Path::new(&KubeConfig::default_path()).exists() {
-            let kube_action = SimpleAction::new("kube", None);
-            app.add_action(&kube_action);
-            let pod_selector_tx = tx.clone();
-            kube_action.connect_activate(move |_,_| {
-                pod_selector_tx.send(Msg::PodSelectorMsg(PodSelectorMsg::Show)).expect("Could not send pod selector msg");
-            });
-
-            app.set_accels_for_action("app.kube", &["<Primary>K"]);
-            let kube_menu_item = gtk::MenuItem::with_label("Kubernetes");
-            kube_menu_item.set_action_name(Some("app.kube"));
-            file_menu.append(&kube_menu_item);
-        }
-
         let tx2 = tx.clone();
         app.connect_shutdown(move|_| {
             send_msg(&tx2, Msg::Exit);
@@ -257,9 +215,10 @@ async fn int_main() {
 
         let ag = AccelGroup::new();
         window.add_accel_group(&ag);
+
         let main = gtk::Box::new(Orientation::Vertical, 0);
+        configure_menu(tx.clone(), &app, &window, &main);
         window.add(&main);
-        main.add(&menu_bar);
         main.add(&notebook);
 
         let tx = tx.clone();
@@ -327,15 +286,6 @@ async fn int_main() {
         window.set_title("Log Viewer");
         window.set_default_size(1280, 600);
 
-        app.set_accels_for_action("app.open", &["<Primary>O"]);
-        let open_menu_item = gtk::MenuItem::with_label("Open");
-        open_menu_item.set_action_name(Some("app.open"));
-        file_menu.append(&open_menu_item);
-
-        let quit_menu_item = gtk::MenuItem::with_label("Quit");
-        quit_menu_item.set_action_name(Some("app.quit"));
-        file_menu.append(&quit_menu_item);
-
         let icon = get_app_icon();
         window.set_icon(
             Some(&icon)
@@ -347,18 +297,4 @@ async fn int_main() {
     application.run(&[]);
 }
 
-fn get_app_icon() -> gdk_pixbuf::Pixbuf {
-    let app_icon_data = image::load_from_memory_with_format(
-        APP_ICON_BUFFER,
-        image::ImageFormat::Png,
-    ).expect("Could not load app icon")
-        .to_rgba8();
 
-    gdk_pixbuf::Pixbuf::from_bytes(&glib::Bytes::from(app_icon_data.as_raw()), gdk_pixbuf::Colorspace::Rgb, true, 8, 512, 512, 512*4)
-}
-
-fn send_msg(tx: &Sender<Msg>, msg: Msg) {
-    if let Err(e) = tx.send(msg) {
-        error!("Could not send msg: {}", e);
-    }
-}
