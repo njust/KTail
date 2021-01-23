@@ -5,7 +5,7 @@ use log::{error, info};
 
 use crate::util::{create_col, ColumnType, add_css_with_name, show_error_msg};
 use glib::Sender;
-use k8s_client::{KubeConfig, KubeClient, Pod, Namespace, ClientOptions};
+use crate::k8s_client::{KubeConfig, KubeClient, Pod, Namespace, ClientOptions};
 use crate::model::{Msg, LogViewData, CreateKubeLogData, CreateLogView, PodSelectorMsg};
 use std::error::Error;
 use std::collections::{HashSet};

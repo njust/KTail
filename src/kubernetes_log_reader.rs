@@ -1,7 +1,7 @@
 use crate::model::{CreateKubeLogData};
 use std::collections::HashMap;
 use std::error::Error;
-use k8s_client::{KubeClient, LogOptions, KubeConfig};
+use crate::k8s_client::{KubeClient, LogOptions, KubeConfig};
 use stream_cancel::{Valved, Trigger};
 use tokio::sync::oneshot::Sender;
 use async_trait::async_trait;

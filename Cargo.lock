@@ -1006,25 +1006,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "k8s_client"
-version = "0.1.0"
-source = "git+https://github.com/njust/k8s_client.git?rev=6150bd4#6150bd4af2101b1858349acb836703aedc135a44"
-dependencies = [
- "base64 0.6.0",
- "bytes 0.5.6",
- "dirs",
- "k8s-openapi",
- "openssl",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml 0.7.5",
- "tokio",
- "url 1.7.2",
- "url_serde",
-]
-
-[[package]]
 name = "kernel32-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1040,6 +1021,9 @@ version = "0.2.6"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.6.0",
+ "bytes 0.5.6",
+ "dirs",
  "encoding",
  "gdk",
  "gdk-pixbuf",
@@ -1048,16 +1032,21 @@ dependencies = [
  "glib_data_model_helper",
  "gtk",
  "image",
- "k8s_client",
+ "k8s-openapi",
  "log",
  "log4rs",
  "mime_guess",
+ "openssl",
  "regex",
+ "reqwest",
  "serde",
  "serde_json",
+ "serde_yaml 0.7.5",
  "sourceview",
  "stream-cancel",
  "tokio",
+ "url 1.7.2",
+ "url_serde",
  "uuid",
  "winres",
 ]

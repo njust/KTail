@@ -13,6 +13,7 @@ mod log_file_reader;
 mod kubernetes_log_reader;
 mod highlighters;
 mod menu;
+mod k8s_client;
 
 use gtk::prelude::*;
 use gio::prelude::*;

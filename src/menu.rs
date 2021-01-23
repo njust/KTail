@@ -4,7 +4,7 @@ use gtk::{Application, ApplicationWindow, FileChooserDialogBuilder, FileChooserA
 use gio::{SimpleAction};
 use glib::Sender;
 use crate::model::{Msg, PodSelectorMsg, CreateLogView, LogViewData};
-use k8s_client::KubeConfig;
+use crate::k8s_client::KubeConfig;
 use crate::util::{get_app_icon, send_msg};
 
 pub fn create_open_file_dlg_action(tx: Sender<Msg>) -> SimpleAction {
