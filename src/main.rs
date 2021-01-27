@@ -44,6 +44,7 @@ pub fn get_default_highlighters() -> Vec<Highlighter> {
             name: Some(String::from("Search")),
             is_system: true,
             rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
+            extractor_regex: None,
         },
         Highlighter {
             id: Uuid::new_v4(),
@@ -52,6 +53,7 @@ pub fn get_default_highlighters() -> Vec<Highlighter> {
             name: Some(String::from("Error")),
             is_system: false,
             rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
+            extractor_regex: Some("((?i)error|fatal|failed(?-i))(?P<text>.*)".to_string()),
         },
         Highlighter {
             id: Uuid::new_v4(),
@@ -60,6 +62,7 @@ pub fn get_default_highlighters() -> Vec<Highlighter> {
             name: Some(String::from("Warning")),
             is_system: false,
             rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
+            extractor_regex: Some("((?i)warn(?-i))(?P<text>.*)".to_string()),
         }
     ]
 }

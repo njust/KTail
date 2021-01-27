@@ -50,7 +50,7 @@ impl PodSelector {
 
         let dlg = gtk::DialogBuilder::new()
             .window_position(WindowPosition::CenterOnParent)
-            .default_width(540)
+            .default_width(710)
             .default_height(600)
             .modal(true)
             .build();

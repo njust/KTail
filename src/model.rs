@@ -58,7 +58,7 @@ impl LogViewData {
 pub struct SearchResultData {
     pub full_search: bool,
     pub data: String,
-    pub matches: HashMap<String, Vec<SearchResultMatch>>,
+    pub rule_search_result: HashMap<String, RuleSearchResultData>,
 }
 
 pub enum PodSelectorMsg {
@@ -113,9 +113,17 @@ pub enum LogTextViewMsg {
 
 #[derive(Debug, Clone)]
 pub struct SearchResultMatch {
+    pub name: Option<String>,
     pub line: usize,
     pub start: usize,
     pub end: usize,
+    pub extracted_text: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct RuleSearchResultData {
+    pub name: Option<String>,
+    pub matches: Vec<SearchResultMatch>,
 }
 
 pub enum LogState {
@@ -134,8 +142,10 @@ pub trait LogReader : std::marker::Send {
 
 pub struct ActiveRule {
     pub id: String,
+    pub name: Option<String>,
     pub line_offset: usize,
     pub regex: Option<Regex>,
+    pub extractor_regex: Option<Regex>,
     pub is_exclude: bool,
 }
 

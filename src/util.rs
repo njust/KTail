@@ -11,7 +11,8 @@ use log::{error};
 use std::collections::{HashMap};
 use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore, Widget, ApplicationWindow, DialogFlags, MessageType, ButtonsType};
 use std::rc::Rc;
-use crate::model::{ActiveRule, SearchResultData, SearchResultMatch, LogReplacer, Msg};
+use crate::model::{ActiveRule, SearchResultData, SearchResultMatch, LogReplacer, Msg, RuleSearchResultData};
+
 
 pub const APP_ICON_BUFFER: &'static [u8] = include_bytes!("../assets/app-icon/512x512.png");
 
@@ -61,7 +62,7 @@ pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>, Box<dyn Error>> {
 
 pub fn search(text: String, active_rules: &mut Vec<ActiveRule>, full_search: bool) -> Result<SearchResultData, Box<dyn Error>> {
     let lines = text.split("\n").enumerate();
-    let mut matches: HashMap<String, Vec<SearchResultMatch>> = HashMap::new();
+    let mut rule_search_result: HashMap<String, RuleSearchResultData> = HashMap::new();
 
     let mut data = String::new();
     let mut line_count = 0;
@@ -80,16 +81,25 @@ pub fn search(text: String, active_rules: &mut Vec<ActiveRule>, full_search: boo
             if let Some(regex) = &rule.regex {
                 if !rule.is_exclude {
                     for rule_match in regex.find_iter(&line) {
-                        if !matches.contains_key(&rule.id) {
-                            matches.insert(rule.id.clone(), vec![]);
+                        if !rule_search_result.contains_key(&rule.id) {
+                            rule_search_result.insert(rule.id.clone(), RuleSearchResultData {
+                                name: rule.name.clone(),
+                                matches: vec![]
+                            });
                         }
 
-                        let rule_matches = matches.get_mut(&rule.id).unwrap();
+                        let rule_matches = rule_search_result.get_mut(&rule.id).unwrap();
+                        let extracted_text = rule.extractor_regex.as_ref()
+                            .and_then(|extractor| extractor.captures(&line))
+                            .and_then(|extracted| extracted.name("text"))
+                            .and_then(|extracted| Some(extracted.as_str().to_owned()));
 
-                        rule_matches.push(SearchResultMatch {
+                        rule_matches.matches.push(SearchResultMatch {
                             line: line_count,
                             start: rule_match.start(),
-                            end: rule_match.end()
+                            end: rule_match.end(),
+                            extracted_text,
+                            name: rule.name.clone()
                         });
                     }
                 }else {
@@ -112,7 +122,7 @@ pub fn search(text: String, active_rules: &mut Vec<ActiveRule>, full_search: boo
     Ok(SearchResultData {
         full_search,
         data,
-        matches
+        rule_search_result,
     })
 }
 
@@ -178,13 +188,15 @@ impl<'a, 'b, T: PartialOrd> Iterator for SortedListCompare<'a, 'b, T> {
 
 pub enum ColumnType {
     String,
-    Bool
+    Bool,
+    Number
 }
 
 pub fn create_col(title: Option<&str>, idx: i32, col_type: ColumnType, ts: Rc<TreeStore>) -> TreeViewColumn {
     let col = TreeViewColumn::new();
     match col_type {
-        ColumnType::String => {
+        ColumnType::String
+        | ColumnType::Number => {
             let cell = CellRendererText::new();
             col.pack_start(&cell, true);
             col.add_attribute(&cell, "text", idx);

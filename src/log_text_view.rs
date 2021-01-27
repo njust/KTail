@@ -1,8 +1,8 @@
-use gtk::{prelude::*, TextIter, TextBuffer};
+use gtk::{prelude::*, TextIter, TextBuffer, TreeStore, ScrolledWindowBuilder, TreeIter, SortType, SortColumn};
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::rc::Rc;
 use glib::{SignalHandlerId};
-use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data, add_css_with_name};
+use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data, add_css_with_name, create_col, ColumnType};
 use crate::model::{LogTextViewMsg, LogViewData, SearchResultMatch, LogReplacer};
 
 use sourceview::{ViewExt, BufferExt, Mark};
@@ -15,8 +15,13 @@ use crate::log_file_reader::LogFileReader;
 use crate::kubernetes_log_reader::KubernetesLogReader;
 use crate::model::{LogState, ActiveRule, LogReader, LogTextViewThreadMsg, RuleChanges};
 
+struct ExtractData {
+    count: i32,
+    item: TreeIter,
+}
+
 pub struct LogTextView {
-    container: gtk::Box,
+    container: gtk::Paned,
     text_view: Rc<sourceview::View>,
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<Highlighter>,
@@ -26,6 +31,9 @@ pub struct LogTextView {
     current_result_selection: Option<(String, usize)>,
     result_match_cursor_pos: Option<usize>,
     marker: HashMap<u16, (i32, Mark)>,
+    extracted_data_model: Rc<TreeStore>,
+    extraction_nodes: HashMap<String, ExtractData>,
+    extractions: HashMap<String, HashMap<String, ExtractData>>,
 }
 
 const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
@@ -151,14 +159,31 @@ impl LogTextView {
         scroll_wnd.set_hexpand(true);
         scroll_wnd.add(&*text_view);
 
+        let paned = gtk::Paned::new(Orientation::Vertical);
+        paned.set_position(400);
+        let extracted_data_model = Rc::new(gtk::TreeStore::new(&[glib::Type::String, glib::Type::I32, glib::Type::String]));
+        let extracted_data_view = gtk::TreeView::with_model(&*extracted_data_model);
+        extracted_data_model.set_sort_column_id(SortColumn::Index(1), SortType::Descending);
+        let sw = ScrolledWindowBuilder::new()
+            .expand(true)
+            .build();
+
+        sw.add(&extracted_data_view);
+        extracted_data_view.append_column(&create_col(Some("Rule"), 0, ColumnType::String, extracted_data_model.clone()));
+        extracted_data_view.append_column(&create_col(Some("Count"), 1, ColumnType::Number, extracted_data_model.clone()));
+        extracted_data_view.append_column(&create_col(Some("Extracted"), 2, ColumnType::String, extracted_data_model.clone()));
+
         let container = gtk::Box::new(Orientation::Horizontal, 0);
         container.add(&scroll_wnd);
         container.add(&minimap);
 
+        paned.add(&container);
+        paned.add(&sw);
+
         let result_map: HashMap<String, Vec<SearchResultMatch>> = HashMap::new();
 
         Self {
-            container,
+            container: paned,
             text_view,
             autoscroll_handler: None,
             rules: vec![],
@@ -168,6 +193,9 @@ impl LogTextView {
             current_result_selection: None ,
             result_match_cursor_pos: None,
             marker: HashMap::new(),
+            extracted_data_model,
+            extraction_nodes: HashMap::new(),
+            extractions: HashMap::new(),
         }
     }
 
@@ -268,14 +296,44 @@ impl LogTextView {
                     if res.data.len() > 0 {
                         buffer.insert(&mut end, &res.data);
                     }
-                    for (tag, matches) in res.matches {
+                    for (tag, sd) in res.rule_search_result {
                         if !self.result_map.contains_key(&tag) {
                             self.result_map.insert(tag.clone(), vec![]);
                         }
 
                         let result = self.result_map.get_mut(&tag).expect("Could not get result map");
 
-                        for mut search_match in matches {
+                        for mut search_match in sd.matches {
+                            if let (Some(extracted_text), Some(name)) = (&search_match.extracted_text, &sd.name) {
+                                if let Some(parent) = self.extraction_nodes.get_mut(name) {
+                                    parent.count += 1;
+                                    self.extracted_data_model.set(&parent.item, &[1], &[&parent.count]);
+                                }else {
+                                    let item = self.extracted_data_model.insert_with_values(None, None, &[0], &[name]);
+                                    self.extraction_nodes.insert(name.clone(), ExtractData {
+                                        count: 1,
+                                        item
+                                    });
+                                    self.extractions.insert(name.clone(), HashMap::new());
+                                }
+
+
+                                //TODO: store hash of extracted_text
+                                //TODO: use id as key of data and store name as struct data
+                                if let (Some(parent), Some(ex)) = (self.extraction_nodes.get(name), self.extractions.get_mut(name)) {
+                                    if let Some(child) = ex.get_mut(extracted_text) {
+                                        child.count += 1;
+                                        self.extracted_data_model.set(&child.item, &[1], &[&child.count]);
+                                    }else {
+                                        let child = self.extracted_data_model.insert_with_values(Some(&parent.item), None, &[1, 2], &[&1, extracted_text]);
+                                        ex.insert(extracted_text.clone(), ExtractData {
+                                            count: 1,
+                                            item: child
+                                        });
+                                    }
+                                }
+                            }
+
                             let line = search_match.line as i32 + offset;
                             let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
                             let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
@@ -481,12 +539,10 @@ impl LogTextView {
         }
     }
 
-    pub fn view(&self) -> &gtk::Box {
+    pub fn view(&self) -> &gtk::Paned {
         &self.container
     }
 }
-
-
 
 fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, rx: std::sync::mpsc::Receiver<LogTextViewThreadMsg>)
     where T : 'static + Send + Clone + Fn(LogTextViewMsg)
@@ -524,7 +580,9 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                                     id: new.id.to_string(),
                                     line_offset: 0,
                                     regex,
-                                    is_exclude: new.is_exclude()
+                                    name: new.name.clone(),
+                                    is_exclude: new.is_exclude(),
+                                    extractor_regex: new.extractor_regex.as_ref().and_then(|r| Regex::new(r).ok())
                                 });
                             }
                             for remove in &changes.remove {
@@ -539,7 +597,10 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                                     if let Some(regex) = update.regex.as_ref() {
                                         search.line_offset = 0;
                                         search.regex = Regex::new(regex).ok();
-                                        search.is_exclude = update.is_exclude()
+                                        search.is_exclude = update.is_exclude();
+                                        if let Some(ex) = update.extractor_regex.as_ref() {
+                                            search.regex = Regex::new(ex).ok();
+                                        }
                                     } else {
                                         search.regex.take();
                                     }
@@ -555,7 +616,7 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
 
                 if let Some(data) = full_search_data {
                     if let Ok(result) = search(data, &mut active_rules, true) {
-                        if result.matches.len() > 0 {
+                        if result.rule_search_result.len() > 0 {
                             sender(LogTextViewMsg::Data(result));
                         }
                     }

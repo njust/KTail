@@ -130,7 +130,7 @@ impl KubeClient {
 
 #[test]
 pub fn test_load_namespaces() -> crate::Result<()> {
-    use crate::KubeConfig;
+    use crate::k8s_client::{Result, ClusterContext, KubeConfig};
 
     let mut rt = tokio::runtime::Builder::new()
         .basic_scheduler()

@@ -23,6 +23,7 @@ pub struct Highlighter {
     pub regex: Option<String>,
     pub is_system: bool,
     pub rule_type: String,
+    pub extractor_regex: Option<String>,
 }
 
 impl Highlighter {
@@ -34,6 +35,7 @@ impl Highlighter {
             regex: None,
             is_system: false,
             rule_type: rule_type.to_string(),
+            extractor_regex: None,
         }
     }
 
@@ -67,6 +69,8 @@ pub const COLOR_PROP: &'static str = "color";
 pub const IS_SYSTEM_PROP: &'static str = "isSystem";
 pub const RULE_TYPE: &'static str = "ruleType";
 
+pub const EXTRACTOR_REGEX_PROP: &'static str = "extractorRegex";
+
 pub const RULE_TYPE_HIGHLIGHT: &'static str = "highlight";
 pub const RULE_TYPE_EXCLUDE: &'static str = "exclude";
 
@@ -98,6 +102,9 @@ impl DataModelDescription for HighlighterData {
             }),
             subclass::Property(RULE_TYPE, |name|{
                 glib::ParamSpec::string(name, "Type", "Type", None, glib::ParamFlags::READWRITE)
+            }),
+            subclass::Property(EXTRACTOR_REGEX_PROP, |name| {
+                glib::ParamSpec::string(name,"Extractor","Extractor",None, glib::ParamFlags::READWRITE)
             }),
         ]
     }
@@ -143,6 +150,11 @@ impl HighlighterListView {
                 item.bind_property(REGEX_PROP, &regex_entry, "text")
                     .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
                 container.add(&regex_entry);
+
+                let extractor_regex_entry = gtk::Entry::new();
+                item.bind_property(EXTRACTOR_REGEX_PROP, &extractor_regex_entry, "text")
+                    .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
+                container.add(&extractor_regex_entry);
 
                 let color_button = gtk::ColorButton::new();
                 item.bind_property(COLOR_PROP, &color_button, "rgba")
@@ -228,7 +240,8 @@ impl HighlighterListView {
             (REGEX_PROP, &data.regex.unwrap_or_default()),
             (COLOR_PROP, &data.color),
             (IS_SYSTEM_PROP, &data.is_system),
-            (RULE_TYPE, &data.rule_type)
+            (RULE_TYPE, &data.rule_type),
+            (EXTRACTOR_REGEX_PROP, &data.extractor_regex.unwrap_or_default()),
         ]));
     }
 
@@ -241,6 +254,7 @@ impl HighlighterListView {
                 let id = o.get_property(ID_PROP)?.get::<String>()?.ok_or("No id")?;
                 let name = o.get_property(NAME_PROP)?.get::<String>()?.and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let regex = o.get_property(REGEX_PROP)?.get::<String>()?.and_then(|s|if s.len() <= 0 {None}else {Some(s)});
+                let extractor_regex = o.get_property(EXTRACTOR_REGEX_PROP)?.get::<String>()?.and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let color = o.get_property(COLOR_PROP)?.get::<String>().unwrap_or(None);
                 let rule_type = o.get_property(RULE_TYPE)?.get::<String>()?.ok_or("No type for rule")?;
                 let is_system = o.get_property(IS_SYSTEM_PROP)?.get::<bool>()?.unwrap_or(false);
@@ -250,7 +264,8 @@ impl HighlighterListView {
                     regex,
                     color,
                     is_system,
-                    rule_type
+                    rule_type,
+                    extractor_regex
                 })
             }
         }

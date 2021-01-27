@@ -1,6 +1,6 @@
 use gtk::prelude::*;
 use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, AccelFlags, AccelGroup, TreeIter};
-use crate::model::{LogViewToolbarMsg, SearchResultMatch, UNNAMED_RULE};
+use crate::model::{LogViewToolbarMsg, UNNAMED_RULE, RuleSearchResultData};
 use crate::highlighters::Highlighter;
 use std::collections::HashMap;
 
@@ -146,9 +146,9 @@ impl LogViewToolbar {
         None
     }
 
-    pub fn update_results(&mut self, matches: &HashMap<String, Vec<SearchResultMatch>>) {
-        for (id, results) in matches {
-            let cnt = results.len() as i32;
+    pub fn update_results(&mut self, matches: &HashMap<String, RuleSearchResultData>) {
+        for (id, result) in matches {
+            let cnt = result.matches.len() as i32;
             if cnt > 0 {
                 self.inc_rule(id, cnt);
             }

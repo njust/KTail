@@ -148,7 +148,7 @@ impl LogView {
             }
             LogViewMsg::LogTextViewMsg(msg) => {
                 if let LogTextViewMsg::Data(res) = &msg {
-                    self.toolbar.update_results(&res.matches);
+                    self.toolbar.update_results(&res.rule_search_result);
                 }
                 self.log_text_view.update(msg);
             }
