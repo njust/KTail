@@ -108,7 +108,8 @@ pub enum LogTextViewMsg {
     Clear,
     CursorChanged,
     ToggleBookmark(u16),
-    ScrollToBookmark(u16)
+    ScrollToBookmark(u16),
+    ExtractSelected(u32),
 }
 
 #[derive(Debug, Clone)]

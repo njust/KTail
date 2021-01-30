@@ -20,6 +20,7 @@ log = "0.4.11"
 gdk-pixbuf = {version = "0.9.0", features = ["v2_32"] }
 image = { version = "0.23", default-features = false, features = ["png"] }
 regex = "1.3.9"
+crc = "1.8.1"
 uuid = {version = "0.8.1", features = ["v4"]}
 stream-cancel = "0.6.1"
 glib_data_model_helper = {git = "https://github.com/njust/glib_data_model_helper.git"}

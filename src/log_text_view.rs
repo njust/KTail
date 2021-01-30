@@ -1,4 +1,4 @@
-use gtk::{prelude::*, TextIter, TextBuffer, TreeStore, ScrolledWindowBuilder, TreeIter, SortType, SortColumn};
+use gtk::{prelude::*, TextIter, TextBuffer, TreeStore, ScrolledWindowBuilder, TreeIter, SortType, SortColumn, TreeView};
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::rc::Rc;
 use glib::{SignalHandlerId};
@@ -18,6 +18,7 @@ use crate::model::{LogState, ActiveRule, LogReader, LogTextViewThreadMsg, RuleCh
 struct ExtractData {
     count: i32,
     item: TreeIter,
+    positions: Vec<i32>,
 }
 
 pub struct LogTextView {
@@ -32,8 +33,9 @@ pub struct LogTextView {
     result_match_cursor_pos: Option<usize>,
     marker: HashMap<u16, (i32, Mark)>,
     extracted_data_model: Rc<TreeStore>,
-    extraction_nodes: HashMap<String, ExtractData>,
-    extractions: HashMap<String, HashMap<String, ExtractData>>,
+    extracted_data_view: TreeView,
+    extract: HashMap<u32, ExtractData>,
+    active_extract: Option<(u32, usize)>,
 }
 
 const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
@@ -94,6 +96,17 @@ impl LogTextView {
             });
         }
 
+        {
+            let tx = sender.clone();
+            self.extracted_data_view.connect_row_activated(move |tv, _path, _col| {
+                if let Some((item, iter)) = tv.get_selection().get_selected() {
+                    if let Some(id) = item.get_value(&iter, 0).get::<u32>().unwrap_or(None) {
+                        tx(LogTextViewMsg::ExtractSelected(id));
+                    }
+                }
+            });
+        }
+
         let file_thread_tx = sender.clone();
         match data {
             LogViewData::File(path) => {
@@ -116,6 +129,8 @@ impl LogTextView {
             }
         }
     }
+
+
     pub fn new() -> Self {
         let tag_table = TextTagTable::new();
         let current_cursor_tag = gtk::TextTagBuilder::new()
@@ -161,17 +176,17 @@ impl LogTextView {
 
         let paned = gtk::Paned::new(Orientation::Vertical);
         paned.set_position(400);
-        let extracted_data_model = Rc::new(gtk::TreeStore::new(&[glib::Type::String, glib::Type::I32, glib::Type::String]));
+        let extracted_data_model = Rc::new(gtk::TreeStore::new(&[glib::Type::U32, glib::Type::String, glib::Type::I32, glib::Type::String]));
         let extracted_data_view = gtk::TreeView::with_model(&*extracted_data_model);
-        extracted_data_model.set_sort_column_id(SortColumn::Index(1), SortType::Descending);
+        extracted_data_model.set_sort_column_id(SortColumn::Index(2), SortType::Descending);
         let sw = ScrolledWindowBuilder::new()
             .expand(true)
             .build();
 
         sw.add(&extracted_data_view);
-        extracted_data_view.append_column(&create_col(Some("Rule"), 0, ColumnType::String, extracted_data_model.clone()));
-        extracted_data_view.append_column(&create_col(Some("Count"), 1, ColumnType::Number, extracted_data_model.clone()));
-        extracted_data_view.append_column(&create_col(Some("Extracted"), 2, ColumnType::String, extracted_data_model.clone()));
+        extracted_data_view.append_column(&create_col(Some("Rule"), 1, ColumnType::String, extracted_data_model.clone()));
+        extracted_data_view.append_column(&create_col(Some("Count"), 2, ColumnType::Number, extracted_data_model.clone()));
+        extracted_data_view.append_column(&create_col(Some("Extracted"), 3, ColumnType::String, extracted_data_model.clone()));
 
         let container = gtk::Box::new(Orientation::Horizontal, 0);
         container.add(&scroll_wnd);
@@ -180,22 +195,21 @@ impl LogTextView {
         paned.add(&container);
         paned.add(&sw);
 
-        let result_map: HashMap<String, Vec<SearchResultMatch>> = HashMap::new();
-
         Self {
             container: paned,
             text_view,
             autoscroll_handler: None,
             rules: vec![],
             thread_action_sender: None,
-            result_map,
+            result_map: HashMap::new(),
             active_rule: SEARCH_ID.to_string(),
             current_result_selection: None ,
             result_match_cursor_pos: None,
             marker: HashMap::new(),
             extracted_data_model,
-            extraction_nodes: HashMap::new(),
-            extractions: HashMap::new(),
+            extract: HashMap::new(),
+            extracted_data_view,
+            active_extract: None,
         }
     }
 
@@ -221,14 +235,6 @@ impl LogTextView {
                 buffer.remove_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
             }
         }
-    }
-
-    pub fn select_prev_match(&mut self, id: &String) {
-        self.select_match(id, false);
-    }
-
-    pub fn select_next_match(&mut self, id: &String) {
-        self.select_match(id, true);
     }
 
     pub fn select_match(&mut self, id: &String, forward: bool) {
@@ -296,48 +302,50 @@ impl LogTextView {
                     if res.data.len() > 0 {
                         buffer.insert(&mut end, &res.data);
                     }
-                    for (tag, sd) in res.rule_search_result {
-                        if !self.result_map.contains_key(&tag) {
-                            self.result_map.insert(tag.clone(), vec![]);
+                    for (search_id, search_result_data) in res.rule_search_result {
+                        if !self.result_map.contains_key(&search_id) {
+                            self.result_map.insert(search_id.clone(), vec![]);
                         }
+                        let result = self.result_map.get_mut(&search_id).expect("Could not get result map");
 
-                        let result = self.result_map.get_mut(&tag).expect("Could not get result map");
+                        let group_id = crc::crc32::checksum_ieee(search_id.as_bytes());
+                        for mut search_match in search_result_data.matches {
+                            let line = search_match.line as i32 + offset;
 
-                        for mut search_match in sd.matches {
-                            if let (Some(extracted_text), Some(name)) = (&search_match.extracted_text, &sd.name) {
-                                if let Some(parent) = self.extraction_nodes.get_mut(name) {
-                                    parent.count += 1;
-                                    self.extracted_data_model.set(&parent.item, &[1], &[&parent.count]);
+                            if let (Some(extracted_text), Some(name)) = (&search_match.extracted_text, &search_result_data.name) {
+                                if let Some(extract) = self.extract.get_mut(&group_id) {
+                                    extract.count += 1;
+                                    extract.positions.push(line);
+                                    self.extracted_data_model.set(&extract.item, &[2], &[&extract.count]);
                                 }else {
-                                    let item = self.extracted_data_model.insert_with_values(None, None, &[0], &[name]);
-                                    self.extraction_nodes.insert(name.clone(), ExtractData {
+                                    let item = self.extracted_data_model.insert_with_values(None, None, &[0, 1], &[&group_id, name]);
+                                    self.extract.insert(group_id, ExtractData {
                                         count: 1,
-                                        item
+                                        item,
+                                        positions: vec![line]
                                     });
-                                    self.extractions.insert(name.clone(), HashMap::new());
-                                }
+                                };
 
-
-                                //TODO: store hash of extracted_text
-                                //TODO: use id as key of data and store name as struct data
-                                if let (Some(parent), Some(ex)) = (self.extraction_nodes.get(name), self.extractions.get_mut(name)) {
-                                    if let Some(child) = ex.get_mut(extracted_text) {
-                                        child.count += 1;
-                                        self.extracted_data_model.set(&child.item, &[1], &[&child.count]);
-                                    }else {
-                                        let child = self.extracted_data_model.insert_with_values(Some(&parent.item), None, &[1, 2], &[&1, extracted_text]);
-                                        ex.insert(extracted_text.clone(), ExtractData {
+                                if let Some(parent) = self.extract.get(&group_id).and_then(|parent|Some(parent.item.clone())) {
+                                    let text_id = crc::crc32::checksum_ieee(format!("{}-{}", search_id, extracted_text).as_bytes());
+                                    if let Some(extract) = self.extract.get_mut(&text_id) {
+                                        extract.count += 1;
+                                        extract.positions.push(line);
+                                        self.extracted_data_model.set(&extract.item, &[2], &[&extract.count]);
+                                    } else {
+                                        let child = self.extracted_data_model.insert_with_values(Some(&parent), None, &[0, 2, 3], &[&text_id, &1, extracted_text]);
+                                        self.extract.insert(text_id, ExtractData {
                                             count: 1,
-                                            item: child
+                                            item: child,
+                                            positions: vec![line]
                                         });
                                     }
                                 }
                             }
 
-                            let line = search_match.line as i32 + offset;
                             let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
                             let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
-                            buffer.apply_tag_by_name(&tag, &iter_start, &iter_end);
+                            buffer.apply_tag_by_name(&search_id, &iter_start, &iter_end);
 
                             search_match.line = line as usize;
                             result.push(search_match);
@@ -389,9 +397,50 @@ impl LogTextView {
                     self.clear_result_selection_data();
                 }
             }
+            LogTextViewMsg::ExtractSelected(id) => {
+                if let Some(extract) = self.extract.get(&id) {
+                    println!("ED: {}", extract.count);
+                    if let Some(first) = extract.positions.iter().next() {
+                        self.select_line(*first);
+                        self.active_extract = Some((id, 0));
+                    }
+                }
+            }
         }
     }
 
+    fn select_line(&mut self, line: i32) {
+        if let Some(buffer) = self.text_view.get_buffer() {
+            let mut line_iter = buffer.get_iter_at_line(line);
+            let res = self.text_view.scroll_to_iter(&mut line_iter, 0.0, true, 0.5, 0.5);
+
+            println!("Scroll to line: {} at iter: {:?}. Res: {}", line, line_iter, res);
+        }
+    }
+
+    pub fn select_prev_match(&mut self, id: &String) {
+        // self.select_match(id, false);
+        self.select_match_new(false);
+    }
+
+    pub fn select_next_match(&mut self, id: &String) {
+        // self.select_match(id, true);
+        self.select_match_new(true);
+    }
+
+    fn select_match_new(&mut self, forward: bool) {
+        if let Some((id, pos)) = self.active_extract.as_mut() {
+            if let Some(e) = self.extract.get(id) {
+                if forward { *pos += 1 } else {
+                    if *pos > 0 { *pos -=1 } else { *pos = 0 }
+                }
+                if let Some(line) = e.positions.get(*pos) {
+                    println!("Select line: {}", line);
+                    self.select_line(*line);
+                }
+            }
+        }
+    }
 
     fn get_next_from_pos(&self, current_pos: &TextIter, rule_id: &String) -> Option<usize> {
         if let Some(buffer) = self.text_view.get_buffer() {

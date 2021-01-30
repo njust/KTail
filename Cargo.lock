@@ -128,6 +128,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "build_const"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39092a32794787acd8525ee150305ff051b0aa6cc2abaf193924f5ab05425f39"
+
+[[package]]
 name = "bumpalo"
 version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -242,6 +248,15 @@ name = "core-foundation-sys"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea221b5284a47e40033bf9b66f35f984ec0ea2931eb03505246cd27a963f981b"
+
+[[package]]
+name = "crc"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d663548de7f5cca343f1e0a48d14dcfb0e9eb4e079ec58883b7251539fa10aeb"
+dependencies = [
+ "build_const",
+]
 
 [[package]]
 name = "crc32fast"
@@ -1023,6 +1038,7 @@ dependencies = [
  "async-trait",
  "base64 0.6.0",
  "bytes 0.5.6",
+ "crc",
  "dirs",
  "encoding",
  "gdk",
