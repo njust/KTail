@@ -1,20 +1,24 @@
 use gtk::prelude::*;
-use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, AccelFlags, AccelGroup, TreeIter};
-use crate::model::{LogViewToolbarMsg, UNNAMED_RULE, RuleSearchResultData};
-use crate::highlighters::Highlighter;
-use std::collections::HashMap;
+use gtk::{ToggleButton, Orientation, ButtonExt, ToggleButtonExt, IconSize, SearchEntry, Button, AccelFlags, AccelGroup};
+use crate::model::{LogViewToolbarMsg};
+use crate::util::add_css_with_name;
 
 pub struct LogViewToolbar {
     container: gtk::Box,
-    rules_selector_data: gtk::ListStore,
 }
 
 impl LogViewToolbar {
-    pub fn new<T>(tx: T, accelerators: &AccelGroup, init_rules: &Vec<Highlighter>) -> Self
+    pub fn new<T>(tx: T, accelerators: &AccelGroup) -> Self
         where T: 'static + Clone + Fn(LogViewToolbarMsg)
     {
         let toolbar = gtk::Box::new(Orientation::Horizontal, 4);
-        toolbar.set_property_margin(4);
+        add_css_with_name(&toolbar, "toolbar", r"
+            #toolbar {
+                background-color: #f0f0f0;
+                padding: 2px;
+            }
+        ");
+        toolbar.set_property_margin(0);
 
         let search_txt = SearchEntry::new();
         let (key, modifier) = gtk::accelerator_parse("<Primary>F");
@@ -59,34 +63,6 @@ impl LogViewToolbar {
             toolbar.add(&prev_btn);
         }
 
-        let rules_data = gtk::ListStore::new(&[glib::Type::String, glib::Type::String, glib::Type::I32, glib::Type::String]);
-        let default_name = String::from(UNNAMED_RULE);
-        for rule in init_rules {
-            let name = rule.name.as_ref().unwrap_or(&default_name);
-            let id = rule.id.to_string();
-            rules_data.insert_with_values(None, &[0, 1, 2, 3], &[&id, &name, &0, &name]);
-        }
-
-        let rule_selector = gtk::ComboBoxBuilder::new()
-            .model(&rules_data)
-            .width_request(70)
-            .id_column(0)
-            .active(0)
-            .build();
-
-        let renderer =  gtk::CellRendererText::new();
-        rule_selector.pack_start(&renderer, true);
-        rule_selector.add_attribute(&renderer, "text", 3);
-        toolbar.add(&rule_selector);
-        {
-            let tx = tx.clone();
-            rule_selector.connect_changed(move |cb| {
-                if let Some(selected) = cb.get_active_id() {
-                    tx(LogViewToolbarMsg::SelectRule(selected.as_str().into()))
-                }
-            });
-        }
-
         let next_btn = gtk::Button::with_mnemonic("_Next"); {
             let (key, modifier) = gtk::accelerator_parse("<Primary>N");
             next_btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
@@ -125,86 +101,8 @@ impl LogViewToolbar {
         }
 
         Self {
-            container: toolbar,
-            rules_selector_data: rules_data,
+            container: toolbar
         }
-    }
-
-    pub fn get_rule_iter(&mut self, id: &str) -> Option<TreeIter> {
-        if let Some(current) = self.rules_selector_data.get_iter_first() {
-            loop {
-                if let Some(current_id) = self.rules_selector_data.get_value(&current, 0).get::<String>().ok().and_then(|v|v) {
-                    if id == current_id {
-                        return Some(current);
-                    }
-                }
-                if !self.rules_selector_data.iter_next(&current) {
-                    break;
-                }
-            }
-        }
-        None
-    }
-
-    pub fn update_results(&mut self, matches: &HashMap<String, RuleSearchResultData>) {
-        for (id, result) in matches {
-            let cnt = result.matches.len() as i32;
-            if cnt > 0 {
-                self.inc_rule(id, cnt);
-            }
-        }
-    }
-
-    pub fn update_rule(&mut self, iter: &TreeIter, name: &str) {
-        self.rules_selector_data.set(&iter, &[1], &[&name]);
-        let current_cnt = self.get_cnt(&iter);
-        self.set_cnt(&iter, current_cnt);
-    }
-
-    pub fn clear_counts(&mut self) {
-        if let Some(current) = self.rules_selector_data.get_iter_first() {
-            loop {
-                self.set_cnt(&current, 0);
-                if !self.rules_selector_data.iter_next(&current) {
-                    break;
-                }
-            }
-        }
-    }
-
-    pub fn set_cnt(&mut self, iter: &TreeIter, cnt: i32) {
-        let name = self.rules_selector_data.get_value(&iter, 1).get::<String>().ok().and_then(|v|v).unwrap();
-        self.rules_selector_data.set(&iter, &[2], &[&(cnt)]);
-        let label = if cnt > 0 {
-            format!("{} ({})", name, cnt)
-        }else {
-            name
-        };
-        self.rules_selector_data.set(&iter, &[3], &[&label]);
-    }
-
-    fn get_cnt(&self, iter: &TreeIter) -> i32 {
-        self.rules_selector_data.get_value(&iter, 2).get::<i32>().ok().and_then(|v|v).unwrap_or(0)
-    }
-
-    pub fn inc_rule(&mut self, id: &str, cnt: i32) {
-        if let Some(iter) = self.get_rule_iter(id) {
-            let current_cnt = self.get_cnt(&iter);
-            self.set_cnt(&iter, current_cnt + cnt)
-        }
-    }
-
-    pub fn delete_rule(&mut self, id: &str) {
-        if let Some(iter) = self.get_rule_iter(id) {
-            self.rules_selector_data.remove(&iter);
-        }
-    }
-
-    pub fn add_rule(&mut self, rule: &Highlighter) {
-        let default_name = String::from(UNNAMED_RULE);
-        let name = rule.name.as_ref().unwrap_or(&default_name);
-        let id = rule.id.to_string();
-        self.rules_selector_data.insert_with_values(None, &[0, 1, 2, 3], &[&id, &name, &0, &name]);
     }
 
     pub fn view(&self) -> &gtk::Box {

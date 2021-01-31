@@ -272,10 +272,13 @@ impl HighlighterListView {
         Ok(rules)
     }
 
-    pub fn set_regex(&mut self, id: &str, regex: &String) {
+    pub fn set_regex(&mut self, id: &str, regex: &String, extractor: &String) {
         if let Some(o) = Self::get_highlighter_by_id(id, self.highlighter_list_data.clone()) {
             if let Err(e) = o.set_property(REGEX_PROP, &regex) {
                 error!("Could not set regex: {}", e);
+            }
+            if let Err(e) = o.set_property(EXTRACTOR_REGEX_PROP, &extractor) {
+                error!("Could not set extractor regex: {}", e);
             }
         }
     }

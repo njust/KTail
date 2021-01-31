@@ -6,8 +6,6 @@ use uuid::Uuid;
 use std::path::PathBuf;
 use std::collections::HashMap;
 
-pub const UNNAMED_RULE: &'static str = "Unnamed rule";
-
 pub struct CreateKubeLogData {
     pub pods: Vec<String>,
     pub cluster: String,
@@ -98,7 +96,6 @@ pub enum LogViewToolbarMsg {
     ToggleAutoScroll(bool),
     SelectNextMatch,
     SelectPrevMatch,
-    SelectRule(String),
     Clear
 }
 

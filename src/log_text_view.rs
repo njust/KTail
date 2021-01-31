@@ -1,14 +1,14 @@
-use gtk::{prelude::*, TextIter, TextBuffer, TreeStore, ScrolledWindowBuilder, TreeIter, SortType, SortColumn, TreeView};
+use gtk::{prelude::*, TreeStore, ScrolledWindowBuilder, TreeIter, SortType, SortColumn, TreeView};
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::rc::Rc;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data, add_css_with_name, create_col, ColumnType};
-use crate::model::{LogTextViewMsg, LogViewData, SearchResultMatch, LogReplacer};
+use crate::model::{LogTextViewMsg, LogViewData, LogReplacer};
 
 use sourceview::{ViewExt, BufferExt, Mark};
 use regex::Regex;
 use std::collections::{HashMap};
-use crate::highlighters::{SEARCH_ID, Highlighter};
+use crate::highlighters::{Highlighter};
 
 use log::{info, error, debug};
 use crate::log_file_reader::LogFileReader;
@@ -26,11 +26,7 @@ pub struct LogTextView {
     text_view: Rc<sourceview::View>,
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<Highlighter>,
-    active_rule: String,
     thread_action_sender: Option<std::sync::mpsc::Sender<LogTextViewThreadMsg>>,
-    result_map: HashMap<String, Vec<SearchResultMatch>>,
-    current_result_selection: Option<(String, usize)>,
-    result_match_cursor_pos: Option<usize>,
     marker: HashMap<u16, (i32, Mark)>,
     extracted_data_model: Rc<TreeStore>,
     extracted_data_view: TreeView,
@@ -201,10 +197,6 @@ impl LogTextView {
             autoscroll_handler: None,
             rules: vec![],
             thread_action_sender: None,
-            result_map: HashMap::new(),
-            active_rule: SEARCH_ID.to_string(),
-            current_result_selection: None ,
-            result_match_cursor_pos: None,
             marker: HashMap::new(),
             extracted_data_model,
             extract: HashMap::new(),
@@ -213,77 +205,24 @@ impl LogTextView {
         }
     }
 
+    fn scroll_to_line(&self, line: i32) {
+        let text_view = self.text_view.clone();
+        glib::idle_add_local(move || {
+            if let Some(buffer) = text_view.get_buffer() {
+                let mut iter = buffer.get_iter_at_line(line);
+                let iter_loc = text_view.get_iter_location(&iter);
+                let visible_rect = text_view.get_visible_rect();
 
-    fn get_bounds_for_match(buffer: &TextBuffer, result: &SearchResultMatch) -> (TextIter, TextIter) {
-        let line = result.line as i32;
-        let iter_start = buffer.get_iter_at_line_index(line, result.start as i32);
-        let iter_end = buffer.get_iter_at_line_index(line, result.end as i32);
-        (iter_start, iter_end)
-    }
-
-    pub fn set_active_rule(&mut self, rule: &str) {
-        self.active_rule = rule.to_string();
-    }
-
-    fn set_or_remove_selected_match(text_view: &sourceview::View, search_match: &SearchResultMatch, set: bool) {
-        if let Some(buffer) = text_view.get_buffer() {
-            let (mut iter_start, iter_end) = Self::get_bounds_for_match(&buffer, &search_match);
-            if set {
-                buffer.apply_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
-                text_view.scroll_to_iter(&mut iter_start, 0.0, true, 0.5, 0.5);
+                text_view.scroll_to_iter(&mut iter, 0.0, true, 0.5, 0.5);
+                if visible_rect.intersect(&iter_loc).is_none() {
+                    glib::Continue(true)
+                } else {
+                    glib::Continue(false)
+                }
             }else {
-                buffer.remove_tag_by_name(CURRENT_CURSOR_TAG, &iter_start, &iter_end);
+                glib::Continue(false)
             }
-        }
-    }
-
-    pub fn select_match(&mut self, id: &String, forward: bool) {
-        if let Some(matches) = self.result_map.get(id) {
-            if let Some((current_id, current)) = self.current_result_selection.take() {
-                if id != &current_id {
-                    if let Some(rs) = self.result_map.get(&current_id) {
-                        if let Some(c) = rs.get(current) {
-                            if let Some(buffer) = self.text_view.get_buffer() {
-                                let (start, _end) = Self::get_bounds_for_match(&buffer, &c);
-                                self.result_match_cursor_pos = self.get_next_from_pos(&start, &id);
-                            }
-                            Self::set_or_remove_selected_match(&*self.text_view, &c, false);
-                        }
-                    }
-                }
-
-                let next = if let Some(next) = self.result_match_cursor_pos.take() {
-                    next
-                }else {
-                    if forward {
-                        if current < matches.len() -1 { current +1 } else { 0 }
-                    } else {
-                        if current > 0 { current -1 } else { 0 }
-                    }
-                };
-                if let Some(prev) = matches.get(current) {
-                    Self::set_or_remove_selected_match(&*self.text_view, &prev, false);
-                }
-                if let Some(next) = matches.get(next) {
-                    Self::set_or_remove_selected_match(&*self.text_view, &next, true);
-                }
-                self.current_result_selection = Some((id.to_string(), next));
-            }else {
-                let start = if let Some(start) = self.result_match_cursor_pos.take() {
-                    start
-                }else {
-                    if forward {
-                        0
-                    }else {
-                        if matches.len() > 0 { matches.len() -1 } else { 0 }
-                    }
-                };
-                if let Some(first_match) = matches.get(start) {
-                    Self::set_or_remove_selected_match(&*self.text_view, &first_match, true);
-                    self.current_result_selection = Some((id.to_string(), start));
-                }
-            }
-        }
+        });
     }
 
     pub fn update(&mut self, msg: LogTextViewMsg) {
@@ -302,14 +241,10 @@ impl LogTextView {
                     if res.data.len() > 0 {
                         buffer.insert(&mut end, &res.data);
                     }
-                    for (search_id, search_result_data) in res.rule_search_result {
-                        if !self.result_map.contains_key(&search_id) {
-                            self.result_map.insert(search_id.clone(), vec![]);
-                        }
-                        let result = self.result_map.get_mut(&search_id).expect("Could not get result map");
 
+                    for (search_id, search_result_data) in res.rule_search_result {
                         let group_id = crc::crc32::checksum_ieee(search_id.as_bytes());
-                        for mut search_match in search_result_data.matches {
+                        for search_match in search_result_data.matches {
                             let line = search_match.line as i32 + offset;
 
                             if let (Some(extracted_text), Some(name)) = (&search_match.extracted_text, &search_result_data.name) {
@@ -318,7 +253,7 @@ impl LogTextView {
                                     extract.positions.push(line);
                                     self.extracted_data_model.set(&extract.item, &[2], &[&extract.count]);
                                 }else {
-                                    let item = self.extracted_data_model.insert_with_values(None, None, &[0, 1], &[&group_id, name]);
+                                    let item = self.extracted_data_model.insert_with_values(None, None, &[0, 1, 2], &[&group_id, name, &1]);
                                     self.extract.insert(group_id, ExtractData {
                                         count: 1,
                                         item,
@@ -346,19 +281,13 @@ impl LogTextView {
                             let iter_start = buffer.get_iter_at_line_index(line, search_match.start as i32);
                             let iter_end = buffer.get_iter_at_line_index(line, search_match.end as i32);
                             buffer.apply_tag_by_name(&search_id, &iter_start, &iter_end);
-
-                            search_match.line = line as usize;
-                            result.push(search_match);
                         }
                     }
                 }
             }
             LogTextViewMsg::ScrollToBookmark(key) => {
                 if let Some((line, _)) = self.marker.get(&key) {
-                    if let Some(buffer) = self.text_view.get_buffer() {
-                        let mut iter = buffer.get_iter_at_line(*line);
-                        self.text_view.scroll_to_iter(&mut iter, 0.0, true, 0.5, 0.5);
-                    }
+                    self.scroll_to_line(*line);
                 }
             }
             LogTextViewMsg::ToggleBookmark(key) => {
@@ -383,25 +312,21 @@ impl LogTextView {
                 }
             }
             LogTextViewMsg::CursorChanged => {
-
-                if let Some(buffer) = self.text_view.get_buffer() {
-                    let cursor_pos = buffer.get_property_cursor_position();
-                    let cursor_pos = buffer.get_iter_at_offset(cursor_pos);
-
-                    self.result_match_cursor_pos = self.get_next_from_pos(&cursor_pos, &self.active_rule);
+                if let Some(_buffer) = self.text_view.get_buffer() {
+                    // let cursor_pos = buffer.get_property_cursor_position();
+                    // let cursor_pos = buffer.get_iter_at_offset(cursor_pos);
+                    //
                 }
             }
             LogTextViewMsg::Clear => {
                 if let Some(buffer) = &self.text_view.get_buffer() {
                     buffer.set_text("");
-                    self.clear_result_selection_data();
                 }
             }
             LogTextViewMsg::ExtractSelected(id) => {
                 if let Some(extract) = self.extract.get(&id) {
-                    println!("ED: {}", extract.count);
                     if let Some(first) = extract.positions.iter().next() {
-                        self.select_line(*first);
+                        self.scroll_to_line(*first);
                         self.active_extract = Some((id, 0));
                     }
                 }
@@ -409,72 +334,31 @@ impl LogTextView {
         }
     }
 
-    fn select_line(&mut self, line: i32) {
-        if let Some(buffer) = self.text_view.get_buffer() {
-            let mut line_iter = buffer.get_iter_at_line(line);
-            let res = self.text_view.scroll_to_iter(&mut line_iter, 0.0, true, 0.5, 0.5);
-
-            println!("Scroll to line: {} at iter: {:?}. Res: {}", line, line_iter, res);
-        }
+    pub fn select_prev_match(&mut self) {
+        self.select_match(false);
     }
 
-    pub fn select_prev_match(&mut self, id: &String) {
-        // self.select_match(id, false);
-        self.select_match_new(false);
+    pub fn select_next_match(&mut self) {
+        self.select_match(true);
     }
 
-    pub fn select_next_match(&mut self, id: &String) {
-        // self.select_match(id, true);
-        self.select_match_new(true);
-    }
-
-    fn select_match_new(&mut self, forward: bool) {
+    fn select_match(&mut self, forward: bool) {
         if let Some((id, pos)) = self.active_extract.as_mut() {
             if let Some(e) = self.extract.get(id) {
-                if forward { *pos += 1 } else {
-                    if *pos > 0 { *pos -=1 } else { *pos = 0 }
+                if forward {
+                    if *pos == e.positions.len() -1 { *pos = 0 }else { *pos += 1 }
+                } else {
+                    if *pos > 0 { *pos -=1 } else { *pos = e.positions.len() -1 }
                 }
                 if let Some(line) = e.positions.get(*pos) {
-                    println!("Select line: {}", line);
-                    self.select_line(*line);
+                    self.scroll_to_line(*line);
                 }
             }
         }
-    }
-
-    fn get_next_from_pos(&self, current_pos: &TextIter, rule_id: &String) -> Option<usize> {
-        if let Some(buffer) = self.text_view.get_buffer() {
-            if let Some(search_results) = self.result_map.get(rule_id) {
-                let next = search_results.iter().enumerate().find(|(_, m)| {
-                    let search_match_pos = buffer.get_iter_at_line_index(m.line as i32, m.start as i32);
-                    &search_match_pos > current_pos
-                }).map(|(idx, _)| idx).or_else(|| {
-                    search_results.iter().enumerate().last().map(|(idx, _)| idx)
-                });
-
-                if let Some(next) = next {
-                    let next = if next > 0 { next } else { 0 };
-                    return Some(next);
-                }
-            }
-        }
-        return None
-    }
-
-    fn clear_result_selection_data(&mut self) {
-        for (id, pos) in &self.current_result_selection {
-            if let Some(d) = self.result_map.get(id).and_then(|m| m.get(*pos)) {
-                Self::set_or_remove_selected_match(&self.text_view, &d, false);
-            }
-        }
-        self.current_result_selection.take();
-        self.result_map.clear();
     }
 
     pub fn clear_log(&mut self) {
         if let Some(buffer) = self.text_view.get_buffer() {
-            self.result_map.clear();
-            self.current_result_selection.take();
             buffer.set_text("");
         }
     }
@@ -486,8 +370,8 @@ impl LogTextView {
 
         rules.sort_by_key(|i| i.id);
         let init = self.rules.len() <= 0;
-        let mut clear_cursor = false;
         let mut has_changes = false;
+        let mut clear_data = false;
         let compare_results = SortedListCompare::new(&mut self.rules, &mut rules);
         for compare_result in compare_results {
             let text_view = self.text_view.clone();
@@ -523,20 +407,25 @@ impl LogTextView {
                         .and_then(|tag_table| tag_table.lookup(&left.id.to_string())) {
                         tag.set_property_background(right.color.as_ref().map(|s|s.as_str()));
                     }
-                    if left.regex != right.regex || left.is_exclude() != right.is_exclude() {
+                    if left.regex != right.regex
+                        || left.is_exclude() != right.is_exclude()
+                        || left.extractor_regex != right.extractor_regex {
                         has_changes = true;
+                        clear_data = true;
                         update.push(right.clone());
                         if let Some(tb) = text_view.get_buffer() {
                             let (start, end) = tb.get_bounds();
                             tb.remove_tag_by_name(&left.id.to_string(), &start, &end);
                         }
-                        clear_cursor = true;
                     }
                 }
             }
         }
-        if clear_cursor {
-            self.clear_result_selection_data();
+
+        if clear_data {
+            self.extract.clear();
+            self.extracted_data_model.clear();
+            self.active_extract = None;
         }
 
         if has_changes {
@@ -648,7 +537,7 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                                         search.regex = Regex::new(regex).ok();
                                         search.is_exclude = update.is_exclude();
                                         if let Some(ex) = update.extractor_regex.as_ref() {
-                                            search.regex = Regex::new(ex).ok();
+                                            search.extractor_regex = Regex::new(ex).ok();
                                         }
                                     } else {
                                         search.regex.take();
