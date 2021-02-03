@@ -100,13 +100,19 @@ pub enum LogViewToolbarMsg {
 }
 
 #[derive(Debug)]
+pub enum ExtractSelection {
+    SearchGroup(String),
+    TextGroup(String, u32)
+}
+
+#[derive(Debug)]
 pub enum LogTextViewMsg {
     Data(SearchResultData),
     Clear,
     CursorChanged,
     ToggleBookmark(u16),
     ScrollToBookmark(u16),
-    ExtractSelected(u32),
+    ExtractSelected(ExtractSelection),
 }
 
 #[derive(Debug, Clone)]
@@ -145,6 +151,7 @@ pub struct ActiveRule {
     pub regex: Option<Regex>,
     pub extractor_regex: Option<Regex>,
     pub is_exclude: bool,
+    pub is_dirty: bool,
 }
 
 pub struct RuleChanges {

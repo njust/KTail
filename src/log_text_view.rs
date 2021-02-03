@@ -3,7 +3,7 @@ use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::rc::Rc;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data, add_css_with_name, create_col, ColumnType};
-use crate::model::{LogTextViewMsg, LogViewData, LogReplacer};
+use crate::model::{LogTextViewMsg, LogViewData, LogReplacer, ExtractSelection};
 
 use sourceview::{ViewExt, BufferExt, Mark};
 use regex::Regex;
@@ -15,10 +15,41 @@ use crate::log_file_reader::LogFileReader;
 use crate::kubernetes_log_reader::KubernetesLogReader;
 use crate::model::{LogState, ActiveRule, LogReader, LogTextViewThreadMsg, RuleChanges};
 
+
+const EXTRACT_TYPE_GROUP : &'static u8 = &0;
+const EXTRACT_TYPE_CHILD : &'static u8 = &1;
+
+const EXTRACT_COL_TYPE :  u32 = 0;
+const EXTRACT_COL_SEARCH_ID : u32 = 1;
+const EXTRACT_COL_CHECKSUM : u32 = 2;
+const EXTRACT_COL_NAME : u32 = 3;
+const EXTRACT_COL_COUNT : u32 = 4;
+const EXTRACT_COL_TEXT : u32 = 5;
+
+
+
 struct ExtractData {
     count: i32,
     item: TreeIter,
     positions: Vec<i32>,
+}
+
+struct SearchGroup {
+    count: i32,
+    item: TreeIter,
+    positions: Vec<i32>,
+    children: HashMap<u32, ExtractData>
+}
+
+impl SearchGroup {
+    fn new(item: TreeIter) -> Self {
+        Self {
+            count: 1,
+            item,
+            positions: vec![],
+            children: HashMap::new()
+        }
+    }
 }
 
 pub struct LogTextView {
@@ -30,8 +61,8 @@ pub struct LogTextView {
     marker: HashMap<u16, (i32, Mark)>,
     extracted_data_model: Rc<TreeStore>,
     extracted_data_view: TreeView,
-    extract: HashMap<u32, ExtractData>,
-    active_extract: Option<(u32, usize)>,
+    extract: HashMap<String, SearchGroup>,
+    active_extract: Option<(ExtractSelection, usize)>,
 }
 
 const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
@@ -96,8 +127,16 @@ impl LogTextView {
             let tx = sender.clone();
             self.extracted_data_view.connect_row_activated(move |tv, _path, _col| {
                 if let Some((item, iter)) = tv.get_selection().get_selected() {
-                    if let Some(id) = item.get_value(&iter, 0).get::<u32>().unwrap_or(None) {
-                        tx(LogTextViewMsg::ExtractSelected(id));
+                    if let Some(col_type) = item.get_value(&iter, EXTRACT_COL_TYPE as i32).get::<u8>().unwrap_or(None) {
+                        let selection = if &col_type == EXTRACT_TYPE_GROUP {
+                            item.get_value(&iter, EXTRACT_COL_SEARCH_ID as i32).get::<String>().unwrap_or(None).map(|s| ExtractSelection::SearchGroup(s))
+                        }else {
+                            let search_id = item.get_value(&iter, EXTRACT_COL_SEARCH_ID as i32).get::<String>().unwrap_or(None).expect("Invalid item without search id");
+                            item.get_value(&iter, EXTRACT_COL_CHECKSUM as i32).get::<u32>().unwrap_or(None).map(|s| ExtractSelection::TextGroup(search_id, s))
+                        };
+                        if let Some(r) = selection {
+                            tx(LogTextViewMsg::ExtractSelected(r));
+                        }
                     }
                 }
             });
@@ -172,17 +211,24 @@ impl LogTextView {
 
         let paned = gtk::Paned::new(Orientation::Vertical);
         paned.set_position(400);
-        let extracted_data_model = Rc::new(gtk::TreeStore::new(&[glib::Type::U32, glib::Type::String, glib::Type::I32, glib::Type::String]));
+        let extracted_data_model = Rc::new(gtk::TreeStore::new(&[
+            glib::Type::U8,         // Type             0
+            glib::Type::String,     // SearchId         1
+            glib::Type::U32,        // Checksum         2
+            glib::Type::String,     // Name             3
+            glib::Type::I32,        // Count            4
+            glib::Type::String      // Extracted Text   5
+        ]));
         let extracted_data_view = gtk::TreeView::with_model(&*extracted_data_model);
-        extracted_data_model.set_sort_column_id(SortColumn::Index(2), SortType::Descending);
+        extracted_data_model.set_sort_column_id(SortColumn::Index(EXTRACT_COL_COUNT), SortType::Descending);
         let sw = ScrolledWindowBuilder::new()
             .expand(true)
             .build();
 
         sw.add(&extracted_data_view);
-        extracted_data_view.append_column(&create_col(Some("Rule"), 1, ColumnType::String, extracted_data_model.clone()));
-        extracted_data_view.append_column(&create_col(Some("Count"), 2, ColumnType::Number, extracted_data_model.clone()));
-        extracted_data_view.append_column(&create_col(Some("Extracted"), 3, ColumnType::String, extracted_data_model.clone()));
+        extracted_data_view.append_column(&create_col(Some("Rule"), EXTRACT_COL_NAME as i32, ColumnType::String, extracted_data_model.clone()));
+        extracted_data_view.append_column(&create_col(Some("Count"), EXTRACT_COL_COUNT as i32, ColumnType::Number, extracted_data_model.clone()));
+        extracted_data_view.append_column(&create_col(Some("Extracted"), EXTRACT_COL_TEXT as i32, ColumnType::String, extracted_data_model.clone()));
 
         let container = gtk::Box::new(Orientation::Horizontal, 0);
         container.add(&scroll_wnd);
@@ -243,38 +289,40 @@ impl LogTextView {
                     }
 
                     for (search_id, search_result_data) in res.rule_search_result {
-                        let group_id = crc::crc32::checksum_ieee(search_id.as_bytes());
+                        let name = &search_result_data.name.expect("Search result data should have a name");
+                        if !self.extract.contains_key(&search_id) {
+                            let item = self.extracted_data_model.insert_with_values(None, None,
+                            &[EXTRACT_COL_TYPE, EXTRACT_COL_SEARCH_ID, EXTRACT_COL_NAME, EXTRACT_COL_COUNT],
+                            &[EXTRACT_TYPE_GROUP, &search_id, name, &1]);
+                            self.extract.insert(search_id.clone(), SearchGroup::new(item));
+                        }
+
+                        let mut extract_group = self.extract.get_mut(&search_id).unwrap();
+
                         for search_match in search_result_data.matches {
                             let line = search_match.line as i32 + offset;
+                            extract_group.positions.push(line);
+                            extract_group.count += 1;
+                            self.extracted_data_model.set(&extract_group.item, &[EXTRACT_COL_COUNT], &[&extract_group.count]);
 
-                            if let (Some(extracted_text), Some(name)) = (&search_match.extracted_text, &search_result_data.name) {
-                                if let Some(extract) = self.extract.get_mut(&group_id) {
+
+                            if let Some(extracted_text) = &search_match.extracted_text {
+                                let text_id = crc::crc32::checksum_ieee(extracted_text.as_bytes());
+                                if let Some(extract) = extract_group.children.get_mut(&text_id) {
                                     extract.count += 1;
                                     extract.positions.push(line);
-                                    self.extracted_data_model.set(&extract.item, &[2], &[&extract.count]);
-                                }else {
-                                    let item = self.extracted_data_model.insert_with_values(None, None, &[0, 1, 2], &[&group_id, name, &1]);
-                                    self.extract.insert(group_id, ExtractData {
+                                    self.extracted_data_model.set(&extract.item, &[EXTRACT_COL_COUNT], &[&extract.count]);
+                                } else {
+                                    let child = self.extracted_data_model.insert_with_values(
+                                        Some(&extract_group.item), None,
+                                        &[EXTRACT_COL_TYPE, EXTRACT_COL_SEARCH_ID, EXTRACT_COL_CHECKSUM, EXTRACT_COL_COUNT, EXTRACT_COL_TEXT],
+                                        &[EXTRACT_TYPE_CHILD, &search_id ,&text_id, &1, extracted_text]);
+
+                                    extract_group.children.insert(text_id, ExtractData {
                                         count: 1,
-                                        item,
+                                        item: child,
                                         positions: vec![line]
                                     });
-                                };
-
-                                if let Some(parent) = self.extract.get(&group_id).and_then(|parent|Some(parent.item.clone())) {
-                                    let text_id = crc::crc32::checksum_ieee(format!("{}-{}", search_id, extracted_text).as_bytes());
-                                    if let Some(extract) = self.extract.get_mut(&text_id) {
-                                        extract.count += 1;
-                                        extract.positions.push(line);
-                                        self.extracted_data_model.set(&extract.item, &[2], &[&extract.count]);
-                                    } else {
-                                        let child = self.extracted_data_model.insert_with_values(Some(&parent), None, &[0, 2, 3], &[&text_id, &1, extracted_text]);
-                                        self.extract.insert(text_id, ExtractData {
-                                            count: 1,
-                                            item: child,
-                                            positions: vec![line]
-                                        });
-                                    }
                                 }
                             }
 
@@ -323,11 +371,24 @@ impl LogTextView {
                     buffer.set_text("");
                 }
             }
-            LogTextViewMsg::ExtractSelected(id) => {
-                if let Some(extract) = self.extract.get(&id) {
-                    if let Some(first) = extract.positions.iter().next() {
-                        self.scroll_to_line(*first);
-                        self.active_extract = Some((id, 0));
+            LogTextViewMsg::ExtractSelected(selection) => {
+                match &selection {
+                    ExtractSelection::SearchGroup(search_id) => {
+                        if let Some(line) = self.extract.get(search_id)
+                            .and_then(|search_group| search_group.positions.first())
+                        {
+                            self.scroll_to_line(*line);
+                            self.active_extract = Some((selection, 0))
+                        }
+                    }
+                    ExtractSelection::TextGroup(search_id, text_id) => {
+                        if let Some(line) = self.extract.get(search_id)
+                            .and_then(|search| search.children.get(&text_id))
+                            .and_then(|extract_data| extract_data.positions.first() )
+                        {
+                            self.scroll_to_line(*line);
+                            self.active_extract = Some((selection, 0))
+                        }
                     }
                 }
             }
@@ -343,18 +404,37 @@ impl LogTextView {
     }
 
     fn select_match(&mut self, forward: bool) {
-        if let Some((id, pos)) = self.active_extract.as_mut() {
-            if let Some(e) = self.extract.get(id) {
-                if forward {
-                    if *pos == e.positions.len() -1 { *pos = 0 }else { *pos += 1 }
-                } else {
-                    if *pos > 0 { *pos -=1 } else { *pos = e.positions.len() -1 }
+        if let Some((sel, pos)) = self.active_extract.as_mut() {
+            match sel {
+                ExtractSelection::SearchGroup(search_id) => {
+                    if let Some(search_group) = self.extract.get(search_id) {
+                        *pos = Self::get_next_pos(&search_group.positions, *pos, forward);
+                        if let Some(line) = search_group.positions.get(*pos) {
+                            self.scroll_to_line(*line);
+                        }
+                    }
                 }
-                if let Some(line) = e.positions.get(*pos) {
-                    self.scroll_to_line(*line);
+                ExtractSelection::TextGroup(search_id, text_id) => {
+                    if let Some(extract_data) = self.extract.get(search_id)
+                        .and_then(|search_group| search_group.children.get(text_id)) {
+                        *pos = Self::get_next_pos(&extract_data.positions, *pos, forward);
+                        if let Some(line) = extract_data.positions.get(*pos) {
+                            self.scroll_to_line(*line);
+                        }
+                    }
                 }
             }
         }
+    }
+
+    fn get_next_pos(positions: &Vec<i32>, pos: usize, forward: bool) -> usize {
+        let mut next = pos;
+        if forward {
+            if pos == positions.len() -1 { next = 0 }else { next += 1 }
+        } else {
+            if pos > 0 { next -=1 } else { next = positions.len() -1 }
+        }
+        next
     }
 
     pub fn clear_log(&mut self) {
@@ -412,6 +492,12 @@ impl LogTextView {
                         || left.extractor_regex != right.extractor_regex {
                         has_changes = true;
                         clear_data = true;
+                        let id = right.id.to_string();
+                        if let Some(data) = self.extract.get(&id) {
+                            self.extracted_data_model.remove(&data.item);
+                            self.extract.remove(&id);
+                        }
+
                         update.push(right.clone());
                         if let Some(tb) = text_view.get_buffer() {
                             let (start, end) = tb.get_bounds();
@@ -423,8 +509,6 @@ impl LogTextView {
         }
 
         if clear_data {
-            self.extract.clear();
-            self.extracted_data_model.clear();
             self.active_extract = None;
         }
 
@@ -520,6 +604,7 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                                     regex,
                                     name: new.name.clone(),
                                     is_exclude: new.is_exclude(),
+                                    is_dirty: false,
                                     extractor_regex: new.extractor_regex.as_ref().and_then(|r| Regex::new(r).ok())
                                 });
                             }
@@ -536,6 +621,7 @@ fn register_log_data_watcher<T>(sender: T, mut log_reader: Box<dyn LogReader>, r
                                         search.line_offset = 0;
                                         search.regex = Regex::new(regex).ok();
                                         search.is_exclude = update.is_exclude();
+                                        search.is_dirty = true;
                                         if let Some(ex) = update.extractor_regex.as_ref() {
                                             search.extractor_regex = Regex::new(ex).ok();
                                         }

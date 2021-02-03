@@ -74,7 +74,7 @@ pub fn search(text: String, active_rules: &mut Vec<ActiveRule>, full_search: boo
 
         let mut add_line = true;
         for rule in active_rules.iter_mut() {
-            if rule.line_offset > n {
+            if rule.line_offset > n || (full_search && !rule.is_dirty) {
                 continue;
             }
 
@@ -117,6 +117,10 @@ pub fn search(text: String, active_rules: &mut Vec<ActiveRule>, full_search: boo
             }
             line_count += 1;
         }
+    }
+
+    for active_rule in active_rules {
+        active_rule.is_dirty = false;
     }
 
     Ok(SearchResultData {
