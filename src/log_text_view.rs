@@ -26,7 +26,11 @@ const EXTRACT_COL_NAME : u32 = 3;
 const EXTRACT_COL_COUNT : u32 = 4;
 const EXTRACT_COL_TEXT : u32 = 5;
 
-
+enum Step {
+    First,
+    Forward,
+    Backward,
+}
 
 struct ExtractData {
     count: i32,
@@ -58,15 +62,16 @@ pub struct LogTextView {
     autoscroll_handler: Option<SignalHandlerId>,
     rules: Vec<Highlighter>,
     thread_action_sender: Option<std::sync::mpsc::Sender<LogTextViewThreadMsg>>,
-    marker: HashMap<u16, (i32, Mark)>,
+    bookmarks: HashMap<u16, (i32, Mark)>,
     extracted_data_model: Rc<TreeStore>,
     extracted_data_view: TreeView,
     extract: HashMap<String, SearchGroup>,
     active_extract: Option<(ExtractSelection, usize)>,
+    active_line_mark: Option<Mark>,
 }
 
-const CURRENT_CURSOR_TAG: &'static str = "CURRENT_CURSOR";
 const MARKER_CATEGORY_BOOKMARK: &'static str = "BOOKMARK";
+const MARKER_CATEGORY_LINE: &'static str = "LINE";
 
 impl LogTextView {
     pub fn start<T>(&mut self, data: LogViewData, sender: T, default_rules: Vec<Highlighter>)
@@ -168,24 +173,22 @@ impl LogTextView {
 
     pub fn new() -> Self {
         let tag_table = TextTagTable::new();
-        let current_cursor_tag = gtk::TextTagBuilder::new()
-            .name(CURRENT_CURSOR_TAG)
-            .background("rgba(114,159,207,1)")
-            .build();
-
-        tag_table.add(&current_cursor_tag);
-        current_cursor_tag.set_priority(tag_table.get_size() - 1);
-
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));
         let tv = sourceview::View::new_with_buffer(&text_buffer);
 
-        let marker_attributes = sourceview::MarkAttributesBuilder::new()
+        let bookmark_marker = sourceview::MarkAttributesBuilder::new()
+            .icon_name("mail-unread-symbolic")
+            .build();
+        tv.set_mark_attributes(MARKER_CATEGORY_BOOKMARK, &bookmark_marker, 10);
+
+        let current_line_marker = sourceview::MarkAttributesBuilder::new()
             .icon_name("pan-end-symbolic")
             .build();
-        tv.set_mark_attributes(MARKER_CATEGORY_BOOKMARK, &marker_attributes, 10);
+        tv.set_mark_attributes(MARKER_CATEGORY_LINE, &current_line_marker, 10);
 
         tv.set_editable(false);
         tv.set_show_line_numbers(true);
+        tv.set_show_line_marks(true);
         tv.set_child_visible(true);
 
         let minimap = sourceview::MapBuilder::new()
@@ -220,6 +223,7 @@ impl LogTextView {
             glib::Type::String      // Extracted Text   5
         ]));
         let extracted_data_view = gtk::TreeView::with_model(&*extracted_data_model);
+        extracted_data_view.set_activate_on_single_click(true);
         extracted_data_model.set_sort_column_id(SortColumn::Index(EXTRACT_COL_COUNT), SortType::Descending);
         let sw = ScrolledWindowBuilder::new()
             .expand(true)
@@ -243,11 +247,12 @@ impl LogTextView {
             autoscroll_handler: None,
             rules: vec![],
             thread_action_sender: None,
-            marker: HashMap::new(),
+            bookmarks: HashMap::new(),
             extracted_data_model,
             extract: HashMap::new(),
             extracted_data_view,
             active_extract: None,
+            active_line_mark: None,
         }
     }
 
@@ -334,7 +339,7 @@ impl LogTextView {
                 }
             }
             LogTextViewMsg::ScrollToBookmark(key) => {
-                if let Some((line, _)) = self.marker.get(&key) {
+                if let Some((line, _)) = self.bookmarks.get(&key) {
                     self.scroll_to_line(*line);
                 }
             }
@@ -346,17 +351,15 @@ impl LogTextView {
                     let cursor_line = cursor_pos.get_line();
                     let line_pos = buffer.get_iter_at_line(cursor_line);
                     let mut add_marker = true;
-                    if let Some((marker_line, existing)) = self.marker.remove(&key) {
+                    if let Some((marker_line, existing)) = self.bookmarks.remove(&key) {
                         buffer.delete_mark(&existing);
                         add_marker = marker_line != cursor_line;
                     }
 
                     if add_marker {
                         let mark = buffer.create_source_mark(None, MARKER_CATEGORY_BOOKMARK, &line_pos).unwrap();
-                        self.marker.insert(key, (cursor_line, mark));
+                        self.bookmarks.insert(key, (cursor_line, mark));
                     }
-
-                    self.text_view.set_show_line_marks(self.marker.len() > 0);
                 }
             }
             LogTextViewMsg::CursorChanged => {
@@ -372,69 +375,73 @@ impl LogTextView {
                 }
             }
             LogTextViewMsg::ExtractSelected(selection) => {
-                match &selection {
-                    ExtractSelection::SearchGroup(search_id) => {
-                        if let Some(line) = self.extract.get(search_id)
-                            .and_then(|search_group| search_group.positions.first())
-                        {
-                            self.scroll_to_line(*line);
-                            self.active_extract = Some((selection, 0))
-                        }
-                    }
-                    ExtractSelection::TextGroup(search_id, text_id) => {
-                        if let Some(line) = self.extract.get(search_id)
-                            .and_then(|search| search.children.get(&text_id))
-                            .and_then(|extract_data| extract_data.positions.first() )
-                        {
-                            self.scroll_to_line(*line);
-                            self.active_extract = Some((selection, 0))
-                        }
+                if let Some(active) = self.active_line_mark.take() {
+                    if let Some(buffer) = self.text_view.get_buffer() {
+                        let buffer = buffer.downcast::<sourceview::Buffer>().unwrap();
+                        buffer.delete_mark(&active);
                     }
                 }
+                self.select_match(Step::First, selection, 0);
             }
         }
     }
 
     pub fn select_prev_match(&mut self) {
-        self.select_match(false);
+        if let Some((sel, pos)) = self.active_extract.take() {
+            self.select_match(Step::Backward, sel, pos);
+        }
     }
 
     pub fn select_next_match(&mut self) {
-        self.select_match(true);
+        if let Some((sel, pos)) = self.active_extract.take() {
+            self.select_match(Step::Forward, sel, pos);
+        }
     }
 
-    fn select_match(&mut self, forward: bool) {
-        if let Some((sel, pos)) = self.active_extract.as_mut() {
-            match sel {
-                ExtractSelection::SearchGroup(search_id) => {
-                    if let Some(search_group) = self.extract.get(search_id) {
-                        *pos = Self::get_next_pos(&search_group.positions, *pos, forward);
-                        if let Some(line) = search_group.positions.get(*pos) {
-                            self.scroll_to_line(*line);
-                        }
-                    }
+    fn select_match(&mut self, step: Step, sel: ExtractSelection, pos: usize) {
+        let lines = match &sel {
+            ExtractSelection::SearchGroup(search_id) => {
+                self.extract.get(search_id).and_then(|search_group|Some(&search_group.positions))
+            }
+            ExtractSelection::TextGroup(search_id, text_id) => {
+                self.extract.get(search_id)
+                    .and_then(|search_group| search_group.children.get(text_id))
+                    .and_then(|text_group|Some(&text_group.positions))
+            }
+        };
+
+        if let Some(lines) = lines {
+            let next_pos = self.get_next_pos(lines, pos, step);
+            if let Some(buffer) = self.text_view.get_buffer() {
+                let buffer = buffer.downcast::<sourceview::Buffer>().unwrap();
+                if let Some(prev_mark) = self.active_line_mark.take() {
+                    buffer.delete_mark(&prev_mark);
                 }
-                ExtractSelection::TextGroup(search_id, text_id) => {
-                    if let Some(extract_data) = self.extract.get(search_id)
-                        .and_then(|search_group| search_group.children.get(text_id)) {
-                        *pos = Self::get_next_pos(&extract_data.positions, *pos, forward);
-                        if let Some(line) = extract_data.positions.get(*pos) {
-                            self.scroll_to_line(*line);
-                        }
-                    }
+
+                if let Some(next_line) = lines.get(next_pos) {
+                    self.scroll_to_line(*next_line);
+                    let next = buffer.get_iter_at_line(*next_line);
+                    let mark = buffer.create_source_mark(None, MARKER_CATEGORY_LINE, &next).unwrap();
+                    self.active_line_mark = Some(mark);
                 }
             }
+
+            self.active_extract = Some((sel, next_pos));
         }
     }
 
-    fn get_next_pos(positions: &Vec<i32>, pos: usize, forward: bool) -> usize {
-        let mut next = pos;
-        if forward {
-            if pos == positions.len() -1 { next = 0 }else { next += 1 }
-        } else {
-            if pos > 0 { next -=1 } else { next = positions.len() -1 }
+    fn get_next_pos(&self, positions: &Vec<i32>, pos: usize, step: Step) -> usize {
+        match step {
+            Step::First => {
+              0
+            }
+            Step::Forward => {
+                if pos == positions.len() -1 { 0 }else { pos + 1 }
+            }
+            Step::Backward => {
+                if pos > 0 { pos - 1 } else { positions.len() -1 }
+            }
         }
-        next
     }
 
     pub fn clear_log(&mut self) {
