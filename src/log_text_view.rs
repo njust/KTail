@@ -1,4 +1,4 @@
-use gtk::{prelude::*, TreeStore, ScrolledWindowBuilder, TreeIter, SortType, SortColumn, TreeView};
+use gtk::{prelude::*, TreeStore, ScrolledWindowBuilder, TreeIter, SortType, SortColumn, TreeView, IconSize, ReliefStyle, AccelGroup, AccelFlags};
 use gtk::{ScrolledWindow, Orientation, TextTag, TextTagTable};
 use std::rc::Rc;
 use glib::{SignalHandlerId};
@@ -171,7 +171,9 @@ impl LogTextView {
     }
 
 
-    pub fn new() -> Self {
+    pub fn new<T>(accelerators: &AccelGroup, tx: T) -> Self
+        where T : 'static + Send + Clone + Fn(LogTextViewMsg)
+    {
         let tag_table = TextTagTable::new();
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));
         let tv = sourceview::View::new_with_buffer(&text_buffer);
@@ -229,6 +231,16 @@ impl LogTextView {
             .height_request(100)
             .build();
 
+        let ed = gtk::BoxBuilder::new()
+            .orientation(Orientation::Horizontal)
+            .build();
+
+
+        let result_toolbar = Self::build_results_toolbar(tx.clone(), accelerators);
+
+        ed.add(&result_toolbar);
+        ed.add(&extract_scroll_view);
+
         extract_scroll_view.add(&extracted_data_view);
         extracted_data_view.append_column(&create_col(Some("Rule"), EXTRACT_COL_NAME as i32, ColumnType::String, extracted_data_model.clone()));
         extracted_data_view.append_column(&create_col(Some("Count"), EXTRACT_COL_COUNT as i32, ColumnType::Number, extracted_data_model.clone()));
@@ -242,7 +254,7 @@ impl LogTextView {
         text_container.add(&minimap);
 
         paned.pack1(&text_container, true, false);
-        paned.pack2(&extract_scroll_view, false, false);
+        paned.pack2(&ed, false, false);
 
         Self {
             container: paned,
@@ -257,6 +269,75 @@ impl LogTextView {
             active_extract: None,
             active_line_mark: None,
         }
+    }
+
+    fn build_results_toolbar<T>(tx: T, accelerators: &AccelGroup) -> gtk::Box
+        where T : 'static + Send + Clone + Fn(LogTextViewMsg)
+    {
+        let sidebar = gtk::BoxBuilder::new()
+            .orientation(Orientation::Vertical)
+            .width_request(20)
+            .build();
+
+        add_css_with_name(&sidebar, "toolbar", r"
+            #toolbar {
+                background-color: rgba(248,248,248,255);
+                border-right: 1px solid #c0c0c0;
+            }
+        ");
+
+        let tb_header = gtk::BoxBuilder::new()
+            .orientation(Orientation::Horizontal)
+            .height_request(31)
+            .build();
+        add_css_with_name(&tb_header, "toolbar", r"
+            #toolbar {
+                background-color: rgba(237,237,237,255);
+                border-bottom: 1px solid #c0c0c0;
+            }
+        ");
+        sidebar.add(&tb_header);
+
+        let btn_toolbar = gtk::BoxBuilder::new()
+            .orientation(Orientation::Vertical)
+            .spacing(4)
+            .margin(2)
+            .build();
+        sidebar.add(&btn_toolbar);
+
+        let btn = gtk::ButtonBuilder::new()
+            .image(&gtk::Image::from_icon_name(Some("pan-up-symbolic"), IconSize::Menu))
+            .height_request(16)
+            .width_request(16)
+            .relief(ReliefStyle::None)
+            .build();
+        {
+            let (key, modifier) = gtk::accelerator_parse("<Primary>P");
+            btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
+
+            let tx = tx.clone();
+            btn.connect_clicked(move |_| {
+                tx(LogTextViewMsg::PrevMatch);
+            });
+        }
+        btn_toolbar.add(&btn);
+
+        let btn = gtk::ButtonBuilder::new()
+            .image(&gtk::Image::from_icon_name(Some("pan-down-symbolic"), IconSize::Menu))
+            .height_request(16)
+            .width_request(16)
+            .relief(ReliefStyle::None)
+            .build();
+        {
+            let (key, modifier) = gtk::accelerator_parse("<Primary>N");
+            btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
+            let tx = tx.clone();
+            btn.connect_clicked(move |_| {
+                tx(LogTextViewMsg::NextMatch);
+            });
+        }
+        btn_toolbar.add(&btn);
+        sidebar
     }
 
     fn scroll_to_line(&self, line: i32) {
@@ -312,7 +393,6 @@ impl LogTextView {
                             extract_group.positions.push(line);
                             extract_group.count += 1;
                             self.extracted_data_model.set(&extract_group.item, &[EXTRACT_COL_COUNT], &[&extract_group.count]);
-
 
                             if let Some(extracted_text) = &search_match.extracted_text {
                                 let text_id = crc::crc32::checksum_ieee(extracted_text.as_bytes());
@@ -385,6 +465,12 @@ impl LogTextView {
                     }
                 }
                 self.select_match(Step::First, selection, 0);
+            }
+            LogTextViewMsg::NextMatch => {
+                self.select_next_match();
+            }
+            LogTextViewMsg::PrevMatch => {
+                self.select_prev_match();
             }
         }
     }

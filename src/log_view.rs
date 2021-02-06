@@ -14,7 +14,7 @@ pub struct LogView {
     log_text_view: LogTextView,
     search_text: String,
     highlighters_dlg: Option<gtk::Dialog>,
-    sender: Rc<dyn Fn(LogViewMsg)>
+    sender: Rc<dyn Fn(LogViewMsg)>,
 }
 
 impl LogView {
@@ -29,7 +29,11 @@ impl LogView {
         }, accelerators);
 
         let file_tx = sender.clone();
-        let mut file_view = LogTextView::new();
+        let tm = sender.clone();
+        let mut file_view = LogTextView::new(accelerators, move |msg| {
+            tm(LogViewMsg::LogTextViewMsg(msg));
+        });
+
         file_view.start(data.data, move |msg| {
             file_tx(LogViewMsg::LogTextViewMsg(msg));
         }, default_rules.clone());
@@ -91,12 +95,6 @@ impl LogView {
                     }
                     LogViewToolbarMsg::ToggleAutoScroll(enable) => {
                         self.log_text_view.toggle_autoscroll(enable);
-                    }
-                    LogViewToolbarMsg::SelectNextMatch => {
-                        self.log_text_view.select_next_match();
-                    }
-                    LogViewToolbarMsg::SelectPrevMatch => {
-                        self.log_text_view.select_prev_match();
                     }
                 }
             }

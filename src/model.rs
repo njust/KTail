@@ -94,8 +94,6 @@ pub enum LogViewToolbarMsg {
     ClearSearchPressed,
     ShowRules,
     ToggleAutoScroll(bool),
-    SelectNextMatch,
-    SelectPrevMatch,
     Clear
 }
 
@@ -113,6 +111,8 @@ pub enum LogTextViewMsg {
     ToggleBookmark(u16),
     ScrollToBookmark(u16),
     ExtractSelected(ExtractSelection),
+    NextMatch,
+    PrevMatch
 }
 
 #[derive(Debug, Clone)]

@@ -24,7 +24,7 @@ impl LogViewToolbar {
         let search_txt = SearchEntry::new();
         let (key, modifier) = gtk::accelerator_parse("<Primary>F");
         search_txt.add_accelerator("grab-focus", accelerators, key, modifier, AccelFlags::VISIBLE);
-        search_txt.set_width_chars(40);
+        search_txt.set_width_chars(50);
         {
             let tx = tx.clone();
             search_txt.connect_changed(move |e| {
@@ -52,26 +52,6 @@ impl LogViewToolbar {
                 tx(LogViewToolbarMsg::SearchPressed);
             });
             toolbar.add(&search_btn);
-        }
-
-        let prev_btn = gtk::Button::with_mnemonic("_Prev"); {
-            let tx = tx.clone();
-            let (key, modifier) = gtk::accelerator_parse("<Primary>P");
-            prev_btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
-            prev_btn.connect_clicked(move |_| {
-                tx(LogViewToolbarMsg::SelectPrevMatch);
-            });
-            toolbar.add(&prev_btn);
-        }
-
-        let next_btn = gtk::Button::with_mnemonic("_Next"); {
-            let (key, modifier) = gtk::accelerator_parse("<Primary>N");
-            next_btn.add_accelerator("activate", accelerators, key, modifier, AccelFlags::VISIBLE);
-            let tx = tx.clone();
-            next_btn.connect_clicked(move |_| {
-                tx(LogViewToolbarMsg::SelectNextMatch);
-            });
-            toolbar.add(&next_btn);
         }
 
         let show_rules_btn = Button::with_label("Rules"); {
@@ -105,6 +85,7 @@ impl LogViewToolbar {
             container: toolbar
         }
     }
+
 
     pub fn view(&self) -> &gtk::Box {
         &self.container
