@@ -16,6 +16,7 @@ impl LogViewToolbar {
             #toolbar {
                 background-color: #f0f0f0;
                 padding: 2px;
+                border-bottom: 1px solid #c0c0c0;
             }
         ");
         toolbar.set_property_margin(0);

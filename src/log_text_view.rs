@@ -48,7 +48,7 @@ struct SearchGroup {
 impl SearchGroup {
     fn new(item: TreeIter) -> Self {
         Self {
-            count: 1,
+            count: 0,
             item,
             positions: vec![],
             children: HashMap::new()
@@ -213,7 +213,6 @@ impl LogTextView {
         scroll_wnd.add(&*text_view);
 
         let paned = gtk::Paned::new(Orientation::Vertical);
-        paned.set_position(400);
         let extracted_data_model = Rc::new(gtk::TreeStore::new(&[
             glib::Type::U8,         // Type             0
             glib::Type::String,     // SearchId         1
@@ -225,21 +224,25 @@ impl LogTextView {
         let extracted_data_view = gtk::TreeView::with_model(&*extracted_data_model);
         extracted_data_view.set_activate_on_single_click(true);
         extracted_data_model.set_sort_column_id(SortColumn::Index(EXTRACT_COL_COUNT), SortType::Descending);
-        let sw = ScrolledWindowBuilder::new()
+        let extract_scroll_view = ScrolledWindowBuilder::new()
             .expand(true)
+            .height_request(100)
             .build();
 
-        sw.add(&extracted_data_view);
+        extract_scroll_view.add(&extracted_data_view);
         extracted_data_view.append_column(&create_col(Some("Rule"), EXTRACT_COL_NAME as i32, ColumnType::String, extracted_data_model.clone()));
         extracted_data_view.append_column(&create_col(Some("Count"), EXTRACT_COL_COUNT as i32, ColumnType::Number, extracted_data_model.clone()));
         extracted_data_view.append_column(&create_col(Some("Extracted"), EXTRACT_COL_TEXT as i32, ColumnType::String, extracted_data_model.clone()));
 
-        let container = gtk::Box::new(Orientation::Horizontal, 0);
-        container.add(&scroll_wnd);
-        container.add(&minimap);
+        let text_container = gtk::BoxBuilder::new()
+            .orientation(Orientation::Horizontal)
+            .height_request(350)
+            .build();
+        text_container.add(&scroll_wnd);
+        text_container.add(&minimap);
 
-        paned.add(&container);
-        paned.add(&sw);
+        paned.pack1(&text_container, true, false);
+        paned.pack2(&extract_scroll_view, false, false);
 
         Self {
             container: paned,
@@ -298,7 +301,7 @@ impl LogTextView {
                         if !self.extract.contains_key(&search_id) {
                             let item = self.extracted_data_model.insert_with_values(None, None,
                             &[EXTRACT_COL_TYPE, EXTRACT_COL_SEARCH_ID, EXTRACT_COL_NAME, EXTRACT_COL_COUNT],
-                            &[EXTRACT_TYPE_GROUP, &search_id, name, &1]);
+                            &[EXTRACT_TYPE_GROUP, &search_id, name, &0]);
                             self.extract.insert(search_id.clone(), SearchGroup::new(item));
                         }
 

@@ -141,17 +141,26 @@ impl HighlighterListView {
 
                 container.add(&type_selector);
 
-                let name_entry = gtk::Entry::new();
+                let name_entry = gtk::EntryBuilder::new()
+                    .placeholder_text("Name")
+                    .build();
                 item.bind_property(NAME_PROP, &name_entry, "text")
                     .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
                 container.add(&name_entry);
 
-                let regex_entry = gtk::Entry::new();
+                let regex_entry = gtk::EntryBuilder::new()
+                    .placeholder_text("Regex")
+                    .expand(true)
+                    .build();
+                regex_entry.set_property_expand(true);
                 item.bind_property(REGEX_PROP, &regex_entry, "text")
                     .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
                 container.add(&regex_entry);
 
-                let extractor_regex_entry = gtk::Entry::new();
+                let extractor_regex_entry = gtk::EntryBuilder::new()
+                    .placeholder_text("Extractor")
+                    .expand(true)
+                    .build();
                 item.bind_property(EXTRACTOR_REGEX_PROP, &extractor_regex_entry, "text")
                     .flags(glib::BindingFlags::DEFAULT | glib::BindingFlags::SYNC_CREATE | glib::BindingFlags::BIDIRECTIONAL).build();
                 container.add(&extractor_regex_entry);
