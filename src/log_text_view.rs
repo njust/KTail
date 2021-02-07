@@ -178,6 +178,7 @@ impl LogTextView {
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));
         let tv = sourceview::View::new_with_buffer(&text_buffer);
 
+        //TODO: we dont ship icons on linux so this may look weired
         let bookmark_marker = sourceview::MarkAttributesBuilder::new()
             .icon_name("mail-unread-symbolic")
             .build();
