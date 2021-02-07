@@ -29,7 +29,6 @@ use crate::log_view::LogView;
 use crate::model::{LogViewData, Msg, CreateLogView};
 use crate::highlighters::{Highlighter, SEARCH_ID, RULE_TYPE_HIGHLIGHT};
 use util::{get_app_icon, send_msg};
-
 use menu::configure_menu;
 use crate::menu::create_open_file_dlg_action;
 
