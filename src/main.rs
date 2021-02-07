@@ -49,7 +49,7 @@ pub fn get_default_highlighters() -> Vec<Highlighter> {
         Highlighter {
             id: Uuid::new_v4(),
             regex: Some(r".*\s((?i)error|fatal|failed(?-i))\s.*".into()),
-            color: Some(String::from("rgba(239,41,41,1)")),
+            color: Some(String::from("rgba(244,94,94,1)")),
             name: Some(String::from("Error")),
             is_system: false,
             rule_type: RULE_TYPE_HIGHLIGHT.to_string(),
