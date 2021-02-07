@@ -205,7 +205,7 @@ impl LogTextView {
         add_css_with_name(&minimap, "minimap",r##"
             #minimap {
                   font: 1px "Monospace";
-                  color: rgba(1,1,1,0.5);
+                  background-color: rgba(0,0,0,0);
             }
         "##);
 
