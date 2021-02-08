@@ -13,6 +13,7 @@ use url::Url;
 use base64;
 use serde::{Deserialize, Serialize};
 use crate::{Result};
+use crate::model::CmdOptions;
 
 /// Configuration to build a Kubernetes client.
 #[derive(Debug, Serialize, Deserialize)]
@@ -202,6 +203,14 @@ impl KubeConfig {
     }
 
     pub fn default_path() -> PathBuf {
+        let cmd_options: CmdOptions = argh::from_env();
+        if let Some(cfg) = cmd_options.config {
+            return PathBuf::from(cfg);
+        }
+
+        if let Ok(kube_config) = std::env::var("KUBECONFIG") {
+            return PathBuf::from(kube_config);
+        }
         dirs::home_dir()
             .expect("Could not determine home dir!")
             .join(".kube")

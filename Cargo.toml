@@ -1,8 +1,8 @@
 [package]
 name = "ktail"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["nico.just <nico.just@gmail.com>"]
-description = "Kubernetes Logviewer"
+description = "Kubernetes Log Viewer"
 edition = "2018"
 license = "Copyright © 2020 Nico Just"
 
@@ -28,6 +28,7 @@ tokio = { version = "0.2", features = ["full"] }
 async-trait = "0.1.40"
 anyhow = "1.0.37"
 mime_guess = "2.0.3"
+argh = "0.1.4"
 
 # k8s_client deps
 reqwest = { version = "0.10", features = ["json", "native-tls", "stream"] }

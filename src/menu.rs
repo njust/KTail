@@ -81,7 +81,7 @@ pub fn configure_menu(tx: Sender<Msg>, app: &Application, window: &ApplicationWi
         });
 
         app.set_accels_for_action("app.kube", &["<Primary>K"]);
-        menu_model.append_item(&gio::MenuItem::new(Some("Kube"), Some("app.kube")));
+        menu_model.append_item(&gio::MenuItem::new(Some("Kubernetes"), Some("app.kube")));
     }
 
     app.set_accels_for_action("app.open", &["<Primary>O"]);
@@ -96,7 +96,7 @@ pub fn configure_menu(tx: Sender<Msg>, app: &Application, window: &ApplicationWi
 
     let header_bar = HeaderBarBuilder::new()
         .show_close_button(true)
-        .title("Log viewer")
+        .title("Log Viewer")
         .build();
     header_bar.pack_end(&menu_button);
 

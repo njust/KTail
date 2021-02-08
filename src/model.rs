@@ -6,6 +6,21 @@ use uuid::Uuid;
 use std::path::PathBuf;
 use std::collections::HashMap;
 
+
+use argh::FromArgs;
+
+#[derive(FromArgs)]
+/// KTail
+pub struct CmdOptions {
+    #[argh(positional)]
+    pub file: Option<String>,
+
+    /// path to kube config file
+    #[argh(option, short = 'c')]
+    pub config: Option<String>,
+}
+
+
 pub struct CreateKubeLogData {
     pub pods: Vec<String>,
     pub cluster: String,
