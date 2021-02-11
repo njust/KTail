@@ -1,7 +1,8 @@
 use reqwest::{self, header, ClientBuilder};
 use openssl::pkcs12::Pkcs12;
 use url::Url;
-use crate::k8s_client::{Result, ClusterContext};
+use anyhow::Result;
+use crate::k8s_client::{ClusterContext};
 use serde::{Deserialize, Serialize};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus, NamespaceSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;

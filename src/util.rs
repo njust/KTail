@@ -2,7 +2,6 @@ use gtk::prelude::*;
 use glib::{SignalHandlerId, Value, Sender};
 
 use std::io::{BufReader, Read, BufRead};
-use std::error::Error;
 use encoding::all::{UTF_8};
 use encoding::{DecoderTrap, Encoding};
 use glib::bitflags::_core::cmp::Ordering;
@@ -12,7 +11,7 @@ use std::collections::{HashMap};
 use gtk::{TreeViewColumn, CellRendererText, CellRendererToggle, TreeStore, Widget, ApplicationWindow, DialogFlags, MessageType, ButtonsType};
 use std::rc::Rc;
 use crate::model::{ActiveRule, SearchResultData, SearchResultMatch, LogReplacer, Msg, RuleSearchResultData};
-
+use anyhow::{Result, anyhow};
 
 pub const APP_ICON_BUFFER: &'static [u8] = include_bytes!("../assets/app-icon/512x512.png");
 
@@ -26,8 +25,8 @@ pub fn enable_auto_scroll(text_view : &sourceview::View) -> SignalHandlerId {
     })
 }
 
-pub fn decode_data<'a>(buffer: &[u8], _encoding_name: &mut Option<String>, _replacers: &Vec<LogReplacer>) -> Result<String, Box<dyn Error>> {
-    let mut data = UTF_8.decode(buffer, DecoderTrap::Ignore)?;
+pub fn decode_data<'a>(buffer: &[u8], _encoding_name: &mut Option<String>, _replacers: &Vec<LogReplacer>) -> Result<String> {
+    let mut data = UTF_8.decode(buffer, DecoderTrap::Ignore).map_err(|e| anyhow!("Cannot decode data: {}", e))?;
     data = data.replace("\0", "");
     data = data.replace("\n\r", "\n");
     data = data.replace("\r\n", "\n");
@@ -38,7 +37,7 @@ pub fn decode_data<'a>(buffer: &[u8], _encoding_name: &mut Option<String>, _repl
 }
 
 
-pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>, Box<dyn Error>> {
+pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>> {
     let mut reader = BufReader::new(stream);
     let mut buffer = vec![];
     let mut read_bytes = 0;
@@ -60,7 +59,7 @@ pub fn read<T: Read>(stream: &mut T) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(buffer)
 }
 
-pub fn search(text: String, active_rules: &mut Vec<ActiveRule>, full_search: bool) -> Result<SearchResultData, Box<dyn Error>> {
+pub fn search(text: String, active_rules: &mut Vec<ActiveRule>, full_search: bool) -> Result<SearchResultData> {
     let lines = text.split("\n").enumerate();
     let mut rule_search_result: HashMap<String, RuleSearchResultData> = HashMap::new();
 

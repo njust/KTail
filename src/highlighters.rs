@@ -12,8 +12,8 @@ use glib_data_model_helper::{
 };
 use gio::{ListStoreExt, ListModelExt};
 use glib::Object;
-use crate::Result;
 use std::rc::Rc;
+use anyhow::{Result, anyhow};
 
 #[derive(Debug, Default, Clone)]
 pub struct Highlighter {
@@ -260,12 +260,12 @@ impl HighlighterListView {
         let mut rules = vec![];
         for i in 0..cnt {
             if let Some(o) = self.highlighter_list_data.get_object(i) {
-                let id = o.get_property(ID_PROP)?.get::<String>()?.ok_or("No id")?;
+                let id = o.get_property(ID_PROP)?.get::<String>()?.ok_or(anyhow!("No id"))?;
                 let name = o.get_property(NAME_PROP)?.get::<String>()?.and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let regex = o.get_property(REGEX_PROP)?.get::<String>()?.and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let extractor_regex = o.get_property(EXTRACTOR_REGEX_PROP)?.get::<String>()?.and_then(|s|if s.len() <= 0 {None}else {Some(s)});
                 let color = o.get_property(COLOR_PROP)?.get::<String>().unwrap_or(None);
-                let rule_type = o.get_property(RULE_TYPE)?.get::<String>()?.ok_or("No type for rule")?;
+                let rule_type = o.get_property(RULE_TYPE)?.get::<String>()?.ok_or(anyhow!("No type for rule"))?;
                 let is_system = o.get_property(IS_SYSTEM_PROP)?.get::<bool>()?.unwrap_or(false);
                 rules.push(Highlighter {
                     id: Uuid::parse_str(&id).unwrap(),

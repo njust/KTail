@@ -32,8 +32,6 @@ use util::{get_app_icon, send_msg};
 use menu::configure_menu;
 use crate::menu::create_open_file_dlg_action;
 
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
 pub fn get_default_highlighters() -> Vec<Highlighter> {
     vec![
         Highlighter {
@@ -107,7 +105,7 @@ async fn int_main() {
     info!("Started with args: {:?}", std::env::args());
 
     let application = Application::new(
-        Some("de.njust.ktail"),
+        Some("de.ktail"),
         Default::default(),
     ).expect("failed to initialize GTK application");
 

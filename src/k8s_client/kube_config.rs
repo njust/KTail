@@ -12,8 +12,8 @@ use openssl::pkey::{PKey, Private};
 use url::Url;
 use base64;
 use serde::{Deserialize, Serialize};
-use crate::{Result};
 use crate::model::CmdOptions;
+use anyhow::{Result, anyhow};
 
 /// Configuration to build a Kubernetes client.
 #[derive(Debug, Serialize, Deserialize)]
@@ -166,9 +166,9 @@ impl KubeConfig {
     pub fn context(&self, name: &str) -> Result<ClusterContext> {
         let ctxs: Vec<&NamedContext> = self.contexts.iter().filter(|c| c.name == name).collect();
         let ctx = match ctxs.len() {
-            0 => Err(format!("unknown context {}", name)),
+            0 => Err(anyhow!("unknown context {}", name)),
             1 => Ok(&ctxs[0].context),
-            _ => Err(format!("ambiguous context {}", name)),
+            _ => Err(anyhow!("ambiguous context {}", name)),
         }?;
 
         let clus: Vec<&NamedCluster> = self.clusters
@@ -177,9 +177,9 @@ impl KubeConfig {
             .collect();
 
         let clu = match clus.len() {
-            0 => Err(format!("unknown cluster {}", name)),
+            0 => Err(anyhow!("unknown cluster {}", name)),
             1 => Ok(&clus[0].cluster),
-            _ => Err(format!("ambiguous cluster {}", name)),
+            _ => Err(anyhow!("ambiguous cluster {}", name)),
         }?;
 
         let auths: Vec<&NamedAuthInfo> = self.users
@@ -188,9 +188,9 @@ impl KubeConfig {
             .collect();
 
         let auth = match auths.len() {
-            0 => Err(format!("unknown auth-info {}", name)),
+            0 => Err(anyhow!("unknown auth-info {}", name)),
             1 => Ok(&auths[0].user),
-            _ => Err(format!("ambiguous auth-info {}", name)),
+            _ => Err(anyhow!("ambiguous auth-info {}", name)),
         }?;
         let rc = ClusterContext {
             name: name.to_string(),

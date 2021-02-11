@@ -7,11 +7,11 @@ use crate::util::{create_col, ColumnType, add_css_with_name, show_error_msg};
 use glib::Sender;
 use crate::k8s_client::{KubeConfig, KubeClient, Pod, Namespace, ClientOptions};
 use crate::model::{Msg, LogViewData, CreateKubeLogData, CreateLogView, PodSelectorMsg};
-use std::error::Error;
 use std::collections::{HashSet};
 use std::time::Duration;
 use crate::highlighters::HighlighterListView;
 use crate::get_default_highlighters;
+use anyhow::Result;
 
 const UNIT_MINUTES: &'static str = "UNIT_MINUTES";
 const UNIT_HOURS: &'static str = "UNIT_HOURS";
@@ -296,14 +296,14 @@ impl PodSelector {
         }
     }
 
-    fn get_namespaces(&self) -> Result<Vec<Namespace>, Box<dyn Error>> {
+    fn get_namespaces(&self) -> Result<Vec<Namespace>> {
         let client= self.kube_client.as_ref().ok_or(anyhow::Error::msg("No k8s client"))?.clone();
         glib::MainContext::default().block_on(async move  {
             client.namespaces().await
         })
     }
 
-    fn get_pods(&self) -> Result<Vec<Pod>, Box<dyn Error>> {
+    fn get_pods(&self) -> Result<Vec<Pod>> {
         let client = self.kube_client.as_ref().ok_or(anyhow::Error::msg("No k8s client"))?.clone();
         let default_namespace = "default".to_string();
         let namespace = self.selected_namespace.as_ref().unwrap_or(&default_namespace);
