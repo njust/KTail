@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate glib;
 
+mod start;
 mod model;
 mod util;
 mod pod_selector;
@@ -13,6 +14,7 @@ mod log_file_reader;
 mod kubernetes_log_reader;
 mod highlighters;
 mod menu;
+mod widget;
 mod k8s_client;
 
 use gtk::prelude::*;
@@ -31,6 +33,8 @@ use crate::highlighters::{Highlighter, SEARCH_ID, RULE_TYPE_HIGHLIGHT};
 use util::{get_app_icon, send_msg};
 use menu::configure_menu;
 use crate::menu::create_open_file_dlg_action;
+use crate::start::{StartView};
+use crate::widget::CustomWidget;
 
 pub fn get_default_highlighters() -> Vec<Highlighter> {
     vec![
@@ -110,7 +114,6 @@ async fn int_main() {
     ).expect("failed to initialize GTK application");
 
     application.connect_activate(move |app| {
-
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
         let notebook = NotebookBuilder::new()
             .hexpand(true)
@@ -147,6 +150,13 @@ async fn int_main() {
             });
         }
 
+        let widget = StartView::new();
+
+        notebook.append_page(
+            widget.get().view(),
+            Some(&gtk::Image::from_icon_name(Some("go-home-symbolic"), IconSize::Button))
+        );
+
         let open_action = create_open_file_dlg_action(tx.clone());
         app.add_action(&open_action);
 
@@ -180,7 +190,6 @@ async fn int_main() {
             });
             app.set_accels_for_action("app.close_current_tab", &["<Primary>W"]);
         }
-
 
         if let Some(open_with) = std::env::args().nth(1) {
             if std::path::Path::new(&open_with).exists() {

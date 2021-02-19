@@ -25,6 +25,7 @@ const EXTRACT_COL_CHECKSUM : u32 = 2;
 const EXTRACT_COL_NAME : u32 = 3;
 const EXTRACT_COL_COUNT : u32 = 4;
 const EXTRACT_COL_TEXT : u32 = 5;
+const EXTRACT_COL_LINE : u32 = 6;
 
 enum Step {
     First,
@@ -221,11 +222,12 @@ impl LogTextView {
             glib::Type::U32,        // Checksum         2
             glib::Type::String,     // Name             3
             glib::Type::I32,        // Count            4
-            glib::Type::String      // Extracted Text   5
+            glib::Type::String,     // Extracted Text   5
+            glib::Type::I32,        // Line             6
         ]));
         let extracted_data_view = gtk::TreeView::with_model(&*extracted_data_model);
         extracted_data_view.set_activate_on_single_click(true);
-        extracted_data_model.set_sort_column_id(SortColumn::Index(EXTRACT_COL_COUNT), SortType::Descending);
+        extracted_data_model.set_sort_column_id(SortColumn::Index(EXTRACT_COL_LINE), SortType::Descending);
         let extract_scroll_view = ScrolledWindowBuilder::new()
             .expand(true)
             .height_request(100)
@@ -243,7 +245,8 @@ impl LogTextView {
 
         extract_scroll_view.add(&extracted_data_view);
         extracted_data_view.append_column(&create_col(Some("Rule"), EXTRACT_COL_NAME as i32, ColumnType::String, extracted_data_model.clone()));
-        extracted_data_view.append_column(&create_col(Some("Count"), EXTRACT_COL_COUNT as i32, ColumnType::Number, extracted_data_model.clone()));
+        extracted_data_view.append_column(&create_col(Some("Matches"), EXTRACT_COL_COUNT as i32, ColumnType::Number, extracted_data_model.clone()));
+        extracted_data_view.append_column(&create_col(Some("Last matching line"), EXTRACT_COL_LINE as i32, ColumnType::Number, extracted_data_model.clone()));
         extracted_data_view.append_column(&create_col(Some("Extracted"), EXTRACT_COL_TEXT as i32, ColumnType::String, extracted_data_model.clone()));
 
         let text_container = gtk::BoxBuilder::new()
@@ -392,19 +395,19 @@ impl LogTextView {
                             let line = search_match.line as i32 + offset;
                             extract_group.positions.push(line);
                             extract_group.count += 1;
-                            self.extracted_data_model.set(&extract_group.item, &[EXTRACT_COL_COUNT], &[&extract_group.count]);
+                            self.extracted_data_model.set(&extract_group.item, &[EXTRACT_COL_COUNT, EXTRACT_COL_LINE], &[&extract_group.count, &(line + 1)]);
 
                             if let Some(extracted_text) = &search_match.extracted_text {
                                 let text_id = crc::crc32::checksum_ieee(extracted_text.as_bytes());
                                 if let Some(extract) = extract_group.children.get_mut(&text_id) {
                                     extract.count += 1;
                                     extract.positions.push(line);
-                                    self.extracted_data_model.set(&extract.item, &[EXTRACT_COL_COUNT], &[&extract.count]);
+                                    self.extracted_data_model.set(&extract.item, &[EXTRACT_COL_COUNT, EXTRACT_COL_LINE], &[&extract.count, &(line + 1)]);
                                 } else {
                                     let child = self.extracted_data_model.insert_with_values(
                                         Some(&extract_group.item), None,
-                                        &[EXTRACT_COL_TYPE, EXTRACT_COL_SEARCH_ID, EXTRACT_COL_CHECKSUM, EXTRACT_COL_COUNT, EXTRACT_COL_TEXT],
-                                        &[EXTRACT_TYPE_CHILD, &search_id ,&text_id, &1, extracted_text]);
+                                        &[EXTRACT_COL_TYPE, EXTRACT_COL_SEARCH_ID, EXTRACT_COL_CHECKSUM, EXTRACT_COL_COUNT, EXTRACT_COL_TEXT, EXTRACT_COL_LINE],
+                                        &[EXTRACT_TYPE_CHILD, &search_id ,&text_id, &1, extracted_text, &(line + 1)]);
 
                                     extract_group.children.insert(text_id, ExtractData {
                                         count: 1,
@@ -522,7 +525,7 @@ impl LogTextView {
     fn get_next_pos(&self, positions: &Vec<i32>, pos: usize, step: Step) -> usize {
         match step {
             Step::First => {
-              0
+              if positions.len() > 0 { positions.len() -1 } else { 0 }
             }
             Step::Forward => {
                 if pos == positions.len() -1 { 0 }else { pos + 1 }

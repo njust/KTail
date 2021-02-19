@@ -5,9 +5,8 @@ use std::error::Error;
 use uuid::Uuid;
 use std::path::PathBuf;
 use std::collections::HashMap;
-
-
 use argh::FromArgs;
+
 
 #[derive(FromArgs)]
 /// KTail
@@ -101,6 +100,12 @@ pub enum LogViewMsg {
     ApplyRules,
     ToolbarMsg(LogViewToolbarMsg),
     LogTextViewMsg(LogTextViewMsg)
+}
+
+#[derive(Debug, Clone)]
+pub enum StartViewMsg {
+    Inc,
+    Dec,
 }
 
 pub enum LogViewToolbarMsg {
