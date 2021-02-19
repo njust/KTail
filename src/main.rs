@@ -150,8 +150,13 @@ async fn int_main() {
             });
         }
 
-        let widget = StartView::new();
+        let widget = StartView::with_options(|_|{}, 2);
+        notebook.append_page(
+            widget.get().view(),
+            Some(&gtk::Image::from_icon_name(Some("go-home-symbolic"), IconSize::Button))
+        );
 
+        let widget = StartView::new();
         notebook.append_page(
             widget.get().view(),
             Some(&gtk::Image::from_icon_name(Some("go-home-symbolic"), IconSize::Button))

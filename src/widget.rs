@@ -4,7 +4,9 @@ use std::rc::Rc;
 #[allow(dead_code)]
 pub trait CustomWidget: Sized + 'static {
     type Msg: Clone;
-    fn init() -> Self;
+    type Input: Default;
+
+    fn init(data: Self::Input) -> Self;
     fn create<T: 'static + Clone + Fn(Self::Msg)>(&self, tx: T);
     fn view(&self) -> &gtk::Box;
     fn update(&mut self, msg: Self::Msg);
@@ -12,8 +14,8 @@ pub trait CustomWidget: Sized + 'static {
         WidgetWrapper::<Self>::new()
     }
 
-    fn new_with_events<T: 'static + Clone + Fn(Self::Msg)>(tx: T) -> WidgetWrapper<Self> {
-        WidgetWrapper::<Self>::new_with_events(tx)
+    fn with_options<T: 'static + Clone + Fn(Self::Msg)>(tx: T, data: Self::Input) -> WidgetWrapper<Self> {
+        WidgetWrapper::<Self>::with_options(tx, data)
     }
 }
 
@@ -23,11 +25,11 @@ pub struct WidgetWrapper<T: CustomWidget> {
 
 impl<W: 'static + CustomWidget> WidgetWrapper<W> {
     pub fn new() -> WidgetWrapper<W> {
-        Self::new_with_events(|_| {})
+        Self::with_options(|_| {}, W::Input::default())
     }
 
-    pub fn new_with_events<T: 'static + Clone + Fn(W::Msg)>(parent_tx: T) -> WidgetWrapper<W> {
-        let widget_view = Rc::new(RefCell::new(W::init()));
+    pub fn with_options<T: 'static + Clone + Fn(W::Msg)>(parent_tx: T, data: W::Input) -> WidgetWrapper<W> {
+        let widget_view = Rc::new(RefCell::new(W::init(data)));
         let view = widget_view.clone();
         let widget_tx = Rc::new(move |msg: W::Msg| {
             view.borrow_mut().update(msg.clone());

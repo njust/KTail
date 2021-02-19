@@ -11,18 +11,20 @@ pub struct StartView {
 
 impl CustomWidget for StartView {
     type Msg = StartViewMsg;
-    fn init() -> Self {
+    type Input = i32;
+
+    fn init(data: Self::Input) -> Self {
         let container = gtk::BoxBuilder::new()
             .valign(Align::Center)
             .halign(Align::Center)
             .spacing(12)
             .build();
 
-        let lbl = gtk::Label::new(Some("0"));
+        let lbl = gtk::Label::new(Some(&format!("Count: {}", data)));
 
         Self {
             container,
-            counter: 0,
+            counter: data,
             lbl
         }
     }
@@ -64,6 +66,6 @@ impl CustomWidget for StartView {
                 self.counter -= 1;
             }
         }
-        self.lbl.set_text(&format!("{}", self.counter));
+        self.lbl.set_text(&format!("Count: {}", self.counter));
     }
 }
