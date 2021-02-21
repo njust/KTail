@@ -1,6 +1,6 @@
 use gtk::{Align};
 use gtk::prelude::*;
-use crate::model::{StartViewMsg};
+use crate::model::{StartViewMsg, StartViewOutputMsg};
 use crate::widget::CustomWidget;
 
 pub struct StartView {
@@ -11,6 +11,7 @@ pub struct StartView {
 
 impl CustomWidget for StartView {
     type Msg = StartViewMsg;
+    type Output = StartViewOutputMsg;
     type Input = i32;
 
     fn init(data: Self::Input) -> Self {
@@ -57,7 +58,7 @@ impl CustomWidget for StartView {
         &self.container
     }
 
-    fn update(&mut self, msg: StartViewMsg) {
+    fn update(&mut self, msg: StartViewMsg) -> Self::Output {
         match msg {
             StartViewMsg::Inc => {
                 self.counter += 1;
@@ -67,5 +68,6 @@ impl CustomWidget for StartView {
             }
         }
         self.lbl.set_text(&format!("Count: {}", self.counter));
+        StartViewOutputMsg::CounterChanged(self.counter)
     }
 }
