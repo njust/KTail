@@ -105,12 +105,13 @@ pub enum LogViewMsg {
 #[derive(Debug, Clone)]
 pub enum StartViewMsg {
     Inc,
+    AsyncInc,
     Dec,
 }
 
 #[derive(Clone)]
-pub enum StartViewOutputMsg {
-    CounterChanged(i32)
+pub enum StartViewOutMsg {
+    Changed(i32)
 }
 
 pub enum LogViewToolbarMsg {
