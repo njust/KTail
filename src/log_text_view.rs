@@ -4,6 +4,7 @@ use std::rc::Rc;
 use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data, add_css_with_name, create_col, ColumnType};
 use crate::model::{LogTextViewMsg, LogViewData, LogReplacer, ExtractSelection};
+use crate::log_text_contrast::{matching_foreground_color_for_background};
 
 use sourceview::{ViewExt, BufferExt, Mark};
 use regex::Regex;
@@ -14,7 +15,6 @@ use log::{info, error, debug};
 use crate::log_file_reader::LogFileReader;
 use crate::kubernetes_log_reader::KubernetesLogReader;
 use crate::model::{LogState, ActiveRule, LogReader, LogTextViewThreadMsg, RuleChanges};
-
 
 const EXTRACT_TYPE_GROUP : &'static u8 = &0;
 const EXTRACT_TYPE_CHILD : &'static u8 = &1;
@@ -568,14 +568,15 @@ impl LogTextView {
                     if let Some(tags) = text_view.get_buffer()
                         .and_then(|buffer| buffer.get_tag_table()) {
                         let tag = TextTag::new(Some(&new.id.to_string()));
-                        tag.set_property_background(new.color.as_ref().map(|c|c.as_str()));
+                        tag.set_property_background(new.color.as_ref().map(|c|c.as_str()));     
+                        let background = tag.get_property_background_rgba();                
+                        tag.set_property_foreground_rgba(matching_foreground_color_for_background(&background).as_ref());
                         tags.add(&tag);
                         if new.is_system {
                             tag.set_priority(tags.get_size() - 2);
                         }else {
                             tag.set_priority(0);
                         }
-
                     }
                 }
                 CompareResult::MissesRight(delete) => {
@@ -592,6 +593,8 @@ impl LogTextView {
                         .and_then(|buffer| buffer.get_tag_table())
                         .and_then(|tag_table| tag_table.lookup(&left.id.to_string())) {
                         tag.set_property_background(right.color.as_ref().map(|s|s.as_str()));
+                        let background = tag.get_property_background_rgba();                
+                        tag.set_property_foreground_rgba(matching_foreground_color_for_background(&background).as_ref());
                     }
                     if left.regex != right.regex
                         || left.is_exclude() != right.is_exclude()

@@ -11,6 +11,7 @@ mod log_view;
 mod toolbar;
 mod log_text_view;
 mod log_file_reader;
+mod log_text_contrast;
 mod kubernetes_log_reader;
 mod highlighters;
 mod menu;
