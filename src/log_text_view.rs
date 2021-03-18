@@ -541,6 +541,13 @@ impl LogTextView {
             buffer.set_text("");
         }
     }
+    
+    pub fn add_seperator_line(&mut self) {
+        if let Some(buffer) = &self.text_view.get_buffer() {
+            let (_start, mut end) = buffer.get_bounds();            
+            buffer.insert(&mut end, "-------------------------------------------------------------------------------\n");
+        }
+    }
 
     pub fn apply_rules(&mut self, mut rules: Vec<Highlighter>) {
         let mut add = vec![];

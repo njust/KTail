@@ -81,6 +81,15 @@ impl LogViewToolbar {
             toolbar.add(&clear_btn);
         }
 
+        let add_separator_line_btn = Button::with_label("Add line");
+        {
+            let tx = tx.clone();
+            add_separator_line_btn.connect_clicked(move |_|{
+                tx(LogViewToolbarMsg::AddSeparatorLine);
+            });
+            toolbar.add(&add_separator_line_btn);
+        }
+
         Self {
             container: toolbar
         }

@@ -87,6 +87,9 @@ impl LogView {
                     LogViewToolbarMsg::Clear  => {
                         self.log_text_view.clear_log();
                     }
+                    LogViewToolbarMsg::AddSeparatorLine => {
+                       self.log_text_view.add_seperator_line();
+                    }
                     LogViewToolbarMsg::ShowRules => {
                         self.show_dlg();
                     }

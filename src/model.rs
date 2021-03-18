@@ -120,7 +120,8 @@ pub enum LogViewToolbarMsg {
     ClearSearchPressed,
     ShowRules,
     ToggleAutoScroll(bool),
-    Clear
+    Clear,
+    AddSeparatorLine
 }
 
 #[derive(Debug)]
