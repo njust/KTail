@@ -28,13 +28,11 @@ use glib::Sender;
 use crate::pod_selector::{PodSelector};
 use std::collections::HashMap;
 use crate::log_view::LogView;
-use crate::model::{LogViewData, Msg, CreateLogView, StartViewOutMsg};
+use crate::model::{LogViewData, Msg, CreateLogView};
 use crate::highlighters::{Highlighter, SEARCH_ID, RULE_TYPE_HIGHLIGHT};
 use util::{get_app_icon, send_msg};
 use menu::configure_menu;
 use crate::menu::create_open_file_dlg_action;
-use crate::start::{StartView};
-use crate::widget::CustomWidget;
 
 pub fn get_default_highlighters() -> Vec<Highlighter> {
     vec![
@@ -149,24 +147,6 @@ async fn int_main() {
                 }
             });
         }
-
-        let widget = StartView::with_options(|msg|{
-            match msg {
-                StartViewOutMsg::Changed(cnt) => {
-                    println!("Counter changed: {}", cnt);
-                }
-            }
-        }, 2);
-        notebook.append_page(
-            widget.view(),
-            Some(&gtk::Image::from_icon_name(Some("go-home-symbolic"), IconSize::Button))
-        );
-
-        let widget = StartView::new();
-        notebook.append_page(
-            widget.view(),
-            Some(&gtk::Image::from_icon_name(Some("go-home-symbolic"), IconSize::Button))
-        );
 
         let open_action = create_open_file_dlg_action(tx.clone());
         app.add_action(&open_action);

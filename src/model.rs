@@ -109,11 +109,6 @@ pub enum StartViewMsg {
     Dec,
 }
 
-#[derive(Clone)]
-pub enum StartViewOutMsg {
-    Changed(i32)
-}
-
 pub enum LogViewToolbarMsg {
     TextChange(String),
     SearchPressed,

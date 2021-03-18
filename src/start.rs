@@ -1,6 +1,6 @@
 
 use gtk::prelude::*;
-use crate::model::{StartViewMsg, StartViewOutMsg};
+use crate::model::{StartViewMsg};
 use crate::widget::{CustomWidget, WidgetMsg};
 use glib::Sender;
 
@@ -11,7 +11,7 @@ pub struct StartView {
 
 impl CustomWidget for StartView {
     type Msg = StartViewMsg;
-    type Output = StartViewOutMsg;
+    type Output = ();
     type Input = i32;
 
     fn init(data: Self::Input) -> Self {
@@ -49,7 +49,7 @@ impl CustomWidget for StartView {
     fn update(&mut self, msg: StartViewMsg) -> WidgetMsg<Self> {
         match msg {
             StartViewMsg::Inc => {
-                self.run_async(inc_async(2))
+                self.run_async(inc_async(self.counter as u64))
             }
             StartViewMsg::Dec => {
                 self.update_counter(false)
@@ -65,7 +65,7 @@ impl StartView {
     fn update_counter(&mut self, inc: bool) -> WidgetMsg<Self> {
         self.counter = if inc { self.counter + 1 } else { self.counter -1 };
         self.lbl.set_text(&format!("Count: {}", self.counter));
-        self.msg_out(StartViewOutMsg::Changed(self.counter))
+        self.msg_none()
     }
 }
 
