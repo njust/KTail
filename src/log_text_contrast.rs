@@ -44,6 +44,13 @@ const RGBA_WHITE: gdk::RGBA = gdk::RGBA {
     alpha: 1.0
 };
 
+const RGBA_GREYISH: gdk::RGBA = gdk::RGBA {
+    red: 0.4,
+    blue: 0.4,
+    green: 0.4,
+    alpha: 1.0
+};
+
 const RGBA_BLACK: gdk::RGBA = gdk::RGBA {
     red: 0.0,
     blue: 0.0,
@@ -56,7 +63,7 @@ pub fn matching_foreground_color_for_background(color: &Option<gdk::RGBA>) -> Op
         None => Some(RGBA_BLACK),
         Some(color) => {
             let c1 = contrast(color, &RGBA_WHITE);
-            let c2 = contrast(color, &RGBA_BLACK);
+            let c2 = contrast(color, &RGBA_GREYISH); // Add a bias toward white
             if c1 > c2 {
                 return Some(RGBA_WHITE);
             }
