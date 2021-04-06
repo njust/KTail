@@ -1,7 +1,7 @@
 [package]
 name = "ktail"
 version = "0.3.2"
-authors = ["nico.just <nico.just@gmail.com>"]
+authors = ["nico.just <mail@njust.de>"]
 description = "Kubernetes Log Viewer"
 edition = "2018"
 license = "Copyright © 2020 Nico Just"
