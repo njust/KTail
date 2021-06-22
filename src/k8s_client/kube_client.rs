@@ -104,9 +104,10 @@ impl KubeClient {
         Ok(response.json::<ListResult<Pod>>().await.map(|r|r.items)?)
     }
 
-    pub async fn logs(&self, namespace: &str, pod: &str, options: Option<LogOptions>) -> Result<impl Stream<Item = reqwest::Result<bytes::Bytes>>> {
+    pub async fn logs(&self, namespace: &str, pod: &str, container: &str, options: Option<LogOptions>) -> Result<impl Stream<Item = reqwest::Result<bytes::Bytes>>> {
         let url = format!("{}api/v1/namespaces/{}/pods/{}/log", self.base_url, namespace, pod);
         let mut request = self.client.get(&url);
+        request = request.query(&[("container", container)]);
         let response = if let Some(opt) = options {
             if opt.follow.is_some() && opt.follow.unwrap() {
                 request = request.query(&[("follow", "true")])

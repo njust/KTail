@@ -20,7 +20,27 @@ pub struct KubernetesLogReader {
 
 pub enum KubernetesLogReaderMsg {
     Data(Vec<u8>),
-    ReInit(String),
+    ReInit(PodContainerData),
+}
+
+#[derive(Clone)]
+pub struct PodContainerData {
+    pod: String,
+    container: String,
+    key: String,
+}
+
+impl PodContainerData {
+    fn new(pod: String, container: String) -> Self {
+        Self {
+            key: format!("{}#{}", pod, container),
+            pod,
+            container,
+        }
+    }
+    fn key(&self) -> &str {
+        self.key.as_str()
+    }
 }
 
 #[async_trait]
@@ -40,7 +60,7 @@ impl LogReader for KubernetesLogReader {
                         }
                         KubernetesLogReaderMsg::ReInit(pod) => {
                             self.is_initialized = false;
-                            self.streams.remove(&pod);
+                            self.streams.remove(pod.key());
                             break;
                         }
                     }
@@ -79,7 +99,9 @@ impl LogReader for KubernetesLogReader {
                         if name.starts_with(pod_name) {
                             if let Some(container_status) = pod.status.as_ref().and_then(|s|s.container_statuses.as_ref()).and_then(|cs|cs.first()) {
                                 if container_status.ready {
-                                    pod_list.push(name.clone());
+                                    for container in pod.spec.containers {
+                                        pod_list.push(PodContainerData::new(name.clone(), container.name.clone()));
+                                    }
                                 }else {
                                     self.is_initialized = false;
                                 }
@@ -93,12 +115,12 @@ impl LogReader for KubernetesLogReader {
 
         let prefix_log_entries = pod_list.len() > 1;
         for pod in pod_list {
-            if self.streams.contains_key(&pod) {
+            if self.streams.contains_key(pod.key()) {
                 // info!("Skipping initiate stream for pod '{}'", pod);
                 continue;
             }
 
-            if let Ok(log_stream) = client.logs(&self.options.namespace, &pod, Some(
+            if let Ok(log_stream) = client.logs(&self.options.namespace, &pod.pod, &pod.container, Some(
                 LogOptions {
                     follow: Some(true),
                     since_seconds: Some(self.options.since),
@@ -106,12 +128,12 @@ impl LogReader for KubernetesLogReader {
             )).await {
                 let (exit_tx, _exit_rx) = tokio::sync::oneshot::channel::<stream_cancel::Trigger>();
                 let (exit, mut inc) = Valved::new(log_stream);
-                self.streams.insert(pod.clone(), (exit_tx, exit));
+                self.streams.insert(pod.key().to_string(), (exit_tx, exit));
                 let mut tx = self.data_tx.clone().unwrap();
-                let pod_name = pod.clone();
+                let pod_data = pod.clone();
                 tokio::spawn(async move {
-                    info!("Stream for pod '{}' started", pod_name);
-                    let pod_id = pod_name.split("-").last().unwrap_or(&pod_name);
+                    info!("Stream for pod '{}' started", pod_data.key());
+                    let pod_id = pod_data.pod.split("-").last().unwrap_or(&pod_data.pod);
                     while let Some(Ok(res)) = inc.next().await {
                         let data = if prefix_log_entries {
                             let mut data = format!("[{}]\t", pod_id).into_bytes();
@@ -122,11 +144,11 @@ impl LogReader for KubernetesLogReader {
                         };
 
                         if let Err(e) = tx.send(KubernetesLogReaderMsg::Data(data)).await {
-                            error!("Failed to send stream data for pod '{}': {}", pod_name, e);
+                            error!("Failed to send stream data for pod '{}': {}", pod_data.key(), e);
                         }
                     }
-                    info!("Stream for pod '{}' ended", pod_name);
-                    if let Err(e) = tx.send(KubernetesLogReaderMsg::ReInit(pod_name)).await {
+                    info!("Stream for pod '{}' ended", pod_data.key());
+                    if let Err(e) = tx.send(KubernetesLogReaderMsg::ReInit(pod_data.clone())).await {
                         debug!("Could not send kubernetes re init msg: {}", e);
                     }
                 });
