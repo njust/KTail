@@ -178,6 +178,11 @@ impl LogTextView {
         let tag_table = TextTagTable::new();
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));
         let tv = sourceview::View::new_with_buffer(&text_buffer);
+        add_css_with_name(&tv, "textview", r##"
+            #textview {
+                  font: 12px "Monospace";
+            }
+        "##);
 
         let bookmark_marker = sourceview::MarkAttributesBuilder::new()
             .icon_name("radio-symbolic")
@@ -542,7 +547,7 @@ impl LogTextView {
         }
     }
     
-    pub fn add_seperator_line(&mut self) {
+    pub fn add_separator_line(&mut self) {
         if let Some(buffer) = &self.text_view.get_buffer() {
             let (_start, mut end) = buffer.get_bounds();            
             buffer.insert(&mut end, "-------------------------------------------------------------------------------\n");

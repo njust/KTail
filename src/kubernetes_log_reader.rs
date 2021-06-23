@@ -41,6 +41,10 @@ impl PodContainerData {
     fn key(&self) -> &str {
         self.key.as_str()
     }
+    fn prefix(&self) -> String {
+        let pod_id = self.pod.split("-").last().unwrap_or(&self.pod);
+        format!("{}-{}", &self.container, pod_id)
+    }
 }
 
 #[async_trait]
@@ -114,6 +118,14 @@ impl LogReader for KubernetesLogReader {
         }
 
         let prefix_log_entries = pod_list.len() > 1;
+        let mut max_prefix_len = 0;
+        for p in &pod_list {
+            let prefix_len = p.prefix().len();
+            if prefix_len > max_prefix_len {
+                max_prefix_len = prefix_len;
+            }
+        }
+        max_prefix_len = max_prefix_len + 3;
         for pod in pod_list {
             if self.streams.contains_key(pod.key()) {
                 // info!("Skipping initiate stream for pod '{}'", pod);
@@ -133,10 +145,12 @@ impl LogReader for KubernetesLogReader {
                 let pod_data = pod.clone();
                 tokio::spawn(async move {
                     info!("Stream for pod '{}' started", pod_data.key());
-                    let pod_id = pod_data.pod.split("-").last().unwrap_or(&pod_data.pod);
+                    let prefix = pod_data.prefix();
+                    let spaces = max_prefix_len - prefix.len();
+                    let space = (0..spaces).map(|_|"").collect::<Vec<&str>>().join(" ");
                     while let Some(Ok(res)) = inc.next().await {
                         let data = if prefix_log_entries {
-                            let mut data = format!("[{}]\t", pod_id).into_bytes();
+                            let mut data = format!("[{}]{}", prefix, space).into_bytes();
                             data.append(&mut res.to_vec());
                             data
                         }else {

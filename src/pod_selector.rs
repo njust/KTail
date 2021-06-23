@@ -281,8 +281,12 @@ impl PodSelector {
                     let pod_name = pod.metadata.name.unwrap_or_default();
                     let name = if self.include_replicas {
                         let parts = pod_name.split("-").collect::<Vec<&str>>();
-                        let part_cnt = parts.len() - 2;
-                        parts.into_iter().take(part_cnt).collect::<Vec<&str>>().join("-")
+                        if parts.len() > 2 {
+                            let part_cnt = parts.len() - 2;
+                            parts.into_iter().take(part_cnt).collect::<Vec<&str>>().join("-")
+                        }else {
+                            pod_name
+                        }
                     } else {
                         pod_name
                     };
