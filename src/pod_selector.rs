@@ -280,12 +280,11 @@ impl PodSelector {
                 for pod in pods.into_iter() {
                     let pod_name = pod.metadata.name.unwrap_or_default();
                     let name = if self.include_replicas {
-                        let parts = pod_name.split("-").collect::<Vec<&str>>();
-                        if parts.len() > 2 {
-                            let part_cnt = parts.len() - 2;
-                            parts.into_iter().take(part_cnt).collect::<Vec<&str>>().join("-")
-                        }else {
+                        let is_stateful_set = pod.metadata.labels.filter(|a| a.contains_key("statefulset.kubernetes.io/pod-name")).is_some();
+                        if is_stateful_set {
                             pod_name
+                        }else {
+                            pod.metadata.generate_name.and_then(|gn| Some(gn[0..gn.len() -1].to_string())).unwrap_or(pod_name)
                         }
                     } else {
                         pod_name
