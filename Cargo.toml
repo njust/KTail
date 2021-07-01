@@ -6,8 +6,6 @@ description = "Kubernetes Log Viewer"
 edition = "2018"
 license = "Copyright © 2020 Nico Just"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 glib = "0.10.1"
 gdk = "0.13.1"
