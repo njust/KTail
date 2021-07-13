@@ -51,7 +51,7 @@ impl PodSelector {
         let dlg = gtk::DialogBuilder::new()
             .window_position(WindowPosition::CenterOnParent)
             .default_width(710)
-            .default_height(600)
+            .default_height(640)
             .modal(true)
             .build();
 
@@ -133,6 +133,24 @@ impl PodSelector {
             .expand(true)
             .build();
         sw.add(rules_view.view());
+
+        let refresh_btn = gtk::ButtonBuilder::new()
+            .label("Refresh pods")
+            .build();
+        {
+            let btn_row = gtk::BoxBuilder::new()
+                .margin_top(3)
+                .build();
+
+            let tx = tx.clone();
+            refresh_btn.connect_clicked(move |_| {
+                tx(PodSelectorMsg::Refresh);
+            });
+
+            btn_row.add(&refresh_btn);
+            content.add(&btn_row);
+        }
+
         let lbl = gtk::LabelBuilder::new()
             .label("Rules")
             .halign(Align::Start)
@@ -419,6 +437,9 @@ impl PodSelector {
             }
             PodSelectorMsg::NamespaceChanged(namespace) => {
                 self.selected_namespace.replace(namespace);
+                self.load_pods();
+            }
+            PodSelectorMsg::Refresh => {
                 self.load_pods();
             }
         }

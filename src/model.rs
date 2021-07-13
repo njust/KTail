@@ -81,6 +81,7 @@ pub enum PodSelectorMsg {
     SinceChanged(u32),
     ClusterChanged(String),
     NamespaceChanged(String),
+    Refresh,
     Ok,
     Close,
 }
