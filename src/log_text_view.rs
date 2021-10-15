@@ -180,7 +180,7 @@ impl LogTextView {
         let tv = sourceview::View::new_with_buffer(&text_buffer);
         add_css_with_name(&tv, "textview", r##"
             #textview {
-                  font: 12px "Monospace";
+                  font: 14px "Monospace";
             }
         "##);
 
