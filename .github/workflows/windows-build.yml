@@ -29,7 +29,7 @@ jobs:
     - name: Pacman location
       run: msys2 -c 'where pacman'
     - name: List files
-      run: Get-ChildItem -Recurse "D:\a\_temp\msys\msys64\mingw64"
+      run: Get-ChildItem -Recurse "D:\"
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
