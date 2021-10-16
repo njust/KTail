@@ -5,6 +5,7 @@ use glib::{SignalHandlerId};
 use crate::util::{enable_auto_scroll, SortedListCompare, CompareResult, search, decode_data, add_css_with_name, create_col, ColumnType};
 use crate::model::{LogTextViewMsg, LogViewData, LogReplacer, ExtractSelection};
 use crate::log_text_contrast::{matching_foreground_color_for_background};
+use crate::settings::SETTINGS;
 
 use sourceview::{ViewExt, BufferExt, Mark};
 use regex::Regex;
@@ -178,11 +179,11 @@ impl LogTextView {
         let tag_table = TextTagTable::new();
         let text_buffer = sourceview::Buffer::new(Some(&tag_table));
         let tv = sourceview::View::new_with_buffer(&text_buffer);
-        add_css_with_name(&tv, "textview", r##"
-            #textview {
-                  font: 14px "Monospace";
-            }
-        "##);
+        add_css_with_name(&tv,
+                          "textview",
+                          &format!("#textview {{ font: {}; }}",
+                                   SETTINGS.log_view_font)
+        );
 
         let bookmark_marker = sourceview::MarkAttributesBuilder::new()
             .icon_name("radio-symbolic")
@@ -207,13 +208,10 @@ impl LogTextView {
             .highlight_current_line(true)
             .build();
 
-        add_css_with_name(&minimap, "minimap",r##"
-            #minimap {
-                  font: 1px "Monospace";
-                  background-color: rgba(0,0,0,0);
-            }
-        "##);
-
+        add_css_with_name(&minimap, "minimap",
+                          &format!("#minimap {{ font: {}; background-color: rgba(0,0,0,0);}}",
+                                   SETTINGS.minimap_font)
+        );
         let text_view = Rc::new(tv);
         let scroll_wnd = ScrolledWindow::new(text_view.get_hadjustment().as_ref(), text_view.get_vadjustment().as_ref());
         scroll_wnd.set_vexpand(true);
@@ -289,7 +287,6 @@ impl LogTextView {
 
         add_css_with_name(&sidebar, "toolbar", r"
             #toolbar {
-                background-color: rgba(248,248,248,255);
                 border-right: 1px solid #c0c0c0;
             }
         ");
@@ -298,12 +295,7 @@ impl LogTextView {
             .orientation(Orientation::Horizontal)
             .height_request(31)
             .build();
-        add_css_with_name(&tb_header, "toolbar", r"
-            #toolbar {
-                background-color: rgba(237,237,237,255);
-                border-bottom: 1px solid #c0c0c0;
-            }
-        ");
+
         sidebar.add(&tb_header);
 
         let btn_toolbar = gtk::BoxBuilder::new()

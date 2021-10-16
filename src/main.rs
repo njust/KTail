@@ -17,6 +17,7 @@ mod highlighters;
 mod menu;
 mod widget;
 mod k8s_client;
+mod settings;
 
 use gtk::prelude::*;
 use gio::prelude::*;

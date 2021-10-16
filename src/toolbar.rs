@@ -14,7 +14,6 @@ impl LogViewToolbar {
         let toolbar = gtk::Box::new(Orientation::Horizontal, 4);
         add_css_with_name(&toolbar, "toolbar", r"
             #toolbar {
-                background-color: #f0f0f0;
                 padding: 2px;
                 border-bottom: 1px solid #c0c0c0;
             }

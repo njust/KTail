@@ -3,6 +3,7 @@ mkdir ktail\config\
 
 copy target\release\ktail.exe .\ktail
 copy config\log4rs.yaml .\ktail\config
+copy config\settings.json .\ktail\config
 
 xcopy assets\icons .\ktail\share\icons /E /I
 xcopy assets\gtk-3.0 .\ktail\share\gtk-3.0 /E /I
