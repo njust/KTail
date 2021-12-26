@@ -1,155 +1,339 @@
-use gtk::prelude::*;
-use crate::toolbar::LogViewToolbar;
-use gtk::{Orientation, WindowPosition, AccelGroup, HeaderBarBuilder};
-use crate::highlighters::{HighlighterListView, SEARCH_ID};
-use crate::log_text_view::{LogTextView};
-use crate::model::{LogViewMsg, LogViewToolbarMsg, CreateLogView};
-use std::rc::Rc;
-use crate::get_default_highlighters;
+use std::collections::HashMap;
+use std::sync::Arc;
+use futures::StreamExt;
+use gtk4_helper::{
+    prelude::*,
+    gtk,
+};
+use crate::util;
+use gtk4_helper::gtk::{ComboBoxText, TextTag, TextTagTable, WrapMode};
 
+use gtk4_helper::prelude::{Command, MsgHandler};
+use gtk4_helper::component::Component;
+use sourceview5::Buffer;
+use stream_cancel::Trigger;
+use crate::cluster_list_view::NamespaceViewData;
+use crate::config::{CONFIG};
+use crate::gtk::{ToggleButton};
+use crate::log_text_contrast::matching_foreground_color_for_background;
+use crate::pod_list_view::PodViewData;
+
+pub const SEARCH_TAG: &'static str = "SEARCH";
+
+#[derive(Clone)]
+pub struct SearchData {
+    pub name: String,
+    pub search: String,
+}
 
 pub struct LogView {
     container: gtk::Box,
-    highlighters_view: HighlighterListView,
-    log_text_view: LogTextView,
-    search_text: String,
-    highlighters_dlg: Option<gtk::Dialog>,
-    sender: Rc<dyn Fn(LogViewMsg)>,
+    exit_trigger: Option<Arc<Trigger>>,
+    sender: Arc<dyn MsgHandler<LogViewMsg>>,
+    text_buffer: Buffer,
+    scroll_to_bottom: bool,
+    text_view: sourceview5::View,
+    selected_context: Option<NamespaceViewData>,
+    selected_pods: Option<Vec<PodViewData>>,
+    since_seconds: u32,
+    active_search: Option<String>,
+    highlighters: Vec<SearchData>,
+}
+
+#[derive(Clone)]
+pub enum LogViewMsg {
+    PodSelected(Vec<PodViewData>),
+    ContextSelected(NamespaceViewData),
+    Loaded(Arc<Trigger>),
+    LogDataLoaded(String),
+    EnableScroll(bool),
+    SinceTimespanChanged(String),
+    Search(String),
+    SearchResult(HashMap<String, Vec<usize>>)
 }
 
 impl LogView {
-    pub fn new<T>(mut data: CreateLogView, sender: T, accelerators: &AccelGroup) -> Self
-        where T: 'static + Send + Clone + Fn(LogViewMsg)
-    {
-        let default_rules = data.rules.take().unwrap_or(get_default_highlighters());
+    fn clear(&mut self) {
+        //TODO: check if it is necessary to remove tags if we clear the buffer anyway
+        let (start, end) = self.text_buffer.bounds();
+        for highlighter in &self.highlighters {
+            self.text_buffer.remove_tag_by_name(&highlighter.name, &start, &end);
+        }
 
-        let toolbar_msg = sender.clone();
-        let toolbar = LogViewToolbar::new(move |msg| {
-            toolbar_msg(LogViewMsg::ToolbarMsg(msg));
-        }, accelerators);
+        self.text_buffer.set_text("");
+        if let Some(exit) = self.exit_trigger.take() {
+            drop(exit);
+        }
+    }
+}
 
-        let file_tx = sender.clone();
-        let tm = sender.clone();
-        let mut file_view = LogTextView::new(accelerators, move |msg| {
-            tm(LogViewMsg::LogTextViewMsg(msg));
+impl Component for LogView {
+    type Msg = LogViewMsg;
+    type View = gtk::Box;
+    type Input = ();
+
+    fn create<T: MsgHandler<Self::Msg> + Clone>(sender: T, _: Option<Self::Input>) -> Self {
+        let toolbar = gtk::BoxBuilder::new()
+            .margin_start(4)
+            .margin_end(4)
+            .margin_top(4)
+            .margin_bottom(4)
+            .build();
+
+        let search_entry = gtk::SearchEntryBuilder::new()
+            .placeholder_text("Search")
+            .margin_end(4)
+            .build();
+        toolbar.append(&search_entry);
+
+        let tx = sender.clone();
+        search_entry.connect_activate(move |se|{
+            let text = se.text().to_string();
+            tx(LogViewMsg::Search(text));
         });
 
-        file_view.start(data.data, move |msg| {
-            file_tx(LogViewMsg::LogTextViewMsg(msg));
-        }, default_rules.clone());
+        let tx = sender.clone();
+        search_entry.connect_changed(move |se|{
+            let text = se.text().to_string();
+            if text.len() <= 0 {
+                tx(LogViewMsg::Search(String::new()));
+            }
+        });
 
-        let container = gtk::Box::new(Orientation::Vertical, 0);
-        container.add(toolbar.view());
-        container.add(file_view.view());
+        let auto_scroll_btn = auto_scroll_btn(sender.clone());
+        toolbar.append(&auto_scroll_btn);
 
-        let rules_view = HighlighterListView::new();
-        rules_view.add_highlighters(default_rules.clone());
+        let since_selector = since_duration_selection(sender.clone());
+        toolbar.append(&since_selector);
 
-        let mut rules = default_rules.clone();
-        rules.sort_by_key(|r|r.id);
+        let search_tag = TextTag::new(Some(SEARCH_TAG));
+        search_tag.set_background(Some("rgba(188,150,0,1)"));
+        let background = search_tag.background_rgba();
+        search_tag.set_foreground_rgba(matching_foreground_color_for_background(&background).as_ref());
+
+        let tag_table = TextTagTable::new();
+        tag_table.add(&search_tag);
+
+        let buffer = sourceview5::Buffer::new(Some(&tag_table));
+        let log_data_view = sourceview5::View::builder()
+            .buffer(&buffer)
+            .monospace(true)
+            .editable(false)
+            .wrap_mode(WrapMode::WordChar)
+            .show_line_numbers(true)
+            .highlight_current_line(true)
+            .hexpand(true)
+            .vexpand(true)
+            .build();
+
+        let search: Vec<SearchData> = if let Ok(cfg) = CONFIG.lock() {
+            for highlighter  in &cfg.highlighters {
+                let tag = TextTag::new(Some(&highlighter.name));
+                tag.set_background(Some(&highlighter.color));
+                let background = tag.background_rgba();
+                tag.set_foreground_rgba(matching_foreground_color_for_background(&background).as_ref());
+                tag_table.add(&tag);
+            }
+
+            util::add_css_with_name(&log_data_view,
+            "textview",
+            &format!("#textview {{ font: {}; }}", cfg.log_view_font)
+            );
+            cfg.highlighters.iter().map(|h| SearchData {
+                search: h.search.clone(),
+                name: h.name.clone()
+            }).collect()
+        } else {
+            vec![]
+        };
+
+        let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        container.append(&toolbar);
+        let scroll_wnd = gtk::ScrolledWindow::new();
+        scroll_wnd.set_child(Some(&log_data_view));
+        container.append(&scroll_wnd);
 
         Self {
             container,
-            highlighters_view: rules_view,
-            log_text_view: file_view,
-            search_text: String::new(),
-            highlighters_dlg: None,
-            sender: Rc::new(sender.clone()),
+            exit_trigger: None,
+            sender: Arc::new(sender.clone()),
+            text_buffer: buffer,
+            text_view: log_data_view,
+            selected_context: None,
+            scroll_to_bottom: false,
+            selected_pods: None,
+            since_seconds: 60*10,
+            active_search: None,
+            highlighters: search
         }
     }
 
-
-    pub fn update(&mut self, msg: LogViewMsg) {
+    fn update(&mut self, msg: Self::Msg) -> Command<Self::Msg> {
         match msg {
-            LogViewMsg::ToolbarMsg(msg) => {
-                match msg {
-                    LogViewToolbarMsg::SearchPressed => {
-                        let (regex, extractor) = if self.search_text.len() > 0 {
-                            (
-                                format!("(?i).*{}.*", self.search_text),
-                                format!(r"(?P<text>(?i){}(?-i).*)", self.search_text),
-                            )
-                        }else {
-                            (String::new(), String::new())
-                        };
+            LogViewMsg::PodSelected(pod_data) => {
+                self.selected_pods = Some(pod_data.clone());
+                self.clear();
 
-                        self.highlighters_view.set_regex(SEARCH_ID, &regex, &extractor);
-                        if let Ok(rules) = self.highlighters_view.get_highlighter() {
-                            self.log_text_view.apply_rules(rules);
+                let tx = self.sender.clone();
+                let ctx = self.selected_context.clone().unwrap();
+                return self.run_async(load_log_stream(ctx, pod_data, tx, self.since_seconds));
+            }
+            LogViewMsg::Loaded(exit_tx) => {
+                self.exit_trigger = Some(exit_tx);
+            }
+            LogViewMsg::LogDataLoaded(data) => {
+                let mut end = self.text_buffer.end_iter();
+                self.text_buffer.insert(&mut end, &data);
+
+                if self.scroll_to_bottom {
+                    let mut end = self.text_buffer.end_iter();
+                    self.text_view.scroll_to_iter(&mut end, 0.0, true, 0., 0.);
+                }
+
+                let mut highlighters = self.highlighters.clone();
+                if let Some(query) = &self.active_search {
+                    highlighters.push(SearchData {
+                        search: query.clone(),
+                        name: SEARCH_TAG.to_string()
+                    });
+                }
+                let offset = self.text_buffer.line_count() - 2;
+                return self.run_async(search(highlighters, data, offset as usize));
+            }
+            LogViewMsg::ContextSelected(ctx) => {
+                self.selected_context = Some(ctx);
+            }
+            LogViewMsg::EnableScroll(enable) => {
+                self.scroll_to_bottom = enable;
+            }
+            LogViewMsg::Search(query) => {
+                let (start, end) = self.text_buffer.bounds();
+                self.text_buffer.remove_tag_by_name(SEARCH_TAG, &start, &end);
+
+                if query.len() <= 0 {
+                    self.active_search.take();
+                } else {
+                    self.active_search = Some(query.clone());
+                    let text = self.text_buffer.text(&start, &end, false).to_string();
+                    return self.run_async(search(vec![SearchData { name: SEARCH_TAG.to_string(), search: query }], text, 0));
+                }
+            }
+            LogViewMsg::SearchResult(matching_lines) => {
+                for (search, matching_lines) in matching_lines {
+                    for idx in matching_lines {
+                        if let Some(start) = self.text_buffer.iter_at_line(idx as i32) {
+                            let mut end = start.clone();
+                            end.forward_to_line_end();
+                            self.text_buffer.apply_tag_by_name(&search, &start, &end);
                         }
-                    }
-                    LogViewToolbarMsg::ClearSearchPressed => {
-                        self.highlighters_view.set_regex(SEARCH_ID, &String::new(), &String::new());
-                        if let Ok(rules) = self.highlighters_view.get_highlighter() {
-                            self.log_text_view.apply_rules(rules);
-                        }
-                    }
-                    LogViewToolbarMsg::Clear  => {
-                        self.log_text_view.clear_log();
-                    }
-                    LogViewToolbarMsg::AddSeparatorLine => {
-                       self.log_text_view.add_separator_line();
-                    }
-                    LogViewToolbarMsg::ShowRules => {
-                        self.show_dlg();
-                    }
-                    LogViewToolbarMsg::TextChange(text) => {
-                        self.search_text = text;
-                    }
-                    LogViewToolbarMsg::ToggleAutoScroll(enable) => {
-                        self.log_text_view.toggle_autoscroll(enable);
                     }
                 }
             }
-            LogViewMsg::ApplyRules => {
-                if let Ok(rules) = self.highlighters_view.get_highlighter() {
-                    self.log_text_view.apply_rules(rules);
+            LogViewMsg::SinceTimespanChanged(id) => {
+                self.since_seconds = id.parse::<u32>().expect("Since seconds should be an u32");
+                if let Some(pods) = self.selected_pods.as_ref()
+                    .map(|pods|pods.clone())
+                {
+                    self.clear();
+                    let tx = self.sender.clone();
+                    let ctx = self.selected_context.clone().unwrap();
+                    return self.run_async(load_log_stream(ctx, pods, tx, self.since_seconds));
                 }
-            }
-            LogViewMsg::LogTextViewMsg(msg) => {
-                self.log_text_view.update(msg);
             }
         }
+        Command::None
     }
 
-    pub fn close(&mut self) {
-        self.log_text_view.close();
-    }
-
-    pub fn view(&self) -> &gtk::Box {
+    fn view(&self) -> &Self::View {
         &self.container
     }
+}
 
-    pub fn show_dlg(&mut self) {
-        if self.highlighters_dlg.is_none() {
-            let header_bar = HeaderBarBuilder::new()
-                .show_close_button(true)
-                .title("Rules")
-                .build();
-
-            let dlg = gtk::DialogBuilder::new()
-                .window_position(WindowPosition::CenterOnParent)
-                .default_width(400)
-                .default_height(200)
-                .modal(true)
-                .build();
-            dlg.set_titlebar(Some(&header_bar));
-
-            let content = dlg.get_content_area();
-            content.add(self.highlighters_view.view());
-
-            let tx = self.sender.clone();
-            dlg.connect_delete_event(move |dlg, _| {
-                (*tx)(LogViewMsg::ApplyRules);
-                dlg.hide();
-                gtk::Inhibit(true)
-            });
-
-            self.highlighters_dlg = Some(dlg);
-        }
-
-        if let Some(dlg)= &self.highlighters_dlg {
-            dlg.show_all();
+fn find_matching_lines(highlighters: Vec<SearchData>, text: String, line_offset: usize) -> HashMap<String, Vec<usize>> {
+    let mut lines = text.lines().enumerate();
+    let mut matching_lines = HashMap::<String, Vec<usize>>::new();
+    while let Some((idx, line)) = lines.next() {
+        for highlighter in &highlighters {
+            if line.contains(&highlighter.search) {
+                if !matching_lines.contains_key(&highlighter.name) {
+                    matching_lines.insert(highlighter.name.clone(), vec![]);
+                }
+                let lines = matching_lines.get_mut(&highlighter.name).unwrap();
+                lines.push(line_offset + idx);
+                break;
+            }
         }
     }
+
+    matching_lines
+}
+
+async fn search(highlighters: Vec<SearchData>, text: String, line_offset: usize) -> LogViewMsg {
+    let matching_lines = find_matching_lines(highlighters, text, line_offset);
+    LogViewMsg::SearchResult(matching_lines)
+}
+
+async fn load_log_stream(ctx: NamespaceViewData, pod_data: Vec<PodViewData>, tx: Arc<dyn MsgHandler<LogViewMsg>>, since_seconds: u32) -> LogViewMsg {
+    let pods = pod_data.iter().map(|pd| pd.name.clone()).collect();
+    let client = crate::log_stream::k8s_client(&ctx.config_path, &ctx.context);
+    let (mut log_stream, exit) = crate::log_stream::log_stream(&client, &ctx.name, &pods, since_seconds).await;
+    let tx = tx.clone();
+    tokio::task::spawn(async move {
+        while let Some(data) = log_stream.next().await {
+            let data = data.to_vec();
+            let data = String::from_utf8_lossy(&data);
+            tx(LogViewMsg::LogDataLoaded(data.to_string()));
+        }
+    });
+    LogViewMsg::Loaded(Arc::new(exit))
+}
+
+const SINCE_10_MIN: u32 = 60*10;
+const SINCE_30_MIN: u32 = 60*30;
+const SINCE_60_MIN: u32 = 60*60;
+const SINCE_2H: u32 = 60*60*2;
+const SINCE_4H: u32 = 60*60*4;
+const SINCE_6H: u32 = 60*60*6;
+const SINCE_8H: u32 = 60*60*8;
+const SINCE_10H: u32 = 60*60*10;
+const SINCE_12H: u32 = 60*60*12;
+const SINCE_24H: u32 = 60*60*24;
+
+fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
+    let since_selector = gtk::ComboBoxTextBuilder::new()
+        .build();
+
+    since_selector.append(Some(&SINCE_10_MIN.to_string()), "10 min");
+    since_selector.append(Some(&SINCE_30_MIN.to_string()), "30 min");
+    since_selector.append(Some(&SINCE_60_MIN.to_string()), "1 hour");
+    since_selector.append(Some(&SINCE_2H.to_string()), "2 hours");
+    since_selector.append(Some(&SINCE_4H.to_string()), "4 hours");
+    since_selector.append(Some(&SINCE_6H.to_string()), "6 hours");
+    since_selector.append(Some(&SINCE_8H.to_string()), "8 hours");
+    since_selector.append(Some(&SINCE_10H.to_string()), "10 hours");
+    since_selector.append(Some(&SINCE_12H.to_string()), "12 hours");
+    since_selector.append(Some(&SINCE_24H.to_string()), "24 hours");
+    since_selector.set_active_id(Some(&SINCE_10_MIN.to_string()));
+
+    since_selector.connect_changed(move |a| {
+        if let Some(active) =  a.active_id() {
+            let active = active.to_string();
+            tx(LogViewMsg::SinceTimespanChanged(active));
+        }
+    });
+
+    since_selector
+}
+
+fn auto_scroll_btn<T: MsgHandler<LogViewMsg>>(tx: T) -> ToggleButton {
+    let auto_scroll_btn = gtk::ToggleButtonBuilder::new()
+        .label("Scroll")
+        .margin_end(4)
+        .build();
+
+    auto_scroll_btn.connect_toggled(move |btn| {
+        tx(LogViewMsg::EnableScroll(btn.is_active()));
+    });
+
+    auto_scroll_btn
 }

@@ -1,18 +1,12 @@
-//! Types and helpers for `kubeconfig` parsing.
-
-// Lifted from https://github.com/camallo/k8s-client-rs/blob/master/src/kubeconfig.rs
-// until a more complete kubernetes client exists
-
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use serde_yaml;
 use openssl::x509::X509;
 use openssl::pkey::{PKey, Private};
 use url::Url;
 use base64;
 use serde::{Deserialize, Serialize};
-use crate::model::CmdOptions;
 use anyhow::{Result, anyhow};
 
 /// Configuration to build a Kubernetes client.
@@ -159,10 +153,6 @@ impl KubeConfig {
         Ok(r)
     }
 
-    pub fn load_default() -> Result<KubeConfig> {
-        KubeConfig::load(KubeConfig::default_path())
-    }
-
     pub fn context(&self, name: &str) -> Result<ClusterContext> {
         let ctxs: Vec<&NamedContext> = self.contexts.iter().filter(|c| c.name == name).collect();
         let ctx = match ctxs.len() {
@@ -200,20 +190,5 @@ impl KubeConfig {
             extensions: None,
         };
         Ok(rc)
-    }
-
-    pub fn default_path() -> PathBuf {
-        let cmd_options: CmdOptions = argh::from_env();
-        if let Some(cfg) = cmd_options.config {
-            return PathBuf::from(cfg);
-        }
-
-        if let Ok(kube_config) = std::env::var("KUBECONFIG") {
-            return PathBuf::from(kube_config);
-        }
-        dirs::home_dir()
-            .expect("Could not determine home dir!")
-            .join(".kube")
-            .join("config")
     }
 }

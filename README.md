@@ -4,20 +4,3 @@ KTail allows you to tail multiple pods in one view. It automatically detects upd
 
 You can find more information on our official website: https://ktail.de
 
-# Build
-For all platforms: https://www.rust-lang.org/tools/install
-
-## Windows prerequisites
-You need to have msys2 with the following packages installed
-
-- mingw-w64-x86_64-toolchain
-- base-devel
-- mingw-w64-x86_64-gtk3
-- mingw-w64-x86_64-gtksourceview3
-
-## Linux (debian based) prerequisites 
-- libgtksourceviewmm-3.0-dev
-
-## MacOS
-- gtk+3 
-- gtksourceview3

@@ -1,3 +1,4 @@
+use std::time::Duration;
 use reqwest::{self, header, ClientBuilder};
 use openssl::pkcs12::Pkcs12;
 use url::Url;
@@ -6,7 +7,8 @@ use crate::k8s_client::{ClusterContext};
 use serde::{Deserialize, Serialize};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus, NamespaceSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use tokio::stream::Stream;
+
+use tokio_stream::Stream;
 
 // Problems with empty password on MacOs
 const PKCS12_PWD: &'static str = "a8c51701-bc96-44a4-a3bc-9b6034d1f8bd";
@@ -52,6 +54,13 @@ impl KubeClient {
     pub fn new(context: &ClusterContext) -> Result<KubeClient> {
         KubeClient::with_options(context, None)
     }
+
+    pub fn with_timeout(context: &ClusterContext) -> Result<KubeClient> {
+        KubeClient::with_options(context, Some(ClientOptions {
+            timeout: Some(Duration::from_secs(5)),
+        }))
+    }
+
     pub fn with_options(context: &ClusterContext, options: Option<ClientOptions>) -> Result<KubeClient> {
         let auth_info = &context.user;
         let cluster = &context.cluster;
@@ -101,13 +110,16 @@ impl KubeClient {
         let url = format!("{}api/v1/namespaces/{}/pods", self.base_url, namespace);
         let response = self.client.get(&url)
             .send().await?;
-        Ok(response.json::<ListResult<Pod>>().await.map(|r|r.items)?)
+        Ok(response.json::<ListResult<Pod>>().await.map(|r| r.items)?)
     }
 
-    pub async fn logs(&self, namespace: &str, pod: &str, container: &str, options: Option<LogOptions>) -> Result<impl Stream<Item = reqwest::Result<bytes::Bytes>>> {
+    pub async fn logs(&self, namespace: &str, pod: &str, container: Option<&str>, options: Option<LogOptions>) -> Result<impl Stream<Item=reqwest::Result<bytes::Bytes>>> {
         let url = format!("{}api/v1/namespaces/{}/pods/{}/log", self.base_url, namespace, pod);
         let mut request = self.client.get(&url);
-        request = request.query(&[("container", container)]);
+        if let Some(container) = container {
+            request = request.query(&[("container", container)]);
+        }
+
         let response = if let Some(opt) = options {
             if opt.follow.is_some() && opt.follow.unwrap() {
                 request = request.query(&[("follow", "true")])
@@ -116,31 +128,32 @@ impl KubeClient {
                 request = request.query(&[("sinceSeconds", since.to_string())])
             }
             request
-        }else {
+        } else {
             request
         }.send().await?.bytes_stream();
-
         Ok(response)
     }
 
+    #[allow(dead_code)]
     pub async fn namespaces(&self) -> Result<Vec<Namespace>> {
         let url = format!("{}api/v1/namespaces", self.base_url);
         let response = self.client.get(&url).send().await?;
-        Ok(response.json::<ListResult<Namespace>>().await.map(|r|r.items)?)
+        Ok(response.json::<ListResult<Namespace>>().await.map(|r| r.items)?)
     }
 }
 
 #[test]
-pub fn test_load_namespaces() -> crate::Result<()> {
-    use crate::k8s_client::{Result, ClusterContext, KubeConfig};
+pub fn test_load_namespaces() -> anyhow::Result<()> {
+    use crate::k8s_client::{ClusterContext, KubeConfig};
+    use gtk4_helper::tokio;
 
-    let mut rt = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let mut rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build().unwrap();
-    rt.block_on(async move  {
+
+    rt.block_on(async move {
         let cfg = KubeConfig::load_default().unwrap();
-        let cx_names: Vec<&String> = cfg.contexts.iter().map(|c|&c.name).collect();
+        let cx_names: Vec<&String> = cfg.contexts.iter().map(|c| &c.name).collect();
         println!("{:?}", cx_names);
         let ctx = cfg.context("DEVCluster").unwrap();
 
@@ -153,7 +166,6 @@ pub fn test_load_namespaces() -> crate::Result<()> {
                 println!("{:?}", e);
             }
         }
-
     });
 
     Ok(())
