@@ -1,0 +1,66 @@
+name: Linux Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install build prerequsites
+        run: sudo apt-get install -y python3-pip libxkbcommon-dev libcairo2-dev libwayland-dev libxrandr-dev libxi-dev libxcursor-dev libxdamage-dev libxinerama-dev libgstreamer1.0-dev libgstreamer-plugins-bad1.0-dev ninja-build
+      - name: Install python modules
+        run: sudo python3 -m pip install meson==0.57.1
+      - name: Clone gtk repo
+        run: git clone https://gitlab.gnome.org/GNOME/gtksourceview.git
+      - name: Checkout tag
+        working-directory: gtksourceview
+        run: git checkout tags/5.2.0
+      - name: Cache gtk build
+        uses: actions/cache@v2
+        id: gtk-build-cache
+        with:
+          path: |
+            /tmp/gtkbuild
+            /opt/gtk
+          key: ${{ runner.os }}-${{ hashFiles('gtksourceview/.git/HEAD') }}
+      - name: Create build dir
+        if: steps.gtk-build-cache.outputs.cache-hit != 'true'
+        run: mkdir -p gtkbuild
+        working-directory: /tmp
+      - name: Configure
+        if: steps.gtk-build-cache.outputs.cache-hit != 'true'
+        run: meson --prefix=/opt/gtk /tmp/gtkbuild
+        working-directory: gtksourceview
+      - name: Build gtk
+        if: steps.gtk-build-cache.outputs.cache-hit != 'true'
+        run: ninja && ninja install
+        working-directory: /tmp/gtkbuild
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cargo build
+        run: cargo build --release
+        env:
+          PKG_CONFIG_PATH: /opt/gtk/lib/x86_64-linux-gnu/pkgconfig
+          LD_LIBRARY_PATH: /opt/gtk/lib/x86_64-linux-gnu
+      - name: Install AppImageTool
+        run: wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage && sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool && chmod +x /usr/local/bin/appimagetool
+      - name: Create AppImage
+        run: ./createAppImage.sh
+      - uses: actions/upload-artifact@v2
+        with:
+          name: AppImage
+          path: ktail
