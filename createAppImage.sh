@@ -21,7 +21,7 @@ APP_RUN_SCRIPT="$TARGET_DIR/AppRun"
 echo '#!/bin/sh
 HERE=$(dirname $(readlink -f "${0}"))
 export LD_LIBRARY_PATH="${HERE}"/usr/lib
-export XDG_DATA_DIRS="${HERE}"/usr/share
+export XDG_DATA_DIRS="${HERE}"/usr/share:$XDG_DATA_DIRS
 "${HERE}"/usr/bin/bin $@
 ' > "$APP_RUN_SCRIPT"
 
