@@ -1,0 +1,46 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: false
+          path-type: inherit
+          install: >-
+            base-devel
+            mingw-w64-x86_64-gtk4
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-gtksourceview5
+
+      - name: Install Windows GNU Toolchain
+        run: rustup default stable-x86_64-pc-windows-gnu
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cargo build
+        run: msys2 -c 'cargo build --release'
+      - name: Create Bundle
+        run: .\createWindowsBundle.ps1
+        shell: powershell
+      - uses: actions/upload-artifact@v2
+        with:
+          name: Bundle
+          path: bundle
