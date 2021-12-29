@@ -250,7 +250,7 @@ fn kube_config_list<T: MsgHandler<ClusterListViewMsg> + Clone>(sender: T) -> (Co
         tx(ClusterListViewMsg::RemoveConfig(pos));
     }, ButtonOptions {
         label: None,
-        image: Some("delete"),
+        image: Some("edit-delete-symbolic"),
     });
 
     let tx = sender;

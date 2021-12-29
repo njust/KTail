@@ -1,6 +1,7 @@
 # Kubernetes log viewer
 
 [![Linux Build](https://github.com/njust/KTail/actions/workflows/linux-build.yml/badge.svg)](https://github.com/njust/KTail/actions/workflows/linux-build.yml)
+[![Windows Build](https://github.com/njust/KTail/actions/workflows/windows-build.yml/badge.svg)](https://github.com/njust/KTail/actions/workflows/windows-build.yml)
 
 KTail allows you to tail multiple pods in one view. It automatically detects updates and attaches to new pods. Configurable highlighters show how often regular expressions matched and let you quickly navigate in the results.
 

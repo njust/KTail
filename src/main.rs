@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use std::rc::Rc;
 use gtk4_helper::{
     prelude::*,

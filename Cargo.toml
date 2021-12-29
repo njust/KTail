@@ -4,7 +4,7 @@ edition = "2021"
 version = "0.4.0"
 authors = ["nico.just <mail@njust.de>"]
 description = "Kubernetes Log Viewer"
-license = "Copyright © 2020 Nico Just"
+license = "Copyright © 2021 Nico Just"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,7 +12,6 @@ license = "Copyright © 2020 Nico Just"
 #gtk4-helper = {path = "./gtk4-helper/gtk4-helper"}
 gtk4-helper = {git = "https://github.com/njust/gtk4-helper.git"}
 sourceview5 = "0.2.0"
-
 reqwest = { version = "0.11.4", features = ["json", "native-tls", "stream"] }
 stream-cancel = "0.6.1"
 openssl = "0.10.30"
@@ -33,6 +32,13 @@ bytes = "1.1.0"
 futures = { version = "0.3.17", features = ["alloc"] }
 once_cell = "1.8.0"
 itertools = "0.10.3"
+
+# Windows metadata
+[package.metadata.winres]
+LegalCopyright = "Copyright © 2021 Nico Just"
+
+[target.'cfg(target_os="windows")'.build-dependencies]
+winres = {git = "https://github.com/njust/winres.git"}
 
 [profile.release]
 opt-level = 'z' # Optimize for size.
