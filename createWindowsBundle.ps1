@@ -1,4 +1,4 @@
-$appName = "gtk_min.exe"
+$appName = "ktail.exe"
 
 $root = "D:\a\_temp\msys64\mingw64"
 Get-ChildItem -Recurse $root
