@@ -37,6 +37,8 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Cargo build
         run: msys2 -c 'cargo build --release'
+      - name: Download theme
+        run: msys2 -c 'wget https://github.com/vinceliuice/Fluent-gtk-theme/raw/master/release/Fluent-grey.tar.xz && tar --xz -xvf Fluent-grey.tar.xz Fluent-grey-light-compact/gtk-4.0 Fluent-grey-light-compact/COPYING Fluent-grey-light-compact/index.theme'
       - name: Create Bundle
         run: .\createWindowsBundle.ps1
         shell: powershell
