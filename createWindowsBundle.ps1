@@ -35,4 +35,4 @@ gtk-theme-name=Fluent-grey-light-compact
 gtk-font-name=Segoe UI 9'
 [IO.File]::WriteAllLines("bundle\share\gtk-4.0\settings.ini", $settings)
 
-Compress-Archive -Path bundle -DestinationPath KTail-x86_x64-win.zip
+Compress-Archive -Path .\bundle\* -DestinationPath KTail-x86_x64-win.zip
