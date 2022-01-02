@@ -30,8 +30,9 @@ mkdir bundle\share\themes
 move Fluent-grey-light-compact .\bundle\share\themes
 
 mkdir bundle\share\gtk-4.0
-$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
 $settings = '[Settings]
 gtk-theme-name=Fluent-grey-light-compact
 gtk-font-name=Segoe UI 9'
-[System.IO.File]::WriteAllLines("bundle\share\gtk-4.0\settings.ini", $settings, $Utf8NoBomEncoding)
+[IO.File]::WriteAllLines("bundle\share\gtk-4.0\settings.ini", $settings)
+
+Compress-Archive -Path bundle -DestinationPath KTail-x86_x64-win.zip

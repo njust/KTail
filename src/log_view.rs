@@ -4,6 +4,7 @@ use futures::StreamExt;
 use gtk4_helper::{
     prelude::*,
     gtk,
+    glib
 };
 use crate::util;
 use gtk4_helper::gtk::{ComboBoxText, TextTag, TextTagTable, WrapMode};
@@ -64,6 +65,26 @@ impl LogView {
         if let Some(exit) = self.exit_trigger.take() {
             drop(exit);
         }
+    }
+
+    fn scroll_to_line(&self, line: i32) {
+        let text_view = self.text_view.clone();
+        glib::idle_add_local(move || {
+            let buffer = text_view.buffer();
+            if let Some(mut iter) = buffer.iter_at_line(line) {
+                let iter_loc = text_view.iter_location(&iter);
+                let visible_rect = text_view.visible_rect();
+
+                text_view.scroll_to_iter(&mut iter, 0.0, true, 0.5, 0.5);
+                if visible_rect.intersect(&iter_loc).is_none() {
+                    glib::Continue(true)
+                } else {
+                    glib::Continue(false)
+                }
+            } else {
+                glib::Continue(false)
+            }
+        });
     }
 }
 
@@ -186,8 +207,8 @@ impl Component for LogView {
                 self.text_buffer.insert(&mut end, &data);
 
                 if self.scroll_to_bottom {
-                    let mut end = self.text_buffer.end_iter();
-                    self.text_view.scroll_to_iter(&mut end, 0.0, true, 0., 0.);
+                    let lines = self.text_buffer.line_count();
+                    self.scroll_to_line(lines);
                 }
 
                 let mut highlighters = self.highlighters.clone();
