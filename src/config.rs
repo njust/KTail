@@ -29,12 +29,12 @@ impl Default for Config {
          highlighters: vec![
             Highlighter {
                name: "Warnings".to_string(),
-               search: "WARNING".to_string(),
+               search: r".*\s((?i)warn(?-i))\s.*".to_string(),
                color: "rgba(207,111,57,1)".to_string(),
             },
             Highlighter {
                name: "Errors".to_string(),
-               search: "ERROR".to_string(),
+               search: r".*\s((?i)error|fatal|failed(?-i))\s.*".to_string(),
                color: "rgba(244,94,94,1)".to_string(),
             }
          ],

@@ -11,6 +11,8 @@ use gtk4_helper::gtk::{ComboBoxText, TextTag, TextTagTable, WrapMode};
 
 use gtk4_helper::prelude::{Command, MsgHandler};
 use gtk4_helper::component::Component;
+use gtk4_helper::glib::SourceId;
+use regex::Regex;
 use sourceview5::Buffer;
 use stream_cancel::Trigger;
 use crate::cluster_list_view::NamespaceViewData;
@@ -24,7 +26,7 @@ pub const SEARCH_TAG: &'static str = "SEARCH";
 #[derive(Clone)]
 pub struct SearchData {
     pub name: String,
-    pub search: String,
+    pub search: Regex,
 }
 
 pub struct LogView {
@@ -32,13 +34,13 @@ pub struct LogView {
     exit_trigger: Option<Arc<Trigger>>,
     sender: Arc<dyn MsgHandler<LogViewMsg>>,
     text_buffer: Buffer,
-    scroll_to_bottom: bool,
     text_view: sourceview5::View,
     selected_context: Option<NamespaceViewData>,
     selected_pods: Option<Vec<PodViewData>>,
     since_seconds: u32,
-    active_search: Option<String>,
+    active_search: Option<Regex>,
     highlighters: Vec<SearchData>,
+    scroll_handler: Option<SourceId>,
 }
 
 #[derive(Clone)]
@@ -67,7 +69,25 @@ impl LogView {
         }
     }
 
-    fn scroll_to_line(&self, line: i32) {
+    fn scroll_to_bottom(&mut self, scroll: bool) {
+        let text_view = self.text_view.clone();
+        if scroll && self.scroll_handler.is_none() {
+            let handle = glib::timeout_add_local(std::time::Duration::from_millis(500),move || {
+                let buffer = text_view.buffer();
+                let (_, mut end) = buffer.bounds();
+                text_view.scroll_to_iter(&mut end, 0.0, true, 0.5, 0.5);
+                glib::Continue(true)
+            });
+            self.scroll_handler = Some(handle);
+        } else {
+            if let Some(sh)  = self.scroll_handler.take() {
+                glib::source::source_remove(sh);
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    fn scroll_to_line(&mut self, line: i32) {
         let text_view = self.text_view.clone();
         glib::idle_add_local(move || {
             let buffer = text_view.buffer();
@@ -160,10 +180,17 @@ impl Component for LogView {
             "textview",
             &format!("#textview {{ font: {}; }}", cfg.log_view_font)
             );
-            cfg.highlighters.iter().map(|h| SearchData {
-                search: h.search.clone(),
-                name: h.name.clone()
-            }).collect()
+
+            let mut search_data = vec![];
+            for highlighter in &cfg.highlighters {
+                if let Ok(regex) = Regex::new(&highlighter.search) {
+                    search_data.push(SearchData {
+                        search: regex,
+                        name: highlighter.name.clone()
+                    });
+                }
+            }
+            search_data
         } else {
             vec![]
         };
@@ -181,11 +208,11 @@ impl Component for LogView {
             text_buffer: buffer,
             text_view: log_data_view,
             selected_context: None,
-            scroll_to_bottom: false,
             selected_pods: None,
             since_seconds: 60*10,
             active_search: None,
-            highlighters: search
+            highlighters: search,
+            scroll_handler: None
         }
     }
 
@@ -205,14 +232,8 @@ impl Component for LogView {
             LogViewMsg::LogDataLoaded(data) => {
                 let mut end = self.text_buffer.end_iter();
                 self.text_buffer.insert(&mut end, &data);
-
-                if self.scroll_to_bottom {
-                    let lines = self.text_buffer.line_count();
-                    self.scroll_to_line(lines);
-                }
-
                 let mut highlighters = self.highlighters.clone();
-                if let Some(query) = &self.active_search {
+                if let Some(query) = self.active_search.as_ref() {
                     highlighters.push(SearchData {
                         search: query.clone(),
                         name: SEARCH_TAG.to_string()
@@ -225,7 +246,7 @@ impl Component for LogView {
                 self.selected_context = Some(ctx);
             }
             LogViewMsg::EnableScroll(enable) => {
-                self.scroll_to_bottom = enable;
+                self.scroll_to_bottom(enable);
             }
             LogViewMsg::Search(query) => {
                 let (start, end) = self.text_buffer.bounds();
@@ -234,9 +255,11 @@ impl Component for LogView {
                 if query.len() <= 0 {
                     self.active_search.take();
                 } else {
-                    self.active_search = Some(query.clone());
+                    self.active_search = Regex::new(&format!("(?i){}", query)).ok();
                     let text = self.text_buffer.text(&start, &end, false).to_string();
-                    return self.run_async(search(vec![SearchData { name: SEARCH_TAG.to_string(), search: query }], text, 0));
+                    if let Some(query) = &self.active_search {
+                        return self.run_async(search(vec![ SearchData { name: SEARCH_TAG.to_string(), search: query.clone() }], text, 0));
+                    }
                 }
             }
             LogViewMsg::SearchResult(matching_lines) => {
@@ -275,7 +298,7 @@ fn find_matching_lines(highlighters: Vec<SearchData>, text: String, line_offset:
     let mut matching_lines = HashMap::<String, Vec<usize>>::new();
     while let Some((idx, line)) = lines.next() {
         for highlighter in &highlighters {
-            if line.contains(&highlighter.search) {
+            if highlighter.search.is_match(line) {
                 if !matching_lines.contains_key(&highlighter.name) {
                     matching_lines.insert(highlighter.name.clone(), vec![]);
                 }
