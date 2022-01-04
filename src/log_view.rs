@@ -50,6 +50,7 @@ pub enum LogViewMsg {
     Loaded(Arc<Trigger>),
     LogDataLoaded(String),
     EnableScroll(bool),
+    WrapText(bool),
     SinceTimespanChanged(String),
     Search(String),
     SearchResult(HashMap<String, Vec<usize>>)
@@ -144,6 +145,9 @@ impl Component for LogView {
         let auto_scroll_btn = auto_scroll_btn(sender.clone());
         toolbar.append(&auto_scroll_btn);
 
+        let wrap_text_btn = wrap_text_btn(sender.clone());
+        toolbar.append(&wrap_text_btn);
+
         let since_selector = since_duration_selection(sender.clone());
         toolbar.append(&since_selector);
 
@@ -160,7 +164,6 @@ impl Component for LogView {
             .buffer(&buffer)
             .monospace(true)
             .editable(false)
-            .wrap_mode(WrapMode::WordChar)
             .show_line_numbers(true)
             .highlight_current_line(true)
             .hexpand(true)
@@ -247,6 +250,13 @@ impl Component for LogView {
             }
             LogViewMsg::EnableScroll(enable) => {
                 self.scroll_to_bottom(enable);
+            }
+            LogViewMsg::WrapText(wrap) => {
+                if wrap {
+                    self.text_view.set_wrap_mode(WrapMode::WordChar)
+                } else {
+                    self.text_view.set_wrap_mode(WrapMode::None)
+                }
             }
             LogViewMsg::Search(query) => {
                 let (start, end) = self.text_buffer.bounds();
@@ -380,4 +390,17 @@ fn auto_scroll_btn<T: MsgHandler<LogViewMsg>>(tx: T) -> ToggleButton {
     });
 
     auto_scroll_btn
+}
+
+fn wrap_text_btn<T: MsgHandler<LogViewMsg>>(tx: T) -> ToggleButton {
+    let wrap_text_btn = gtk::ToggleButtonBuilder::new()
+        .label("Wrap text")
+        .margin_end(4)
+        .build();
+
+    wrap_text_btn.connect_toggled(move |btn| {
+        tx(LogViewMsg::WrapText(btn.is_active()));
+    });
+
+    wrap_text_btn
 }
