@@ -23,8 +23,13 @@ pub struct Config {
 
 impl Default for Config {
    fn default() -> Self {
+      #[cfg(target_os = "linux")]
+      let font = "13px Monospace";
+      #[cfg(target_os = "windows")]
+      let font = "15px Consolas";
+
       Config {
-         log_view_font: "13px Monospace".to_string(),
+         log_view_font: font.to_string(),
          k8s_configs: vec![],
          highlighters: vec![
             Highlighter {
