@@ -19,6 +19,7 @@ mod cluster_list_view;
 mod util;
 mod config;
 mod log_text_contrast;
+mod log_overview;
 
 use crate::pod_list_view::{PodListView, PodListViewMsg};
 

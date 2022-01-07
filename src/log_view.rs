@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use gtk4_helper::{
     prelude::*,
@@ -18,15 +19,33 @@ use stream_cancel::Trigger;
 use crate::cluster_list_view::NamespaceViewData;
 use crate::config::{CONFIG};
 use crate::gtk::{ToggleButton};
+use crate::log_overview::{LogOverview, LogOverviewMsg};
+use crate::log_stream::LogData;
 use crate::log_text_contrast::matching_foreground_color_for_background;
 use crate::pod_list_view::PodViewData;
 
 pub const SEARCH_TAG: &'static str = "SEARCH";
+pub const SEARCH_COLOR: &'static str = "rgba(188,150,0,1)";
 
 #[derive(Clone)]
 pub struct SearchData {
     pub name: String,
     pub search: Regex,
+}
+
+#[derive(Clone)]
+pub struct SearchResult {
+    pub lines: Vec<usize>,
+    pub timestamp: Option<DateTime<Utc>>,
+}
+
+impl SearchResult {
+    pub fn new(timestamp: Option<DateTime<Utc>>) -> Self {
+        Self {
+            lines: vec![],
+            timestamp
+        }
+    }
 }
 
 pub struct LogView {
@@ -41,6 +60,7 @@ pub struct LogView {
     active_search: Option<Regex>,
     highlighters: Vec<SearchData>,
     scroll_handler: Option<SourceId>,
+    overview: ComponentContainer<LogOverview>,
 }
 
 #[derive(Clone)]
@@ -48,16 +68,20 @@ pub enum LogViewMsg {
     PodSelected(Vec<PodViewData>),
     ContextSelected(NamespaceViewData),
     Loaded(Arc<Trigger>),
-    LogDataLoaded(String),
+    LogDataLoaded(LogData),
     EnableScroll(bool),
     WrapText(bool),
+    ShowOverview(bool),
     SinceTimespanChanged(String),
     Search(String),
-    SearchResult(HashMap<String, Vec<usize>>)
+    SearchResult(HashMap<String, SearchResult>),
+    LogOverview(LogOverviewMsg),
 }
 
 impl LogView {
     fn clear(&mut self) {
+        self.overview.update(LogOverviewMsg::Clear);
+
         //TODO: check if it is necessary to remove tags if we clear the buffer anyway
         let (start, end) = self.text_buffer.bounds();
         for highlighter in &self.highlighters {
@@ -142,17 +166,20 @@ impl Component for LogView {
             }
         });
 
-        let auto_scroll_btn = auto_scroll_btn(sender.clone());
+        let auto_scroll_btn = toggle_btn(sender.clone(), "Scroll", |active| LogViewMsg::EnableScroll(active));
         toolbar.append(&auto_scroll_btn);
 
-        let wrap_text_btn = wrap_text_btn(sender.clone());
+        let wrap_text_btn = toggle_btn(sender.clone(), "Wrap text", |active| LogViewMsg::WrapText(active));
         toolbar.append(&wrap_text_btn);
+
+        let show_overview_btn = toggle_btn(sender.clone(), "Show overview", |active| LogViewMsg::ShowOverview(active));
+        toolbar.append(&show_overview_btn);
 
         let since_selector = since_duration_selection(sender.clone());
         toolbar.append(&since_selector);
 
         let search_tag = TextTag::new(Some(SEARCH_TAG));
-        search_tag.set_background(Some("rgba(188,150,0,1)"));
+        search_tag.set_background(Some(SEARCH_COLOR));
         let background = search_tag.background_rgba();
         search_tag.set_foreground_rgba(matching_foreground_color_for_background(&background).as_ref());
 
@@ -171,8 +198,8 @@ impl Component for LogView {
             .build();
 
         let search: Vec<SearchData> = if let Ok(cfg) = CONFIG.lock() {
-            for highlighter  in &cfg.highlighters {
-                let tag = TextTag::new(Some(&highlighter.name));
+            for (name, highlighter)  in &cfg.highlighters {
+                let tag = TextTag::new(Some(name));
                 tag.set_background(Some(&highlighter.color));
                 let background = tag.background_rgba();
                 tag.set_foreground_rgba(matching_foreground_color_for_background(&background).as_ref());
@@ -185,11 +212,11 @@ impl Component for LogView {
             );
 
             let mut search_data = vec![];
-            for highlighter in &cfg.highlighters {
+            for (name, highlighter) in &cfg.highlighters {
                 if let Ok(regex) = Regex::new(&highlighter.search) {
                     search_data.push(SearchData {
                         search: regex,
-                        name: highlighter.name.clone()
+                        name: name.clone(),
                     });
                 }
             }
@@ -198,11 +225,26 @@ impl Component for LogView {
             vec![]
         };
 
-        let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        container.append(&toolbar);
         let scroll_wnd = gtk::ScrolledWindow::new();
         scroll_wnd.set_child(Some(&log_data_view));
-        container.append(&scroll_wnd);
+
+        let tx = sender.clone();
+        let overview = LogOverview::new(move |msg| {
+            tx(LogViewMsg::LogOverview(msg));
+        });
+
+        overview.view().set_visible(false);
+
+        let pane = gtk::PanedBuilder::new()
+            .orientation(gtk::Orientation::Vertical)
+            .start_child(overview.view())
+            .end_child(&scroll_wnd)
+            .position(110)
+            .build();
+
+        let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        container.append(&toolbar);
+        container.append(&pane);
 
         Self {
             container,
@@ -215,7 +257,8 @@ impl Component for LogView {
             since_seconds: 60*10,
             active_search: None,
             highlighters: search,
-            scroll_handler: None
+            scroll_handler: None,
+            overview,
         }
     }
 
@@ -233,17 +276,21 @@ impl Component for LogView {
                 self.exit_trigger = Some(exit_tx);
             }
             LogViewMsg::LogDataLoaded(data) => {
+                if let Some(timestamp) = &data.timestamp {
+                    self.overview.update(LogOverviewMsg::LogData(timestamp.clone()));
+                }
+
                 let mut end = self.text_buffer.end_iter();
-                self.text_buffer.insert(&mut end, &data);
+                self.text_buffer.insert(&mut end, &format!("{} {}", data.pod, data.text));
                 let mut highlighters = self.highlighters.clone();
                 if let Some(query) = self.active_search.as_ref() {
                     highlighters.push(SearchData {
                         search: query.clone(),
-                        name: SEARCH_TAG.to_string()
+                        name: SEARCH_TAG.to_string(),
                     });
                 }
                 let offset = self.text_buffer.line_count() - 2;
-                return self.run_async(search(highlighters, data, offset as usize));
+                return self.run_async(search(highlighters, data.text, data.timestamp, offset as usize));
             }
             LogViewMsg::ContextSelected(ctx) => {
                 self.selected_context = Some(ctx);
@@ -251,12 +298,17 @@ impl Component for LogView {
             LogViewMsg::EnableScroll(enable) => {
                 self.scroll_to_bottom(enable);
             }
+            LogViewMsg::ShowOverview(show) => {
+                self.overview.view().set_visible(show);
+            }
             LogViewMsg::WrapText(wrap) => {
-                if wrap {
-                    self.text_view.set_wrap_mode(WrapMode::WordChar)
-                } else {
-                    self.text_view.set_wrap_mode(WrapMode::None)
-                }
+                self.text_view.set_wrap_mode(
+                    if wrap {
+                        WrapMode::WordChar
+                    } else {
+                        WrapMode::None
+                    }
+                );
             }
             LogViewMsg::Search(query) => {
                 let (start, end) = self.text_buffer.bounds();
@@ -268,13 +320,14 @@ impl Component for LogView {
                     self.active_search = Regex::new(&format!("(?i){}", query)).ok();
                     let text = self.text_buffer.text(&start, &end, false).to_string();
                     if let Some(query) = &self.active_search {
-                        return self.run_async(search(vec![ SearchData { name: SEARCH_TAG.to_string(), search: query.clone() }], text, 0));
+                        return self.run_async(search(vec![ SearchData { name: SEARCH_TAG.to_string(), search: query.clone() }], text, None,0));
                     }
                 }
             }
-            LogViewMsg::SearchResult(matching_lines) => {
-                for (search, matching_lines) in matching_lines {
-                    for idx in matching_lines {
+            LogViewMsg::SearchResult(res) => {
+                self.overview.update(LogOverviewMsg::SearchResults(res.clone()));
+                for (search, search_result) in res {
+                    for idx in search_result.lines {
                         if let Some(start) = self.text_buffer.iter_at_line(idx as i32) {
                             let mut end = start.clone();
                             end.forward_to_line_end();
@@ -294,6 +347,9 @@ impl Component for LogView {
                     return self.run_async(load_log_stream(ctx, pods, tx, self.since_seconds));
                 }
             }
+            LogViewMsg::LogOverview(msg) => {
+                self.overview.update(msg);
+            }
         }
         Command::None
     }
@@ -303,29 +359,25 @@ impl Component for LogView {
     }
 }
 
-fn find_matching_lines(highlighters: Vec<SearchData>, text: String, line_offset: usize) -> HashMap<String, Vec<usize>> {
+async fn search(highlighters: Vec<SearchData>, text: String, timestamp: Option<DateTime<Utc>>, line_offset: usize) -> LogViewMsg {
     let mut lines = text.lines().enumerate();
-    let mut matching_lines = HashMap::<String, Vec<usize>>::new();
+    let mut search_results = HashMap::<String, SearchResult>::new();
     while let Some((idx, line)) = lines.next() {
         for highlighter in &highlighters {
             if highlighter.search.is_match(line) {
-                if !matching_lines.contains_key(&highlighter.name) {
-                    matching_lines.insert(highlighter.name.clone(), vec![]);
+                if !search_results.contains_key(&highlighter.name) {
+                    search_results.insert(highlighter.name.clone(), SearchResult::new(timestamp.clone()));
                 }
-                let lines = matching_lines.get_mut(&highlighter.name).unwrap();
-                lines.push(line_offset + idx);
+
+                let res = search_results.get_mut(&highlighter.name).unwrap();
+                res.lines.push(line_offset + idx);
                 break;
             }
         }
     }
-
-    matching_lines
+    LogViewMsg::SearchResult(search_results)
 }
 
-async fn search(highlighters: Vec<SearchData>, text: String, line_offset: usize) -> LogViewMsg {
-    let matching_lines = find_matching_lines(highlighters, text, line_offset);
-    LogViewMsg::SearchResult(matching_lines)
-}
 
 async fn load_log_stream(ctx: NamespaceViewData, pod_data: Vec<PodViewData>, tx: Arc<dyn MsgHandler<LogViewMsg>>, since_seconds: u32) -> LogViewMsg {
     let pods = pod_data.iter().map(|pd| pd.name.clone()).collect();
@@ -334,9 +386,7 @@ async fn load_log_stream(ctx: NamespaceViewData, pod_data: Vec<PodViewData>, tx:
     let tx = tx.clone();
     tokio::task::spawn(async move {
         while let Some(data) = log_stream.next().await {
-            let data = data.to_vec();
-            let data = String::from_utf8_lossy(&data);
-            tx(LogViewMsg::LogDataLoaded(data.to_string()));
+            tx(LogViewMsg::LogDataLoaded(data));
         }
     });
     LogViewMsg::Loaded(Arc::new(exit))
@@ -379,28 +429,15 @@ fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
     since_selector
 }
 
-fn auto_scroll_btn<T: MsgHandler<LogViewMsg>>(tx: T) -> ToggleButton {
-    let auto_scroll_btn = gtk::ToggleButtonBuilder::new()
-        .label("Scroll")
+fn toggle_btn<T: MsgHandler<LogViewMsg>, M: 'static + Fn(bool) -> LogViewMsg>(tx: T, label: &str, msg: M) -> ToggleButton {
+    let toggle_btn = gtk::ToggleButtonBuilder::new()
+        .label(label)
         .margin_end(4)
         .build();
 
-    auto_scroll_btn.connect_toggled(move |btn| {
-        tx(LogViewMsg::EnableScroll(btn.is_active()));
+    toggle_btn.connect_toggled(move |btn| {
+        tx(msg(btn.is_active()));
     });
 
-    auto_scroll_btn
-}
-
-fn wrap_text_btn<T: MsgHandler<LogViewMsg>>(tx: T) -> ToggleButton {
-    let wrap_text_btn = gtk::ToggleButtonBuilder::new()
-        .label("Wrap text")
-        .margin_end(4)
-        .build();
-
-    wrap_text_btn.connect_toggled(move |btn| {
-        tx(LogViewMsg::WrapText(btn.is_active()));
-    });
-
-    wrap_text_btn
+    toggle_btn
 }

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use anyhow::Result;
@@ -8,7 +9,6 @@ const CONFIG_PATH: &'static str = "config.json";
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Highlighter {
-   pub name: String,
    pub search: String,
    pub color: String,
 }
@@ -18,7 +18,7 @@ pub struct Highlighter {
 pub struct Config {
    pub k8s_configs: Vec<String>,
    pub log_view_font: String,
-   pub highlighters: Vec<Highlighter>,
+   pub highlighters: HashMap<String, Highlighter>,
 }
 
 impl Default for Config {
@@ -28,21 +28,20 @@ impl Default for Config {
       #[cfg(target_os = "windows")]
       let font = "15px Consolas";
 
+      let mut highlighters = HashMap::new();
+      highlighters.insert("Warnings".to_string(), Highlighter {
+         search: r".*\s((?i)warn(?-i))\s.*".to_string(),
+         color: "rgb(207,111,57)".to_string(),
+      });
+      highlighters.insert("Errors".to_string(), Highlighter {
+         search: r".*\s((?i)error|fatal|failed(?-i))\s.*".to_string(),
+         color: "rgb(244,94,94)".to_string(),
+      });
+
       Config {
          log_view_font: font.to_string(),
          k8s_configs: vec![],
-         highlighters: vec![
-            Highlighter {
-               name: "Warnings".to_string(),
-               search: r".*\s((?i)warn(?-i))\s.*".to_string(),
-               color: "rgba(207,111,57,1)".to_string(),
-            },
-            Highlighter {
-               name: "Errors".to_string(),
-               search: r".*\s((?i)error|fatal|failed(?-i))\s.*".to_string(),
-               color: "rgba(244,94,94,1)".to_string(),
-            }
-         ],
+         highlighters,
       }
    }
 }

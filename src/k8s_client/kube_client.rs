@@ -127,7 +127,7 @@ impl KubeClient {
             if let Some(since) = opt.since_seconds {
                 request = request.query(&[("sinceSeconds", since.to_string())])
             }
-            request
+            request.query(&[("timestamps", "true")])
         } else {
             request
         }.send().await?.bytes_stream();

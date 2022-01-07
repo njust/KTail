@@ -57,6 +57,49 @@ impl<T: IsA<Widget>> WidgetLoadingWrapper<T> {
     }
 }
 
+pub struct IfElseWidget<A: IsA<Widget>, B: IsA<Widget>> {
+    widget_a: A,
+    widget_b: B,
+    container: gtk::Box,
+}
+
+#[allow(dead_code)]
+impl<A: IsA<Widget>, B: IsA<Widget>> IfElseWidget<A, B> {
+    pub fn new(widget_a: A, widget_b: B) -> Self {
+        let container = gtk::BoxBuilder::new()
+            .orientation(Orientation::Vertical)
+            .vexpand(true)
+            .build();
+
+        container.append(&widget_a);
+        container.append(&widget_b);
+        widget_a.set_visible(false);
+
+        Self {
+            widget_a,
+            widget_b,
+            container
+        }
+    }
+
+    pub fn show_a(&self, show: bool) {
+        self.widget_a.set_visible(show);
+        self.widget_b.set_visible(!show);
+    }
+
+    pub fn show_b(&self, show: bool) {
+        self.show_a(!show);
+    }
+
+    pub fn widget_a(&self) -> &A {
+        &self.widget_a
+    }
+
+    pub fn container(&self) -> &gtk::Box {
+        &self.container
+    }
+}
+
 pub fn add_css<T: IsA<Widget>>(w: &T, css: &str) {
     let sc = w.style_context();
     let css_provider = gtk::CssProvider::new();

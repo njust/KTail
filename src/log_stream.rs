@@ -1,11 +1,26 @@
+use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use stream_cancel::{StreamExt as StreamCancelStreamExt, Trigger, Tripwire};
 use tokio_stream::wrappers::ReceiverStream;
 use crate::k8s_client::{KubeClient, LogOptions, KubeConfig};
 use crate::tokio;
 
-pub async fn log_stream(k8s_client: &KubeClient, namespace: &str, pods: &Vec<String>, since_seconds: u32) -> (impl Stream<Item = Vec<u8>>, Trigger) {
-    let (tx, rx) = tokio::sync::mpsc::channel::<Vec<u8>>(1000);
+
+static LOG_LINE_PATTERN: Lazy<Regex> = Lazy::new(||{
+    Regex::new(r"(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{9}Z)\s(?P<data>.*\n?)").expect("Invalid regex")
+});
+
+#[derive(Clone)]
+pub struct LogData {
+    pub text: String,
+    pub pod: String,
+    pub timestamp: Option<DateTime<Utc>>,
+}
+
+pub async fn log_stream(k8s_client: &KubeClient, namespace: &str, pods: &Vec<String>, since_seconds: u32) -> (impl Stream<Item = LogData>, Trigger) {
+    let (tx, rx) = tokio::sync::mpsc::channel::<LogData>(1000);
     let (trigger, tripwire) = Tripwire::new();
     for pod in pods {
         let tripwire = tripwire.clone();
@@ -21,13 +36,18 @@ pub async fn log_stream(k8s_client: &KubeClient, namespace: &str, pods: &Vec<Str
             })).await.unwrap();
 
             let mut res = res.take_until_if(tripwire);
-            let prefix = format!("{}   ", pod).into_bytes();
             while let Some(Ok(bytes)) = res.next().await {
-                let mut r = bytes.to_vec();
-                let mut data = prefix.clone();
-                data.append(&mut r);
-                if let Err(e ) = tx.send(data).await {
-                    eprintln!("Failed to send data: {}", e);
+                let data = bytes.to_vec();
+                let data = String::from_utf8_lossy(&data).to_string();
+                if let Some(ma) = LOG_LINE_PATTERN.captures(&data) {
+                    let timestamp = ma.name("timestamp")
+                        .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts.as_str()).ok().and_then(|dt| Some(dt.with_timezone(&Utc))));
+                    let data = ma.name("data").unwrap().as_str().to_string();
+                    if let Err(e ) = tx.send(LogData { pod: pod.clone(), text: data, timestamp }).await {
+                        eprintln!("Failed to send data: {}", e);
+                    }
+                } else {
+                    eprintln!("Log data does not match pattern");
                 }
             }
             println!("Stopped tail for: {}", pod);

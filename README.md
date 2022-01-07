@@ -9,6 +9,7 @@ KTail allows you to tail multiple pods in one view. It automatically detects upd
 - Multiple kubernetes configurations can be added
 - Select a single pod via double click or multiple pods via Shift / Ctrl + Enter 
 - Highlighters can be configured in the config.json
+- Live chart for matching highlighters
 
 For build instructions please check the linux-build.yml workflow. Windows and MacOS will be added later.
 
