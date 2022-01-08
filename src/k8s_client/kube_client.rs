@@ -116,6 +116,7 @@ impl KubeClient {
     pub async fn logs(&self, namespace: &str, pod: &str, container: Option<&str>, options: Option<LogOptions>) -> Result<impl Stream<Item=reqwest::Result<bytes::Bytes>>> {
         let url = format!("{}api/v1/namespaces/{}/pods/{}/log", self.base_url, namespace, pod);
         let mut request = self.client.get(&url);
+        request = request.query(&[("timestamps", "true")]);
         if let Some(container) = container {
             request = request.query(&[("container", container)]);
         }
@@ -127,7 +128,7 @@ impl KubeClient {
             if let Some(since) = opt.since_seconds {
                 request = request.query(&[("sinceSeconds", since.to_string())])
             }
-            request.query(&[("timestamps", "true")])
+            request
         } else {
             request
         }.send().await?.bytes_stream();

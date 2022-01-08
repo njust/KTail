@@ -9,6 +9,14 @@ use gtk4_helper::{
 pub struct PodViewData {
     #[field]
     pub name: String,
+    #[field]
+    container_names: String,
+}
+
+impl PodViewData {
+    pub fn containers(&self) -> Vec<String> {
+        self.container_names.split(";").into_iter().map(|s|s.to_string()).collect()
+    }
 }
 
 use gtk4_helper::{
@@ -97,8 +105,14 @@ impl Component for PodListView {
 async fn load_data(cluster: NamespaceViewData) -> PodListViewMsg {
     let client = crate::log_stream::k8s_client_with_timeout(&cluster.config_path, &cluster.context);
     let pods = if let Ok(pods) = client.pods(&cluster.name).await {
-        pods.into_iter().map(|p| PodViewData {
-            name: p.metadata.name.unwrap_or("failed".to_string())
+        pods.into_iter().map(|p| {
+            //TODO: Currently gtk helper model does not support Vec<String>
+            let container_names = p.spec.containers.iter().map(|c| c.name.as_str()).collect::<Vec<&str>>().join(";");
+            let pod_name = p.metadata.name.unwrap_or("failed".to_string());
+            PodViewData {
+                container_names,
+                name: pod_name,
+            }
         }).collect()
     } else {
         vec![]

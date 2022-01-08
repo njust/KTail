@@ -63,6 +63,7 @@ pub struct LogView {
     scroll_handler: Option<SourceId>,
     overview: ComponentContainer<LogOverview>,
     log_entry_times: Vec<DateTime<Utc>>,
+    show_containers: bool,
 }
 
 #[derive(Clone)]
@@ -74,6 +75,7 @@ pub enum LogViewMsg {
     EnableScroll(bool),
     WrapText(bool),
     ShowOverview(bool),
+    ShowContainer(bool),
     SinceTimespanChanged(String),
     Search(String),
     SearchResult((Option<String>, HashMap<String, SearchResult>)),
@@ -85,7 +87,6 @@ impl LogView {
         self.overview.update(LogOverviewMsg::Clear);
         self.log_entry_times.clear();
 
-        //TODO: check if it is necessary to remove tags if we clear the buffer anyway
         let (start, end) = self.text_buffer.bounds();
         for highlighter in &self.highlighters {
             self.text_buffer.remove_tag_by_name(&highlighter.name, &start, &end);
@@ -95,6 +96,18 @@ impl LogView {
         if let Some(exit) = self.exit_trigger.take() {
             drop(exit);
         }
+    }
+
+    fn reload(&mut self) -> Command<LogViewMsg> {
+        if let Some(pods) = self.selected_pods.as_ref()
+            .map(|pods|pods.clone())
+        {
+            self.clear();
+            let tx = self.sender.clone();
+            let ctx = self.selected_context.clone().unwrap();
+            return self.run_async(load_log_stream(ctx, pods, tx, self.since_seconds));
+        }
+        Command::None
     }
 
     fn scroll_to_bottom(&mut self, scroll: bool) {
@@ -203,6 +216,9 @@ impl Component for LogView {
         let show_overview_btn = toggle_btn(sender.clone(), "Show overview", |active| LogViewMsg::ShowOverview(active));
         toolbar.append(&show_overview_btn);
 
+        let show_container_btn = toggle_btn(sender.clone(), "Append container names", |show| LogViewMsg::ShowContainer(show));
+        toolbar.append(&show_container_btn);
+
         let since_selector = since_duration_selection(sender.clone());
         toolbar.append(&since_selector);
 
@@ -288,6 +304,7 @@ impl Component for LogView {
             scroll_handler: None,
             overview,
             log_entry_times: vec![],
+            show_containers: false,
         }
     }
 
@@ -309,10 +326,13 @@ impl Component for LogView {
                     self.overview.update(LogOverviewMsg::LogData(timestamp.clone()));
                 }
 
-
                 let mut insert_at = self.get_line_offset_for_data(&data).unwrap_or_else(|| self.text_buffer.end_iter());
+                if !self.show_containers {
+                    self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
+                } else {
+                    self.text_buffer.insert(&mut insert_at, &format!("{}-{} {}", data.pod, data.container, data.text));
+                }
 
-                self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
                 let mut highlighters = self.highlighters.clone();
                 if let Some(query) = self.active_search.as_ref() {
                     highlighters.push(SearchData {
@@ -333,6 +353,10 @@ impl Component for LogView {
             }
             LogViewMsg::EnableScroll(enable) => {
                 self.scroll_to_bottom(enable);
+            }
+            LogViewMsg::ShowContainer(show) => {
+                self.show_containers = show;
+                return self.reload();
             }
             LogViewMsg::ShowOverview(show) => {
                 self.overview.view().set_visible(show);
@@ -385,14 +409,7 @@ impl Component for LogView {
             }
             LogViewMsg::SinceTimespanChanged(id) => {
                 self.since_seconds = id.parse::<u32>().expect("Since seconds should be an u32");
-                if let Some(pods) = self.selected_pods.as_ref()
-                    .map(|pods|pods.clone())
-                {
-                    self.clear();
-                    let tx = self.sender.clone();
-                    let ctx = self.selected_context.clone().unwrap();
-                    return self.run_async(load_log_stream(ctx, pods, tx, self.since_seconds));
-                }
+                return self.reload();
             }
             LogViewMsg::LogOverview(msg) => {
                 self.overview.update(msg);
@@ -426,10 +443,9 @@ async fn search(highlighters: Vec<SearchData>, text: String, timestamp: Option<D
 }
 
 
-async fn load_log_stream(ctx: NamespaceViewData, pod_data: Vec<PodViewData>, tx: Arc<dyn MsgHandler<LogViewMsg>>, since_seconds: u32) -> LogViewMsg {
-    let pods = pod_data.iter().map(|pd| pd.name.clone()).collect();
+async fn load_log_stream(ctx: NamespaceViewData, pods: Vec<PodViewData>, tx: Arc<dyn MsgHandler<LogViewMsg>>, since_seconds: u32) -> LogViewMsg {
     let client = crate::log_stream::k8s_client(&ctx.config_path, &ctx.context);
-    let (mut log_stream, exit) = crate::log_stream::log_stream(&client, &ctx.name, &pods, since_seconds).await;
+    let (mut log_stream, exit) = crate::log_stream::log_stream(&client, &ctx.name, pods, since_seconds).await;
     let tx = tx.clone();
     tokio::task::spawn(async move {
         while let Some(data) = log_stream.next().await {
