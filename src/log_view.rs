@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
+use uuid::Uuid;
 use gtk4_helper::{
     prelude::*,
     gtk,
@@ -18,7 +19,7 @@ use sourceview5::Buffer;
 use stream_cancel::Trigger;
 use crate::cluster_list_view::NamespaceViewData;
 use crate::config::{CONFIG};
-use crate::gtk::{ToggleButton};
+use crate::gtk::{TextIter, ToggleButton};
 use crate::log_overview::{LogOverview, LogOverviewMsg};
 use crate::log_stream::LogData;
 use crate::log_text_contrast::matching_foreground_color_for_background;
@@ -43,7 +44,7 @@ impl SearchResult {
     pub fn new(timestamp: Option<DateTime<Utc>>) -> Self {
         Self {
             lines: vec![],
-            timestamp
+            timestamp,
         }
     }
 }
@@ -61,6 +62,7 @@ pub struct LogView {
     highlighters: Vec<SearchData>,
     scroll_handler: Option<SourceId>,
     overview: ComponentContainer<LogOverview>,
+    log_entry_times: Vec<DateTime<Utc>>,
 }
 
 #[derive(Clone)]
@@ -74,13 +76,14 @@ pub enum LogViewMsg {
     ShowOverview(bool),
     SinceTimespanChanged(String),
     Search(String),
-    SearchResult(HashMap<String, SearchResult>),
+    SearchResult((Option<String>, HashMap<String, SearchResult>)),
     LogOverview(LogOverviewMsg),
 }
 
 impl LogView {
     fn clear(&mut self) {
         self.overview.update(LogOverviewMsg::Clear);
+        self.log_entry_times.clear();
 
         //TODO: check if it is necessary to remove tags if we clear the buffer anyway
         let (start, end) = self.text_buffer.bounds();
@@ -130,6 +133,31 @@ impl LogView {
                 glib::Continue(false)
             }
         });
+    }
+
+    fn get_line_offset_for_data(&mut self, data: &LogData) -> Option<TextIter> {
+        data.timestamp.map(|ts| {
+            if self.log_entry_times.is_empty() {
+                self.log_entry_times.push(ts.clone());
+                self.text_buffer.end_iter()
+            } else {
+                let mut idx = self.log_entry_times.len();
+                for log_entry_time in self.log_entry_times.iter().rev() {
+                    if ts > *log_entry_time {
+                        if let Some(iter) = self.text_buffer.iter_at_line(idx as i32) {
+                            self.log_entry_times.insert(idx, ts.clone());
+                            return iter;
+                        } else {
+                            eprintln!("No iter at line: {}", idx);
+                        }
+                    }
+                    idx = idx -1;
+                }
+
+                self.log_entry_times.insert(0, ts.clone());
+                self.text_buffer.start_iter()
+            }
+        })
     }
 }
 
@@ -259,6 +287,7 @@ impl Component for LogView {
             highlighters: search,
             scroll_handler: None,
             overview,
+            log_entry_times: vec![],
         }
     }
 
@@ -280,8 +309,10 @@ impl Component for LogView {
                     self.overview.update(LogOverviewMsg::LogData(timestamp.clone()));
                 }
 
-                let mut end = self.text_buffer.end_iter();
-                self.text_buffer.insert(&mut end, &format!("{} {}", data.pod, data.text));
+
+                let mut insert_at = self.get_line_offset_for_data(&data).unwrap_or_else(|| self.text_buffer.end_iter());
+
+                self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
                 let mut highlighters = self.highlighters.clone();
                 if let Some(query) = self.active_search.as_ref() {
                     highlighters.push(SearchData {
@@ -289,8 +320,13 @@ impl Component for LogView {
                         name: SEARCH_TAG.to_string(),
                     });
                 }
-                let offset = self.text_buffer.line_count() - 2;
-                return self.run_async(search(highlighters, data.text, data.timestamp, offset as usize));
+
+                let id = Uuid::new_v4().to_string();
+                if let Some(iter) = self.text_buffer.iter_at_line(insert_at.line() - 1) {
+                    self.text_buffer.add_mark(&gtk::TextMark::new(Some(&id), false), &iter);
+                }
+
+                return self.run_async(search(highlighters, data.text, data.timestamp, Some(id)));
             }
             LogViewMsg::ContextSelected(ctx) => {
                 self.selected_context = Some(ctx);
@@ -320,20 +356,31 @@ impl Component for LogView {
                     self.active_search = Regex::new(&format!("(?i){}", query)).ok();
                     let text = self.text_buffer.text(&start, &end, false).to_string();
                     if let Some(query) = &self.active_search {
-                        return self.run_async(search(vec![ SearchData { name: SEARCH_TAG.to_string(), search: query.clone() }], text, None,0));
+                        return self.run_async(search(vec![ SearchData { name: SEARCH_TAG.to_string(), search: query.clone() }], text, None,None));
                     }
                 }
             }
-            LogViewMsg::SearchResult(res) => {
+            LogViewMsg::SearchResult((marker, res)) => {
                 self.overview.update(LogOverviewMsg::SearchResults(res.clone()));
                 for (search, search_result) in res {
-                    for idx in search_result.lines {
-                        if let Some(start) = self.text_buffer.iter_at_line(idx as i32) {
+                    if let Some(mark) = &marker {
+                        if let Some(start) = self.text_buffer.mark(mark).map(|m| self.text_buffer.iter_at_mark(&m)) {
                             let mut end = start.clone();
                             end.forward_to_line_end();
                             self.text_buffer.apply_tag_by_name(&search, &start, &end);
                         }
+                    } else {
+                        for idx in search_result.lines {
+                            if let Some(start) = self.text_buffer.iter_at_line(idx as i32) {
+                                let mut end = start.clone();
+                                end.forward_to_line_end();
+                                self.text_buffer.apply_tag_by_name(&search, &start, &end);
+                            }
+                        }
                     }
+                }
+                if let Some(marker) = marker {
+                    self.text_buffer.delete_mark_by_name(&marker);
                 }
             }
             LogViewMsg::SinceTimespanChanged(id) => {
@@ -359,7 +406,7 @@ impl Component for LogView {
     }
 }
 
-async fn search(highlighters: Vec<SearchData>, text: String, timestamp: Option<DateTime<Utc>>, line_offset: usize) -> LogViewMsg {
+async fn search(highlighters: Vec<SearchData>, text: String, timestamp: Option<DateTime<Utc>>, marker: Option<String>) -> LogViewMsg {
     let mut lines = text.lines().enumerate();
     let mut search_results = HashMap::<String, SearchResult>::new();
     while let Some((idx, line)) = lines.next() {
@@ -370,12 +417,12 @@ async fn search(highlighters: Vec<SearchData>, text: String, timestamp: Option<D
                 }
 
                 let res = search_results.get_mut(&highlighter.name).unwrap();
-                res.lines.push(line_offset + idx);
+                res.lines.push(idx);
                 break;
             }
         }
     }
-    LogViewMsg::SearchResult(search_results)
+    LogViewMsg::SearchResult((marker, search_results))
 }
 
 
@@ -392,9 +439,10 @@ async fn load_log_stream(ctx: NamespaceViewData, pod_data: Vec<PodViewData>, tx:
     LogViewMsg::Loaded(Arc::new(exit))
 }
 
-const SINCE_10_MIN: u32 = 60*10;
-const SINCE_30_MIN: u32 = 60*30;
-const SINCE_60_MIN: u32 = 60*60;
+const SINCE_5M: u32 = 60*5;
+const SINCE_10M: u32 = 60*10;
+const SINCE_30M: u32 = 60*30;
+const SINCE_1H: u32 = 60*60;
 const SINCE_2H: u32 = 60*60*2;
 const SINCE_4H: u32 = 60*60*4;
 const SINCE_6H: u32 = 60*60*6;
@@ -407,9 +455,10 @@ fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
     let since_selector = gtk::ComboBoxTextBuilder::new()
         .build();
 
-    since_selector.append(Some(&SINCE_10_MIN.to_string()), "10 min");
-    since_selector.append(Some(&SINCE_30_MIN.to_string()), "30 min");
-    since_selector.append(Some(&SINCE_60_MIN.to_string()), "1 hour");
+    since_selector.append(Some(&SINCE_5M.to_string()), "5 min");
+    since_selector.append(Some(&SINCE_10M.to_string()), "10 min");
+    since_selector.append(Some(&SINCE_30M.to_string()), "30 min");
+    since_selector.append(Some(&SINCE_1H.to_string()), "1 hour");
     since_selector.append(Some(&SINCE_2H.to_string()), "2 hours");
     since_selector.append(Some(&SINCE_4H.to_string()), "4 hours");
     since_selector.append(Some(&SINCE_6H.to_string()), "6 hours");
@@ -417,7 +466,7 @@ fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
     since_selector.append(Some(&SINCE_10H.to_string()), "10 hours");
     since_selector.append(Some(&SINCE_12H.to_string()), "12 hours");
     since_selector.append(Some(&SINCE_24H.to_string()), "24 hours");
-    since_selector.set_active_id(Some(&SINCE_10_MIN.to_string()));
+    since_selector.set_active_id(Some(&SINCE_10M.to_string()));
 
     since_selector.connect_changed(move |a| {
         if let Some(active) =  a.active_id() {

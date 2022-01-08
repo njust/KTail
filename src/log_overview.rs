@@ -101,14 +101,9 @@ impl Component for LogOverview {
                 for (name, result) in results {
                     if let Some(ts) = result.timestamp {
                         let mut chart_data = self.chart_data.borrow_mut();
-                        let series_data = if let Some(series_data) = chart_data.data.get_mut(&name) {
-                            series_data
-                        } else {
-                            chart_data.data.insert(name.clone(), HashMap::new());
-                            chart_data.data.get_mut(&name).unwrap()
-                        };
-
+                        let series_data = chart_data.data.entry(name).or_insert(HashMap::new());
                         let time = ts.time();
+
                         let timestamp = Utc.ymd(ts.year(), ts.month(), ts.day()).and_hms(time.hour(), time.minute(), 0);
                         if let Some(ts_count) = series_data.get_mut(&timestamp) {
                             *ts_count = *ts_count +1;
@@ -140,7 +135,11 @@ fn draw(
 
     let chart_data = chart_data.borrow();
     if let (Some(start), Some(end)) = (chart_data.start_date, chart_data.end_date) {
-        let max = chart_data.data.iter().flat_map(|l| l.1).map(|i|*i.1).max().unwrap_or(0);
+        let max = CONFIG.lock().ok()
+            .and_then(|cfg| chart_data.data.iter()
+            .filter(|i| cfg.highlighters.contains_key(i.0))
+            .flat_map(| l| l.1)
+            .map(|i|*i.1).max()).unwrap_or(0);
         let mut chart = match ChartBuilder::on(&root)
             .x_label_area_size(20)
             .y_label_area_size(25)
