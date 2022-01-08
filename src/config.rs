@@ -30,11 +30,11 @@ impl Default for Config {
 
       let mut highlighters = HashMap::new();
       highlighters.insert("Warnings".to_string(), Highlighter {
-         search: r".s((?i)warn(?-i))\s".to_string(),
+         search: r".*\s((?i)warn(?-i))\s.*".to_string(),
          color: "rgb(207,111,57)".to_string(),
       });
       highlighters.insert("Errors".to_string(), Highlighter {
-         search: r"\s((?i)error|fatal|failed(?-i))\s".to_string(),
+         search: r".*\s((?i)error|fatal|failed(?-i))\s.*".to_string(),
          color: "rgb(244,94,94)".to_string(),
       });
 
