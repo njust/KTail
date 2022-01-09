@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
@@ -26,7 +25,12 @@ use crate::log_text_contrast::matching_foreground_color_for_background;
 use crate::pod_list_view::PodViewData;
 
 pub const SEARCH_TAG: &'static str = "SEARCH";
-pub const SEARCH_COLOR: &'static str = "rgba(188,150,0,1)";
+pub const SEARCH_COLOR: &'static str = "rgba(188,150,0,0.7)";
+
+pub const SELECTED_SEARCH_TAG: &'static str = "SELECTED_SEARCH";
+pub const SELECTED_SEARCH_COLOR: &'static str = "rgba(188,150,0,1)";
+
+pub const DEFAULT_MARGIN: i32 = 4;
 
 #[derive(Clone)]
 pub struct SearchData {
@@ -35,18 +39,23 @@ pub struct SearchData {
 }
 
 #[derive(Clone)]
-pub struct SearchResult {
+pub struct SearchResultData {
     pub lines: Vec<usize>,
-    pub timestamp: Option<DateTime<Utc>>,
 }
 
-impl SearchResult {
-    pub fn new(timestamp: Option<DateTime<Utc>>) -> Self {
+impl SearchResultData {
+    pub fn new() -> Self {
         Self {
             lines: vec![],
-            timestamp,
         }
     }
+}
+
+#[derive(Clone)]
+pub struct HighlightResultData {
+    pub marker: String,
+    pub timestamp: Option<DateTime<Utc>>,
+    pub tags: Vec<String>,
 }
 
 pub struct LogView {
@@ -63,7 +72,10 @@ pub struct LogView {
     scroll_handler: Option<SourceId>,
     overview: ComponentContainer<LogOverview>,
     log_entry_times: Vec<DateTime<Utc>>,
-    show_containers: bool,
+    append_container_names: bool,
+    search_match_markers: Vec<String>,
+    search_results_lbl: gtk::Label,
+    current_search_match_pos: Option<usize>,
 }
 
 #[derive(Clone)]
@@ -75,17 +87,21 @@ pub enum LogViewMsg {
     EnableScroll(bool),
     WrapText(bool),
     ShowOverview(bool),
-    ShowContainer(bool),
+    AppendContainerNames(bool),
     SinceTimespanChanged(String),
     Search(String),
-    SearchResult((Option<String>, HashMap<String, SearchResult>)),
+    SearchResult(SearchResultData),
+    HighlightResult(HighlightResultData),
     LogOverview(LogOverviewMsg),
+    SelectNextSearchMatch,
+    SelectPrevSearchMatch,
 }
 
 impl LogView {
     fn clear(&mut self) {
         self.overview.update(LogOverviewMsg::Clear);
         self.log_entry_times.clear();
+        self.clear_search_markers();
 
         let (start, end) = self.text_buffer.bounds();
         for highlighter in &self.highlighters {
@@ -95,6 +111,49 @@ impl LogView {
         self.text_buffer.set_text("");
         if let Some(exit) = self.exit_trigger.take() {
             drop(exit);
+        }
+    }
+
+    fn update_search_label(&self) {
+        if self.search_match_markers.len() <= 0 {
+            self.search_results_lbl.set_label("");
+        } else {
+            self.search_results_lbl.set_label(&format!("{} matches", self.search_match_markers.len()));
+        }
+    }
+
+    fn add_search_marker(&mut self, pos: &TextIter) {
+        let marker_id = Uuid::new_v4().to_string();
+        self.text_buffer.add_mark(&gtk::TextMark::new(Some(&marker_id), false), &pos);
+        self.search_match_markers.push(marker_id);
+    }
+
+    fn clear_search_markers(&mut self) {
+        for search_match_marker in &self.search_match_markers {
+            self.text_buffer.delete_mark_by_name(&search_match_marker);
+        }
+        self.search_match_markers.clear();
+        self.search_results_lbl.set_label("");
+        self.current_search_match_pos.take();
+        self.clear_active_search_highlight();
+    }
+
+    fn clear_active_search_highlight(&mut self) {
+        let (start, end) = self.text_buffer.bounds();
+        self.text_buffer.remove_tag_by_name(SELECTED_SEARCH_TAG, &start, &end);
+    }
+
+    fn highlight_search_at_pos(&mut self, pos: usize) {
+        if let Some(next_marker) = self.search_match_markers.get(pos).map(|m| m.to_string()) {
+            if let Some(marker) = self.text_buffer.mark(&next_marker) {
+                self.scroll_to_mark(&next_marker);
+                self.clear_active_search_highlight();
+                let line_start = self.text_buffer.iter_at_mark(&marker);
+                let mut line_end = line_start.clone();
+                line_end.forward_to_line_end();
+                self.text_buffer.apply_tag_by_name(SELECTED_SEARCH_TAG, &line_start, &line_end);
+                self.current_search_match_pos = Some(pos);
+            }
         }
     }
 
@@ -127,12 +186,12 @@ impl LogView {
         }
     }
 
-    #[allow(dead_code)]
-    fn scroll_to_line(&mut self, line: i32) {
+    fn scroll_to_mark(&mut self, mark: &str) {
         let text_view = self.text_view.clone();
+        let mark = mark.to_string();
         glib::idle_add_local(move || {
             let buffer = text_view.buffer();
-            if let Some(mut iter) = buffer.iter_at_line(line) {
+            if let Some(mut iter) = buffer.mark(&mark).map(|mark|buffer.iter_at_mark(&mark)) {
                 let iter_loc = text_view.iter_location(&iter);
                 let visible_rect = text_view.visible_rect();
 
@@ -187,26 +246,6 @@ impl Component for LogView {
             .margin_bottom(4)
             .build();
 
-        let search_entry = gtk::SearchEntryBuilder::new()
-            .placeholder_text("Search")
-            .margin_end(4)
-            .build();
-        toolbar.append(&search_entry);
-
-        let tx = sender.clone();
-        search_entry.connect_activate(move |se|{
-            let text = se.text().to_string();
-            tx(LogViewMsg::Search(text));
-        });
-
-        let tx = sender.clone();
-        search_entry.connect_changed(move |se|{
-            let text = se.text().to_string();
-            if text.len() <= 0 {
-                tx(LogViewMsg::Search(String::new()));
-            }
-        });
-
         let auto_scroll_btn = toggle_btn(sender.clone(), "Scroll", |active| LogViewMsg::EnableScroll(active));
         toolbar.append(&auto_scroll_btn);
 
@@ -216,19 +255,27 @@ impl Component for LogView {
         let show_overview_btn = toggle_btn(sender.clone(), "Show overview", |active| LogViewMsg::ShowOverview(active));
         toolbar.append(&show_overview_btn);
 
-        let show_container_btn = toggle_btn(sender.clone(), "Append container names", |show| LogViewMsg::ShowContainer(show));
+        let show_container_btn = toggle_btn(sender.clone(), "Append container names", |show| LogViewMsg::AppendContainerNames(show));
         toolbar.append(&show_container_btn);
 
         let since_selector = since_duration_selection(sender.clone());
         toolbar.append(&since_selector);
+
+        let search_results_lbl = add_search_toolbar(&toolbar, sender.clone());
 
         let search_tag = TextTag::new(Some(SEARCH_TAG));
         search_tag.set_background(Some(SEARCH_COLOR));
         let background = search_tag.background_rgba();
         search_tag.set_foreground_rgba(matching_foreground_color_for_background(&background).as_ref());
 
+        let selected_search_tag = TextTag::new(Some(SELECTED_SEARCH_TAG));
+        selected_search_tag.set_background(Some(SELECTED_SEARCH_COLOR));
+        let background = selected_search_tag.background_rgba();
+        selected_search_tag.set_foreground_rgba(matching_foreground_color_for_background(&background).as_ref());
+
         let tag_table = TextTagTable::new();
         tag_table.add(&search_tag);
+        tag_table.add(&selected_search_tag);
 
         let buffer = sourceview5::Buffer::new(Some(&tag_table));
         let log_data_view = sourceview5::View::builder()
@@ -304,7 +351,10 @@ impl Component for LogView {
             scroll_handler: None,
             overview,
             log_entry_times: vec![],
-            show_containers: false,
+            append_container_names: false,
+            search_match_markers: vec![],
+            search_results_lbl,
+            current_search_match_pos: None,
         }
     }
 
@@ -327,7 +377,7 @@ impl Component for LogView {
                 }
 
                 let mut insert_at = self.get_line_offset_for_data(&data).unwrap_or_else(|| self.text_buffer.end_iter());
-                if !self.show_containers {
+                if !self.append_container_names {
                     self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
                 } else {
                     self.text_buffer.insert(&mut insert_at, &format!("{}-{} {}", data.pod, data.container, data.text));
@@ -346,7 +396,49 @@ impl Component for LogView {
                     self.text_buffer.add_mark(&gtk::TextMark::new(Some(&id), false), &iter);
                 }
 
-                return self.run_async(search(highlighters, data.text, data.timestamp, Some(id)));
+                return self.run_async(highlight(highlighters, data, id));
+            }
+            LogViewMsg::HighlightResult(res) => {
+                self.overview.update(LogOverviewMsg::HighlightResults(res.clone()));
+                for search in res.tags {
+                    if let Some(start) = self.text_buffer.mark(&res.marker).map(|m| self.text_buffer.iter_at_mark(&m)) {
+                        let mut end = start.clone();
+                        end.forward_to_line_end();
+                        self.text_buffer.apply_tag_by_name(&search, &start, &end);
+                        if &search == SEARCH_TAG {
+                            self.add_search_marker(&start);
+                        }
+                    }
+                }
+                self.update_search_label();
+                self.text_buffer.delete_mark_by_name(&res.marker);
+            }
+            LogViewMsg::Search(query) => {
+                let (start, end) = self.text_buffer.bounds();
+                self.text_buffer.remove_tag_by_name(SEARCH_TAG, &start, &end);
+                self.clear_search_markers();
+
+                if query.len() <= 0 {
+                    self.active_search.take();
+                } else {
+                    self.active_search = Regex::new(&format!("(?i){}", query)).ok();
+                    let text = self.text_buffer.text(&start, &end, false).to_string();
+                    if let Some(query) = &self.active_search {
+                        return self.run_async(search( query.clone(), text));
+                    }
+                }
+            }
+            LogViewMsg::SearchResult(res) => {
+                for idx in res.lines {
+                    if let Some(start) = self.text_buffer.iter_at_line(idx as i32) {
+                        self.add_search_marker(&start);
+                        let mut end = start.clone();
+                        end.forward_to_line_end();
+                        self.text_buffer.apply_tag_by_name(SEARCH_TAG, &start, &end);
+                    }
+                }
+                self.update_search_label();
+
             }
             LogViewMsg::ContextSelected(ctx) => {
                 self.selected_context = Some(ctx);
@@ -354,8 +446,8 @@ impl Component for LogView {
             LogViewMsg::EnableScroll(enable) => {
                 self.scroll_to_bottom(enable);
             }
-            LogViewMsg::ShowContainer(show) => {
-                self.show_containers = show;
+            LogViewMsg::AppendContainerNames(show) => {
+                self.append_container_names = show;
                 return self.reload();
             }
             LogViewMsg::ShowOverview(show) => {
@@ -370,42 +462,25 @@ impl Component for LogView {
                     }
                 );
             }
-            LogViewMsg::Search(query) => {
-                let (start, end) = self.text_buffer.bounds();
-                self.text_buffer.remove_tag_by_name(SEARCH_TAG, &start, &end);
-
-                if query.len() <= 0 {
-                    self.active_search.take();
-                } else {
-                    self.active_search = Regex::new(&format!("(?i){}", query)).ok();
-                    let text = self.text_buffer.text(&start, &end, false).to_string();
-                    if let Some(query) = &self.active_search {
-                        return self.run_async(search(vec![ SearchData { name: SEARCH_TAG.to_string(), search: query.clone() }], text, None,None));
-                    }
-                }
-            }
-            LogViewMsg::SearchResult((marker, res)) => {
-                self.overview.update(LogOverviewMsg::SearchResults(res.clone()));
-                for (search, search_result) in res {
-                    if let Some(mark) = &marker {
-                        if let Some(start) = self.text_buffer.mark(mark).map(|m| self.text_buffer.iter_at_mark(&m)) {
-                            let mut end = start.clone();
-                            end.forward_to_line_end();
-                            self.text_buffer.apply_tag_by_name(&search, &start, &end);
-                        }
+            LogViewMsg::SelectNextSearchMatch => {
+                let next_pos = self.current_search_match_pos.map(|current|{
+                    if current == self.search_match_markers.len() -1 {
+                        0
                     } else {
-                        for idx in search_result.lines {
-                            if let Some(start) = self.text_buffer.iter_at_line(idx as i32) {
-                                let mut end = start.clone();
-                                end.forward_to_line_end();
-                                self.text_buffer.apply_tag_by_name(&search, &start, &end);
-                            }
-                        }
+                        current + 1
                     }
-                }
-                if let Some(marker) = marker {
-                    self.text_buffer.delete_mark_by_name(&marker);
-                }
+                }).unwrap_or(0);
+                self.highlight_search_at_pos(next_pos);
+            }
+            LogViewMsg::SelectPrevSearchMatch => {
+                let next_pos = self.current_search_match_pos.map(|current|{
+                    if current == 0 {
+                        self.search_match_markers.len() -1
+                    } else {
+                        current -1
+                    }
+                }).unwrap_or(self.search_match_markers.len() - 1);
+                self.highlight_search_at_pos(next_pos);
             }
             LogViewMsg::SinceTimespanChanged(id) => {
                 self.since_seconds = id.parse::<u32>().expect("Since seconds should be an u32");
@@ -423,25 +498,31 @@ impl Component for LogView {
     }
 }
 
-async fn search(highlighters: Vec<SearchData>, text: String, timestamp: Option<DateTime<Utc>>, marker: Option<String>) -> LogViewMsg {
-    let mut lines = text.lines().enumerate();
-    let mut search_results = HashMap::<String, SearchResult>::new();
-    while let Some((idx, line)) = lines.next() {
-        for highlighter in &highlighters {
-            if highlighter.search.is_match(line) {
-                if !search_results.contains_key(&highlighter.name) {
-                    search_results.insert(highlighter.name.clone(), SearchResult::new(timestamp.clone()));
-                }
+async fn highlight(highlighters: Vec<SearchData>, data: LogData, marker: String) -> LogViewMsg {
+    let mut res = HighlightResultData {
+        marker,
+        timestamp: data.timestamp,
+        tags: vec![]
+    };
 
-                let res = search_results.get_mut(&highlighter.name).unwrap();
-                res.lines.push(idx);
-                break;
-            }
+    for highlighter in highlighters {
+        if highlighter.search.is_match(&data.text) {
+            res.tags.push(highlighter.name)
         }
     }
-    LogViewMsg::SearchResult((marker, search_results))
+    LogViewMsg::HighlightResult(res)
 }
 
+async fn search(query: Regex, text: String) -> LogViewMsg {
+    let mut lines = text.lines().enumerate();
+    let mut search_results = SearchResultData::new();
+    while let Some((idx, line)) = lines.next() {
+        if query.is_match(line) {
+            search_results.lines.push(idx);
+        }
+    }
+    LogViewMsg::SearchResult(search_results)
+}
 
 async fn load_log_stream(ctx: NamespaceViewData, pods: Vec<PodViewData>, tx: Arc<dyn MsgHandler<LogViewMsg>>, since_seconds: u32) -> LogViewMsg {
     let client = crate::log_stream::k8s_client(&ctx.config_path, &ctx.context);
@@ -453,6 +534,54 @@ async fn load_log_stream(ctx: NamespaceViewData, pods: Vec<PodViewData>, tx: Arc
         }
     });
     LogViewMsg::Loaded(Arc::new(exit))
+}
+
+fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(toolbar: &gtk::Box, sender: T) -> gtk::Label {
+    let search_entry = gtk::SearchEntryBuilder::new()
+        .placeholder_text("Search")
+        .margin_end(DEFAULT_MARGIN)
+        .build();
+    toolbar.append(&search_entry);
+
+    let tx = sender.clone();
+    search_entry.connect_activate(move |se|{
+        let text = se.text().to_string();
+        tx(LogViewMsg::Search(text));
+    });
+
+    let tx = sender.clone();
+    search_entry.connect_changed(move |se|{
+        let text = se.text().to_string();
+        if text.len() <= 0 {
+            tx(LogViewMsg::Search(String::new()));
+        }
+    });
+
+    let prev_match_btn = gtk::ButtonBuilder::new()
+        .label("Previous")
+        .margin_end(DEFAULT_MARGIN)
+        .build();
+
+    let tx = sender.clone();
+    prev_match_btn.connect_clicked(move |_| {
+        tx(LogViewMsg::SelectPrevSearchMatch);
+    });
+    toolbar.append(&prev_match_btn);
+
+    let next_match_btn = gtk::ButtonBuilder::new()
+        .label("Next")
+        .margin_end(DEFAULT_MARGIN)
+        .build();
+
+    let tx = sender.clone();
+    next_match_btn.connect_clicked(move |_| {
+        tx(LogViewMsg::SelectNextSearchMatch);
+    });
+    toolbar.append(&next_match_btn);
+
+    let search_results_lbl = gtk::Label::new(None);
+    toolbar.append(&search_results_lbl);
+    search_results_lbl
 }
 
 const SINCE_5M: u32 = 60*5;
@@ -469,6 +598,7 @@ const SINCE_24H: u32 = 60*60*24;
 
 fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
     let since_selector = gtk::ComboBoxTextBuilder::new()
+        .margin_end(DEFAULT_MARGIN)
         .build();
 
     since_selector.append(Some(&SINCE_5M.to_string()), "5 min");
@@ -497,7 +627,7 @@ fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
 fn toggle_btn<T: MsgHandler<LogViewMsg>, M: 'static + Fn(bool) -> LogViewMsg>(tx: T, label: &str, msg: M) -> ToggleButton {
     let toggle_btn = gtk::ToggleButtonBuilder::new()
         .label(label)
-        .margin_end(4)
+        .margin_end(DEFAULT_MARGIN)
         .build();
 
     toggle_btn.connect_toggled(move |btn| {

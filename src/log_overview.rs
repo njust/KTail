@@ -25,7 +25,7 @@ pub struct ChartData {
 pub enum LogOverviewMsg {
     Redraw,
     Clear,
-    SearchResults(HashMap<String, SearchResult>),
+    HighlightResults(HighlightResultData),
     LogData(DateTime<Utc>),
 }
 
@@ -97,11 +97,11 @@ impl Component for LogOverview {
                     }
                 }
             }
-            LogOverviewMsg::SearchResults(results) => {
-                for (name, result) in results {
-                    if let Some(ts) = result.timestamp {
+            LogOverviewMsg::HighlightResults(results) => {
+                for tag in results.tags {
+                    if let Some(ts) = results.timestamp {
                         let mut chart_data = self.chart_data.borrow_mut();
-                        let series_data = chart_data.data.entry(name).or_insert(HashMap::new());
+                        let series_data = chart_data.data.entry(tag).or_insert(HashMap::new());
                         let time = ts.time();
 
                         let timestamp = Utc.ymd(ts.year(), ts.month(), ts.day()).and_hms(time.hour(), time.minute(), 0);
@@ -126,7 +126,7 @@ impl Component for LogOverview {
 use plotters::prelude::*;
 use plotters_cairo::CairoBackend;
 use crate::config::CONFIG;
-use crate::log_view::{SearchResult};
+use crate::log_view::{HighlightResultData};
 
 fn draw(
     chart_data: &Rc<RefCell<ChartData>>,
