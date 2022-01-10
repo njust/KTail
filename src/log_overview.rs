@@ -141,9 +141,9 @@ fn draw(
             .flat_map(| l| l.1)
             .map(|i|*i.1).max()).unwrap_or(0);
         let mut chart = match ChartBuilder::on(&root)
-            .x_label_area_size(20)
+            .x_label_area_size(30)
             .y_label_area_size(30)
-            .margin(5)
+            .margin(8)
             .build_cartesian_2d(start..end, 0u32..max + 1)
         {
             Ok(chart) => chart,
