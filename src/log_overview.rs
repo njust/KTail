@@ -142,7 +142,7 @@ fn draw(
             .map(|i|*i.1).max()).unwrap_or(0);
         let mut chart = match ChartBuilder::on(&root)
             .x_label_area_size(20)
-            .y_label_area_size(25)
+            .y_label_area_size(30)
             .margin(5)
             .build_cartesian_2d(start..end, 0u32..max + 1)
         {
