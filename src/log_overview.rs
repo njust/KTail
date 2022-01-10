@@ -98,18 +98,17 @@ impl Component for LogOverview {
                 }
             }
             LogOverviewMsg::HighlightResults(results) => {
+                let ts = results.timestamp;
                 for tag in results.tags {
-                    if let Some(ts) = results.timestamp {
-                        let mut chart_data = self.chart_data.borrow_mut();
-                        let series_data = chart_data.data.entry(tag).or_insert(HashMap::new());
-                        let time = ts.time();
+                    let mut chart_data = self.chart_data.borrow_mut();
+                    let series_data = chart_data.data.entry(tag).or_insert(HashMap::new());
+                    let time = ts.time();
 
-                        let timestamp = Utc.ymd(ts.year(), ts.month(), ts.day()).and_hms(time.hour(), time.minute(), 0);
-                        if let Some(ts_count) = series_data.get_mut(&timestamp) {
-                            *ts_count = *ts_count +1;
-                        } else {
-                            series_data.insert(timestamp, 1);
-                        }
+                    let timestamp = Utc.ymd(ts.year(), ts.month(), ts.day()).and_hms(time.hour(), time.minute(), 0);
+                    if let Some(ts_count) = series_data.get_mut(&timestamp) {
+                        *ts_count = *ts_count +1;
+                    } else {
+                        series_data.insert(timestamp, 1);
                     }
                 }
             }

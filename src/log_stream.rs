@@ -18,7 +18,7 @@ pub struct LogData {
     pub text: String,
     pub pod: String,
     pub container: String,
-    pub timestamp: Option<DateTime<Utc>>,
+    pub timestamp: DateTime<Utc>,
 }
 
 pub async fn log_stream(k8s_client: &KubeClient, namespace: &str, pods: Vec<PodViewData>, since_seconds: u32) -> (impl Stream<Item = LogData>, Trigger) {
@@ -44,14 +44,20 @@ pub async fn log_stream(k8s_client: &KubeClient, namespace: &str, pods: Vec<PodV
                     let data = bytes.to_vec();
                     let data = String::from_utf8_lossy(&data).to_string();
                     if let Some(ma) = LOG_LINE_PATTERN.captures(&data) {
-                        let timestamp = ma.name("timestamp")
-                            .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts.as_str()).ok().and_then(|dt| Some(dt.with_timezone(&Utc))));
-                        let data = ma.name("data").unwrap().as_str().to_string();
-                        if let Err(e ) = tx.send(LogData { pod: pod.name.clone(), container: container.clone(), text: data, timestamp }).await {
-                            eprintln!("Failed to send data: {}", e);
+                        if let Some(timestamp) = ma.name("timestamp")
+                            .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts.as_str()).ok()
+                            .and_then(|dt| Some(dt.with_timezone(&Utc))))
+                        {
+                            let log_data = ma.name("data").unwrap().as_str().to_string();
+                            if let Err(e ) = tx.send(LogData { pod: pod.name.clone(), container: container.clone(), text: log_data, timestamp }).await {
+                                eprintln!("Failed to send data: {}", e);
+                            }
+                        }
+                        else {
+                            eprintln!("Invalid log data data without timestamp")
                         }
                     } else {
-                        eprintln!("Log data does not match pattern");
+                        eprintln!("Log data does not match pattern: {}", data);
                     }
                 }
                 println!("Stopped tail for: {} ({})", pod.name, container);

@@ -54,7 +54,7 @@ impl SearchResultData {
 #[derive(Clone)]
 pub struct HighlightResultData {
     pub marker: String,
-    pub timestamp: Option<DateTime<Utc>>,
+    pub timestamp: DateTime<Utc>,
     pub tags: Vec<String>,
 }
 
@@ -207,29 +207,24 @@ impl LogView {
         });
     }
 
-    fn get_line_offset_for_data(&mut self, data: &LogData) -> Option<TextIter> {
-        data.timestamp.map(|ts| {
-            if self.log_entry_times.is_empty() {
-                self.log_entry_times.push(ts.clone());
-                self.text_buffer.end_iter()
-            } else {
-                let mut idx = self.log_entry_times.len();
-                for log_entry_time in self.log_entry_times.iter().rev() {
-                    if ts > *log_entry_time {
-                        if let Some(iter) = self.text_buffer.iter_at_line(idx as i32) {
-                            self.log_entry_times.insert(idx, ts.clone());
-                            return iter;
-                        } else {
-                            eprintln!("No iter at line: {}", idx);
-                        }
+    fn get_line_offset_for_data(&mut self, data: &LogData) -> (TextIter, usize) {
+        if self.log_entry_times.is_empty() {
+            self.log_entry_times.push(data.timestamp.clone());
+            (self.text_buffer.end_iter(), self.log_entry_times.len())
+        } else {
+            let mut idx = self.log_entry_times.len();
+            for log_entry_time in self.log_entry_times.iter().rev() {
+                if data.timestamp > *log_entry_time {
+                    if let Some(iter) = self.text_buffer.iter_at_line(idx as i32 - 1) {
+                        return (iter, idx);
+                    } else {
+                        eprintln!("No iter at line: {}", idx);
                     }
-                    idx = idx -1;
                 }
-
-                self.log_entry_times.insert(0, ts.clone());
-                self.text_buffer.start_iter()
+                idx = idx -1;
             }
-        })
+            (self.text_buffer.start_iter(), 0)
+        }
     }
 }
 
@@ -372,15 +367,18 @@ impl Component for LogView {
                 self.exit_trigger = Some(exit_tx);
             }
             LogViewMsg::LogDataLoaded(data) => {
-                if let Some(timestamp) = &data.timestamp {
-                    self.overview.update(LogOverviewMsg::LogData(timestamp.clone()));
-                }
+                self.overview.update(LogOverviewMsg::LogData(data.timestamp.clone()));
 
-                let mut insert_at = self.get_line_offset_for_data(&data).unwrap_or_else(|| self.text_buffer.end_iter());
+                let (mut insert_at, pos) = self.get_line_offset_for_data(&data);
+                let before_insert_count = self.text_buffer.line_count();
                 if !self.append_container_names {
                     self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
                 } else {
                     self.text_buffer.insert(&mut insert_at, &format!("{}-{} {}", data.pod, data.container, data.text));
+                }
+                let inserted = self.text_buffer.line_count() - before_insert_count;
+                for _ in 0..inserted {
+                    self.log_entry_times.insert(pos, data.timestamp)
                 }
 
                 let mut highlighters = self.highlighters.clone();
