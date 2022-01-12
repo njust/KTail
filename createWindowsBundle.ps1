@@ -27,11 +27,11 @@ foreach($icon in $icons)
 }
 
 mkdir bundle\share\themes
-move Fluent-grey-light-compact .\bundle\share\themes
+move Orchis-light-compact .\bundle\share\themes
 
 mkdir bundle\share\gtk-4.0
 $settings = '[Settings]
-gtk-theme-name=Fluent-grey-light-compact
+gtk-theme-name=Orchis-light-compact
 gtk-font-name=Consolas'
 [IO.File]::WriteAllLines("bundle\share\gtk-4.0\settings.ini", $settings)
 
