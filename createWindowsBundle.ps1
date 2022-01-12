@@ -31,8 +31,7 @@ move Orchis-light-compact .\bundle\share\themes
 
 mkdir bundle\share\gtk-4.0
 $settings = '[Settings]
-gtk-theme-name=Orchis-light-compact
-gtk-font-name=Consolas'
+gtk-theme-name=Orchis-light-compact'
 [IO.File]::WriteAllLines("bundle\share\gtk-4.0\settings.ini", $settings)
 
 Compress-Archive -Path .\bundle\* -DestinationPath KTail-x86_x64-win.zip
