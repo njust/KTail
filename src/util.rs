@@ -111,3 +111,42 @@ pub fn add_css_with_name<T: IsA<Widget>>(w: &T, widget_name: &str, css: &str) {
     w.set_widget_name(widget_name);
     add_css(w, css);
 }
+
+pub fn search_offset<T: PartialOrd>(arr: &Vec<T>, search: T) -> usize {
+    if arr.len() == 0 {
+        return 0;
+    }
+
+    if search <= arr[0] {
+        return 0;
+    }
+
+    let n = arr.len();
+    if search >= arr[n -1] {
+        return n;
+    }
+
+    let mut l = 0;
+    let mut r = n;
+    let mut mid = 0;
+    while l < r {
+        mid = (l + r) / 2;
+        if arr[mid] == search {
+            return mid;
+        }
+
+        if search < arr[mid] {
+            if mid > 0 && search > arr[mid -1] {
+                return mid;
+            }
+            r = mid;
+        } else {
+            if mid < n -1 && search < arr[mid +1] {
+                return mid;
+            }
+            l = mid + 1;
+        }
+    }
+
+    return mid;
+}

@@ -23,6 +23,7 @@ use crate::log_overview::{LogOverview, LogOverviewMsg};
 use crate::log_stream::LogData;
 use crate::log_text_contrast::matching_foreground_color_for_background;
 use crate::pod_list_view::PodViewData;
+use crate::util::search_offset;
 
 pub const SEARCH_TAG: &'static str = "SEARCH";
 pub const SEARCH_COLOR: &'static str = "rgba(188,150,0,0.7)";
@@ -86,7 +87,6 @@ pub enum LogViewMsg {
     LogDataLoaded(LogData),
     EnableScroll(bool),
     WrapText(bool),
-    ShowOverview(bool),
     AppendContainerNames(bool),
     SinceTimespanChanged(String),
     Search(String),
@@ -210,46 +210,6 @@ impl LogView {
     fn get_line_offset_for_data(&mut self, timestamp: i64) -> usize {
         search_offset(&self.log_entry_times, timestamp)
     }
-
-}
-
-fn search_offset(arr: &Vec<i64>, search: i64) -> usize {
-    if arr.len() == 0 {
-        return 0;
-    }
-
-    if search <= arr[0] {
-        return 0;
-    }
-
-    let n = arr.len();
-    if search >= arr[n -1] {
-        return n;
-    }
-
-    let mut l = 0;
-    let mut r = n;
-    let mut mid = 0;
-    while l < r {
-        mid = (l + r) / 2;
-        if arr[mid] == search {
-            return mid;
-        }
-
-        if search < arr[mid] {
-            if mid > 0 && search > arr[mid -1] {
-                return mid;
-            }
-            r = mid;
-        } else {
-            if mid < n -1 && search < arr[mid +1] {
-                return mid;
-            }
-            l = mid + 1;
-        }
-    }
-
-    return mid;
 }
 
 impl Component for LogView {
@@ -270,9 +230,6 @@ impl Component for LogView {
 
         let wrap_text_btn = toggle_btn(sender.clone(), "Wrap text", |active| LogViewMsg::WrapText(active));
         toolbar.append(&wrap_text_btn);
-
-        let show_overview_btn = toggle_btn(sender.clone(), "Show overview", |active| LogViewMsg::ShowOverview(active));
-        toolbar.append(&show_overview_btn);
 
         let show_container_btn = toggle_btn(sender.clone(), "Append container names", |show| LogViewMsg::AppendContainerNames(show));
         toolbar.append(&show_container_btn);
@@ -342,8 +299,6 @@ impl Component for LogView {
         let overview = LogOverview::new(move |msg| {
             tx(LogViewMsg::LogOverview(msg));
         });
-
-        overview.view().set_visible(false);
 
         let pane = gtk::PanedBuilder::new()
             .orientation(gtk::Orientation::Vertical)
@@ -475,9 +430,6 @@ impl Component for LogView {
             LogViewMsg::AppendContainerNames(show) => {
                 self.append_container_names = show;
                 return self.reload();
-            }
-            LogViewMsg::ShowOverview(show) => {
-                self.overview.view().set_visible(show);
             }
             LogViewMsg::WrapText(wrap) => {
                 self.text_view.set_wrap_mode(
