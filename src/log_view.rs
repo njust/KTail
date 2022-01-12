@@ -71,7 +71,7 @@ pub struct LogView {
     highlighters: Vec<SearchData>,
     scroll_handler: Option<SourceId>,
     overview: ComponentContainer<LogOverview>,
-    log_entry_times: Vec<DateTime<Utc>>,
+    log_entry_times: Vec<i64>,
     append_container_names: bool,
     search_match_markers: Vec<String>,
     search_results_lbl: gtk::Label,
@@ -207,25 +207,49 @@ impl LogView {
         });
     }
 
-    fn get_line_offset_for_data(&mut self, data: &LogData) -> (TextIter, usize) {
-        if self.log_entry_times.is_empty() {
-            self.log_entry_times.push(data.timestamp.clone());
-            (self.text_buffer.end_iter(), self.log_entry_times.len())
-        } else {
-            let mut idx = self.log_entry_times.len();
-            for log_entry_time in self.log_entry_times.iter().rev() {
-                if data.timestamp > *log_entry_time {
-                    if let Some(iter) = self.text_buffer.iter_at_line(idx as i32 - 1) {
-                        return (iter, idx);
-                    } else {
-                        eprintln!("No iter at line: {}", idx);
-                    }
-                }
-                idx = idx -1;
+    fn get_line_offset_for_data(&mut self, timestamp: i64) -> usize {
+        search_offset(&self.log_entry_times, timestamp)
+    }
+
+}
+
+fn search_offset(arr: &Vec<i64>, search: i64) -> usize {
+    if arr.len() == 0 {
+        return 0;
+    }
+
+    if search <= arr[0] {
+        return 0;
+    }
+
+    let n = arr.len();
+    if search >= arr[n -1] {
+        return n;
+    }
+
+    let mut l = 0;
+    let mut r = n;
+    let mut mid = 0;
+    while l < r {
+        mid = (l + r) / 2;
+        if arr[mid] == search {
+            return mid;
+        }
+
+        if search < arr[mid] {
+            if mid > 0 && search > arr[mid -1] {
+                return mid;
             }
-            (self.text_buffer.start_iter(), 0)
+            r = mid;
+        } else {
+            if mid < n -1 && search < arr[mid +1] {
+                return mid;
+            }
+            l = mid + 1;
         }
     }
+
+    return mid;
 }
 
 impl Component for LogView {
@@ -368,33 +392,37 @@ impl Component for LogView {
             }
             LogViewMsg::LogDataLoaded(data) => {
                 self.overview.update(LogOverviewMsg::LogData(data.timestamp.clone()));
+                let idx = self.get_line_offset_for_data(data.timestamp.timestamp_nanos());
 
-                let (mut insert_at, pos) = self.get_line_offset_for_data(&data);
-                let before_insert_count = self.text_buffer.line_count();
-                if !self.append_container_names {
-                    self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
+                if let Some(mut insert_at) = self.text_buffer.iter_at_line(idx as i32) {
+                    let before_insert_count = self.text_buffer.line_count();
+                    if !self.append_container_names {
+                        self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
+                    } else {
+                        self.text_buffer.insert(&mut insert_at, &format!("{}-{} {}", data.pod, data.container, data.text));
+                    }
+                    let inserted = self.text_buffer.line_count() - before_insert_count;
+                    for _ in 0..inserted {
+                        self.log_entry_times.insert(idx, data.timestamp.timestamp_nanos())
+                    }
+
+                    let mut highlighters = self.highlighters.clone();
+                    if let Some(query) = self.active_search.as_ref() {
+                        highlighters.push(SearchData {
+                            search: query.clone(),
+                            name: SEARCH_TAG.to_string(),
+                        });
+                    }
+
+                    let id = Uuid::new_v4().to_string();
+                    if let Some(iter) = self.text_buffer.iter_at_line(insert_at.line() - 1) {
+                        self.text_buffer.add_mark(&gtk::TextMark::new(Some(&id), false), &iter);
+                    }
+
+                    return self.run_async(highlight(highlighters, data, id));
                 } else {
-                    self.text_buffer.insert(&mut insert_at, &format!("{}-{} {}", data.pod, data.container, data.text));
+                    eprintln!("No iter at line: {}", idx);
                 }
-                let inserted = self.text_buffer.line_count() - before_insert_count;
-                for _ in 0..inserted {
-                    self.log_entry_times.insert(pos, data.timestamp)
-                }
-
-                let mut highlighters = self.highlighters.clone();
-                if let Some(query) = self.active_search.as_ref() {
-                    highlighters.push(SearchData {
-                        search: query.clone(),
-                        name: SEARCH_TAG.to_string(),
-                    });
-                }
-
-                let id = Uuid::new_v4().to_string();
-                if let Some(iter) = self.text_buffer.iter_at_line(insert_at.line() - 1) {
-                    self.text_buffer.add_mark(&gtk::TextMark::new(Some(&id), false), &iter);
-                }
-
-                return self.run_async(highlight(highlighters, data, id));
             }
             LogViewMsg::HighlightResult(res) => {
                 self.overview.update(LogOverviewMsg::HighlightResults(res.clone()));

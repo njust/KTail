@@ -1,6 +1,6 @@
-use std::cell::{RefCell};
 use std::collections::{HashMap};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 use chrono::{Datelike, DateTime, Timelike, TimeZone, Utc};
 use gtk4_helper::component::{Command, MsgHandler};
 use gtk4_helper::prelude::Component;
@@ -10,11 +10,18 @@ use gtk4_helper::{
 };
 use itertools::Itertools;
 
-pub struct LogOverview {
-    drawing_area: gtk::DrawingArea,
-    chart_data: Rc<RefCell<ChartData>>,
+enum WorkerData {
+    Timestamp(DateTime<Utc>),
+    Highlight(HighlightResultData)
 }
 
+pub struct LogOverview {
+    drawing_area: gtk::DrawingArea,
+    chart_data: Arc<Mutex<ChartData>>,
+    worker: Sender<WorkerData>,
+}
+
+#[derive(Clone)]
 pub struct ChartData {
     start_date: Option<DateTime<Utc>>,
     end_date: Option<DateTime<Utc>>,
@@ -36,7 +43,7 @@ impl Component for LogOverview {
 
     fn create<T: MsgHandler<Self::Msg> + Clone>(sender: T, _input: Option<Self::Input>) -> Self {
         let drawing_area = gtk::DrawingArea::new();
-        let chart_data = Rc::new(RefCell::new(ChartData {
+        let chart_data = Arc::new(Mutex::new(ChartData {
             start_date: None,
             end_date: None,
             data: HashMap::new()
@@ -44,18 +51,73 @@ impl Component for LogOverview {
 
         let cd = chart_data.clone();
         drawing_area.set_draw_func(move |_, ctx, width, height| {
-            draw(&cd, &ctx, width, height);
+            if let Ok(cd) = cd.lock().map(|cd| cd.clone()) {
+                draw(cd, &ctx, width, height);
+            }
         });
 
         let tx = sender.clone();
-        gtk::glib::timeout_add_local(std::time::Duration::from_millis(300), move || {
+        gtk::glib::timeout_add_local(std::time::Duration::from_millis(500), move || {
             tx(LogOverviewMsg::Redraw);
             gtk::glib::Continue(true)
         });
 
+        let (s, r) = std::sync::mpsc::channel::<WorkerData>();
+        let cd = chart_data.clone();
+        std::thread::spawn(move|| {
+            while let Ok(data) = r.recv() {
+                match data {
+                    WorkerData::Timestamp(timestamp) => {
+                        if let Ok(mut chart_data) = cd.lock() {
+                            if let Some(ts) = chart_data.start_date {
+                                if timestamp < ts {
+                                    chart_data.start_date.replace(timestamp);
+                                }
+                            } else {
+                                chart_data.start_date.replace(timestamp.clone());
+                            }
+
+                            if let Some(ts) = chart_data.end_date {
+                                if timestamp > ts {
+                                    chart_data.end_date.replace(timestamp.clone());
+                                }
+                            } else {
+                                chart_data.end_date.replace(timestamp);
+                            }
+
+                            let time = timestamp.time();
+                            let ts = Utc.ymd(timestamp.year(),timestamp.month(),timestamp.day()).and_hms(time.hour(), time.minute(), 0);
+                            for (_, data) in chart_data.data.iter_mut() {
+                                if data.len() > 0 && !data.contains_key(&ts) {
+                                    data.insert(ts.clone(), 0);
+                                }
+                            }
+                        }
+                    }
+                    WorkerData::Highlight(results) => {
+                        let ts = results.timestamp;
+                        if let Ok(mut chart_data) = cd.lock() {
+                            for tag in results.tags {
+                                let series_data = chart_data.data.entry(tag).or_insert(HashMap::new());
+                                let time = ts.time();
+
+                                let timestamp = Utc.ymd(ts.year(), ts.month(), ts.day()).and_hms(time.hour(), time.minute(), 0);
+                                if let Some(ts_count) = series_data.get_mut(&timestamp) {
+                                    *ts_count = *ts_count +1;
+                                } else {
+                                    series_data.insert(timestamp, 1);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
         Self {
             drawing_area,
-            chart_data
+            chart_data,
+            worker: s,
         }
     }
 
@@ -65,51 +127,20 @@ impl Component for LogOverview {
                 self.drawing_area.queue_draw();
             }
             LogOverviewMsg::Clear => {
-                let mut cd = self.chart_data.borrow_mut();
-                cd.start_date.take();
-                cd.end_date.take();
-                cd.data.clear();
+                if let Ok(mut cd) = self.chart_data.lock() {
+                    cd.start_date.take();
+                    cd.end_date.take();
+                    cd.data.clear();
+                }
             }
             LogOverviewMsg::LogData(timestamp) => {
-                let mut chart_data = self.chart_data.borrow_mut();
-
-                if let Some(ts) = chart_data.start_date {
-                    if timestamp < ts {
-                        chart_data.start_date.replace(timestamp);
-                    }
-                } else {
-                    chart_data.start_date.replace(timestamp.clone());
-                }
-
-                if let Some(ts) = chart_data.end_date {
-                    if timestamp > ts {
-                        chart_data.end_date.replace(timestamp.clone());
-                    }
-                } else {
-                    chart_data.end_date.replace(timestamp);
-                }
-
-                let time = timestamp.time();
-                let ts = Utc.ymd(timestamp.year(),timestamp.month(),timestamp.day()).and_hms(time.hour(), time.minute(), 0);
-                for (_, data) in chart_data.data.iter_mut() {
-                    if data.len() > 0 && !data.contains_key(&ts) {
-                        data.insert(ts.clone(), 0);
-                    }
+                if let Err(e) = self.worker.send(WorkerData::Timestamp(timestamp)) {
+                    eprintln!("Failed to send worker data: {}", e);
                 }
             }
             LogOverviewMsg::HighlightResults(results) => {
-                let ts = results.timestamp;
-                for tag in results.tags {
-                    let mut chart_data = self.chart_data.borrow_mut();
-                    let series_data = chart_data.data.entry(tag).or_insert(HashMap::new());
-                    let time = ts.time();
-
-                    let timestamp = Utc.ymd(ts.year(), ts.month(), ts.day()).and_hms(time.hour(), time.minute(), 0);
-                    if let Some(ts_count) = series_data.get_mut(&timestamp) {
-                        *ts_count = *ts_count +1;
-                    } else {
-                        series_data.insert(timestamp, 1);
-                    }
+                if let Err(e) = self.worker.send(WorkerData::Highlight(results)) {
+                    eprintln!("Failed to send worker data: {}", e);
                 }
             }
         }
@@ -128,11 +159,10 @@ use crate::config::CONFIG;
 use crate::log_view::{HighlightResultData};
 
 fn draw(
-    chart_data: &Rc<RefCell<ChartData>>,
+    chart_data: ChartData,
     ctx: &gtk::cairo::Context, width: i32, height: i32) {
     let root = CairoBackend::new(ctx, (width as u32, height as u32)).unwrap().into_drawing_area();
 
-    let chart_data = chart_data.borrow();
     if let (Some(start), Some(end)) = (chart_data.start_date, chart_data.end_date) {
         let max = CONFIG.lock().ok()
             .and_then(|cfg| chart_data.data.iter()
