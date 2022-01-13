@@ -171,7 +171,7 @@ fn draw(
             .map(|i|*i.1).max()).unwrap_or(0);
         let mut chart = match ChartBuilder::on(&root)
             .x_label_area_size(25)
-            .y_label_area_size(25)
+            .set_label_area_size(LabelAreaPosition::Left, (10i32).percent())
             .margin_top(5)
             .margin_bottom(2)
             .margin_left(10)
