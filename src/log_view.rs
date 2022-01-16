@@ -72,11 +72,11 @@ pub struct LogView {
     highlighters: Vec<SearchData>,
     scroll_handler: Option<SourceId>,
     overview: ComponentContainer<LogOverview>,
-    log_entry_times: Vec<i64>,
     append_container_names: bool,
     search_match_markers: Vec<String>,
     search_results_lbl: gtk::Label,
     current_search_match_pos: Option<usize>,
+    worker_action: std::sync::mpsc::Sender<WorkerData>,
 }
 
 #[derive(Clone)]
@@ -85,6 +85,7 @@ pub enum LogViewMsg {
     ContextSelected(NamespaceViewData),
     Loaded(Arc<Trigger>),
     LogDataLoaded(LogData),
+    LogDataProcessed(i64, LogData),
     EnableScroll(bool),
     WrapText(bool),
     AppendContainerNames(bool),
@@ -100,8 +101,10 @@ pub enum LogViewMsg {
 impl LogView {
     fn clear(&mut self) {
         self.overview.update(LogOverviewMsg::Clear);
-        self.log_entry_times.clear();
         self.clear_search_markers();
+        if let Err(e) = self.worker_action.send(WorkerData::Clear) {
+            eprintln!("Could not send msg to worker: {}", e);
+        }
 
         let (start, end) = self.text_buffer.bounds();
         for highlighter in &self.highlighters {
@@ -206,10 +209,12 @@ impl LogView {
             }
         });
     }
+}
 
-    fn get_line_offset_for_data(&mut self, timestamp: i64) -> usize {
-        search_offset(&self.log_entry_times, timestamp)
-    }
+enum WorkerData {
+    ProcessLogData(LogData),
+    ProcessHighlighters(Vec<SearchData>, LogData, String),
+    Clear,
 }
 
 impl Component for LogView {
@@ -311,6 +316,46 @@ impl Component for LogView {
         container.append(&toolbar);
         container.append(&pane);
 
+        let (w_tx, w_rx) = std::sync::mpsc::channel::<WorkerData>();
+        let tx = sender.clone();
+        std::thread::spawn(move || {
+            let mut log_entry_times: Vec<i64> = vec![];
+            while let Ok(data) = w_rx.recv() {
+                match data {
+                    WorkerData::ProcessLogData(data) => {
+                        let timestamp = data.timestamp.timestamp_nanos();
+                        let offset = search_offset(&log_entry_times, timestamp);
+                        log_entry_times.insert(offset, timestamp);
+                        // We need to insert a extra entry for lines starting with a linefeed or a new line
+                        if data.text.starts_with("\r") || data.text.starts_with("\n") {
+                            // Sourceview seems to ignore those
+                            if data.text != "\r\n" && data.text != "\n" {
+                                log_entry_times.insert(offset, timestamp);
+                            }
+                        }
+                        tx(LogViewMsg::LogDataProcessed(offset as i64, data))
+                    }
+                    WorkerData::Clear => {
+                        log_entry_times.clear();
+                    }
+                    WorkerData::ProcessHighlighters(highlighters, data, marker) => {
+                        let mut res = HighlightResultData {
+                            marker,
+                            timestamp: data.timestamp,
+                            tags: vec![]
+                        };
+
+                        for highlighter in highlighters {
+                            if highlighter.search.is_match(&data.text) {
+                                res.tags.push(highlighter.name)
+                            }
+                        }
+                        tx(LogViewMsg::HighlightResult(res));
+                    }
+                }
+            }
+        });
+
         Self {
             container,
             exit_trigger: None,
@@ -324,11 +369,11 @@ impl Component for LogView {
             highlighters: search,
             scroll_handler: None,
             overview,
-            log_entry_times: vec![],
             append_container_names: false,
             search_match_markers: vec![],
             search_results_lbl,
             current_search_match_pos: None,
+            worker_action: w_tx,
         }
     }
 
@@ -347,18 +392,16 @@ impl Component for LogView {
             }
             LogViewMsg::LogDataLoaded(data) => {
                 self.overview.update(LogOverviewMsg::LogData(data.timestamp.clone()));
-                let idx = self.get_line_offset_for_data(data.timestamp.timestamp_nanos());
-
+                if let Err(e) = self.worker_action.send(WorkerData::ProcessLogData(data)) {
+                    eprint!("Could not send msg to worker: {}", e);
+                }
+            }
+            LogViewMsg::LogDataProcessed(idx, data) => {
                 if let Some(mut insert_at) = self.text_buffer.iter_at_line(idx as i32) {
-                    let before_insert_count = self.text_buffer.line_count();
                     if !self.append_container_names {
                         self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
                     } else {
                         self.text_buffer.insert(&mut insert_at, &format!("{}-{} {}", data.pod, data.container, data.text));
-                    }
-                    let inserted = self.text_buffer.line_count() - before_insert_count;
-                    for _ in 0..inserted {
-                        self.log_entry_times.insert(idx, data.timestamp.timestamp_nanos())
                     }
 
                     let mut highlighters = self.highlighters.clone();
@@ -374,7 +417,9 @@ impl Component for LogView {
                         self.text_buffer.add_mark(&gtk::TextMark::new(Some(&id), false), &iter);
                     }
 
-                    return self.run_async(highlight(highlighters, data, id));
+                    if let Err(e) = self.worker_action.send(WorkerData::ProcessHighlighters(highlighters, data, id)) {
+                        eprintln!("Could not send msg to worker: {}", e);
+                    }
                 } else {
                     eprintln!("No iter at line: {}", idx);
                 }
@@ -476,21 +521,6 @@ impl Component for LogView {
     }
 }
 
-async fn highlight(highlighters: Vec<SearchData>, data: LogData, marker: String) -> LogViewMsg {
-    let mut res = HighlightResultData {
-        marker,
-        timestamp: data.timestamp,
-        tags: vec![]
-    };
-
-    for highlighter in highlighters {
-        if highlighter.search.is_match(&data.text) {
-            res.tags.push(highlighter.name)
-        }
-    }
-    LogViewMsg::HighlightResult(res)
-}
-
 async fn search(query: Regex, text: String) -> LogViewMsg {
     let mut lines = text.lines().enumerate();
     let mut search_results = SearchResultData::new();
@@ -562,6 +592,7 @@ fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(toolbar: &gtk::Box, sen
     search_results_lbl
 }
 
+const SINCE_1M: u32 = 60;
 const SINCE_5M: u32 = 60*5;
 const SINCE_10M: u32 = 60*10;
 const SINCE_30M: u32 = 60*30;
@@ -579,6 +610,7 @@ fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
         .margin_end(DEFAULT_MARGIN)
         .build();
 
+    since_selector.append(Some(&SINCE_1M.to_string()), "1 min");
     since_selector.append(Some(&SINCE_5M.to_string()), "5 min");
     since_selector.append(Some(&SINCE_10M.to_string()), "10 min");
     since_selector.append(Some(&SINCE_30M.to_string()), "30 min");
