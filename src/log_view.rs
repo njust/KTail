@@ -522,11 +522,18 @@ impl Component for LogView {
 }
 
 async fn search(query: Regex, text: String) -> LogViewMsg {
-    let mut lines = text.lines().enumerate();
+    let mut lines = text.lines();
     let mut search_results = SearchResultData::new();
-    while let Some((idx, line)) = lines.next() {
-        if query.is_match(line) {
-            search_results.lines.push(idx);
+    let mut idx = 0;
+    while let Some(line) = lines.next() {
+        // Some log data contained \r without \n as new line
+        // Sourceview handles it as a new line anyway
+        let sub_lines = line.split("\r");
+        for sub_line in sub_lines {
+            if query.is_match(sub_line) {
+                search_results.lines.push(idx);
+            }
+            idx += 1;
         }
     }
     LogViewMsg::SearchResult(search_results)
