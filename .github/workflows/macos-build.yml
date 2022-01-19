@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Install gtk prerequsites
-        run: brew install gtk4 gtksourceview5 adwaita-icon-theme
+        run: brew install gtk4 gtksourceview5 adwaita-icon-theme openssl@1.1
       - name: Install cargo-bundle
         run: cargo install cargo-bundle
       - uses: actions/checkout@v2
