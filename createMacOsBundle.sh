@@ -77,7 +77,7 @@ cp "/usr/local/Cellar/openssl@1.1/1.1.1m/lib/libssl.1.1.dylib" "$LIB_DIR"
 cp "/usr/local/Cellar/openssl@1.1/1.1.1m/lib/libcrypto.1.1.dylib" "$LIB_DIR"
 
 mkdir "$LIB_DIR/gdk-pixbuf-2.0"
-cp -R -L /usr/local/lib/gdk-pixbuf-2.0/2.10.0/ "$LIB_DIR/gdk-pixbuf-2.0"
+cp -R -L /usr/local/lib/gdk-pixbuf-2.0/2.10.0 "$LIB_DIR/gdk-pixbuf-2.0"
 
 # Copy glib schemas (for file chooser dlg, etc)
 cp -R -L /usr/local/share/glib-2.0 "$BUNDLE_RES_DIR"
