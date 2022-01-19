@@ -599,7 +599,6 @@ fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(toolbar: &gtk::Box, sen
     search_results_lbl
 }
 
-const SINCE_1M: u32 = 60;
 const SINCE_5M: u32 = 60*5;
 const SINCE_10M: u32 = 60*10;
 const SINCE_30M: u32 = 60*30;
@@ -617,7 +616,6 @@ fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
         .margin_end(DEFAULT_MARGIN)
         .build();
 
-    since_selector.append(Some(&SINCE_1M.to_string()), "1 min");
     since_selector.append(Some(&SINCE_5M.to_string()), "5 min");
     since_selector.append(Some(&SINCE_10M.to_string()), "10 min");
     since_selector.append(Some(&SINCE_30M.to_string()), "30 min");
