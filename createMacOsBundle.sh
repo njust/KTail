@@ -24,6 +24,7 @@ export XDG_DATA_DIRS="$RESOURCE_DIR"
 export GDK_PIXBUF_MODULE_FILE="$LIB_DIR/gdk-pixbuf-2.0/loaders.cache"
 export GDK_PIXBUF_MODULEDIR="$LIB_DIR/gdk-pixbuf-2.0/loaders"
 export PANGO_LIBDIR="$LIB_DIR"
+export GTK_THEME="Orchis-light-compact"
 
 $EXEC "$MAC_OS_DIR/ktail-bin"
 ' > "$BUNDLE_MACOS_DIR/$BIN_NAME"
@@ -83,6 +84,10 @@ cp -R -L /usr/local/share/glib-2.0 "$BUNDLE_RES_DIR"
 
 mkdir "$BUNDLE_RES_DIR/icons"
 cp -R -L /usr/local/share/icons/Adwaita "$BUNDLE_RES_DIR/icons"
+
+mkdir "$BUNDLE_RES_DIR/themes"
+curl https://github.com/vinceliuice/Orchis-theme/raw/master/release/Orchis.tar.xz -o Orchis.tar.xz && tar --xz -xvf Orchis.tar.xz Orchis-light-compact/gtk-4.0 Orchis-light-compact/COPYING Orchis-light-compact/index.theme
+mv Orchis-light-compact "$BUNDLE_RES_DIR/themes"
 
 cd ./target/release/bundle/osx/
 hdiutil create "$BIN_NAME".dmg -volname "$BIN_NAME Installer" -fs HFS+ -srcfolder $APP_NAME
