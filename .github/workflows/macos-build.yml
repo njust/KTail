@@ -3,6 +3,8 @@ name: MacOS Build
 on:
   push:
     branches: [ master ]
+    tags:
+      - "v*.*.*"
   pull_request:
     branches: [ master ]
 
@@ -16,7 +18,7 @@ jobs:
 
     steps:
       - name: Install gtk prerequsites
-        run: brew install gtk+3 gtksourceview3
+        run: brew install gtk4 gtksourceview5 adwaita-icon-theme
       - name: Install cargo-bundle
         run: cargo install cargo-bundle
       - uses: actions/checkout@v2
