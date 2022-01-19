@@ -27,6 +27,8 @@ impl Default for Config {
       let font = "13px Monospace";
       #[cfg(target_os = "windows")]
       let font = "15px Consolas";
+      #[cfg(target_os = "macos")]
+      let font = "14px Courier";
 
       let mut highlighters = HashMap::new();
       highlighters.insert("Warnings".to_string(), Highlighter {
