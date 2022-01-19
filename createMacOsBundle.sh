@@ -86,7 +86,8 @@ mkdir "$BUNDLE_RES_DIR/icons"
 cp -R -L /usr/local/share/icons/Adwaita "$BUNDLE_RES_DIR/icons"
 
 mkdir "$BUNDLE_RES_DIR/themes"
-curl https://github.com/vinceliuice/Orchis-theme/raw/master/release/Orchis.tar.xz -o Orchis.tar.xz && tar --xz -xvf Orchis.tar.xz Orchis-light-compact/gtk-4.0 Orchis-light-compact/COPYING Orchis-light-compact/index.theme
+curl https://raw.githubusercontent.com/vinceliuice/Orchis-theme/master/release/Orchis.tar.xz -o Orchis.tar.xz
+tar --xz -xvf Orchis.tar.xz Orchis-light-compact/gtk-4.0 Orchis-light-compact/COPYING Orchis-light-compact/index.theme
 mv Orchis-light-compact "$BUNDLE_RES_DIR/themes"
 
 cd ./target/release/bundle/osx/
