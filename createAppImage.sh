@@ -58,4 +58,4 @@ do
   cp -r "/opt/gtk/share/$CP_PATH/"* "$DST_PATH"
 done
 
-appimagetool "$TARGET_DIR" KTail-x86_64.AppImage
+appimagetool "$TARGET_DIR" KTail-x64.AppImage

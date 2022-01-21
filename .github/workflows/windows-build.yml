@@ -46,10 +46,10 @@ jobs:
         shell: powershell
       - uses: actions/upload-artifact@v2
         with:
-          name: Bundle
-          path: bundle
+          name: KTail-x64-win.zip
+          path: KTail-x64-win.zip
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: KTail-x86_x64-win.zip
+          files: KTail-x64-win.zip

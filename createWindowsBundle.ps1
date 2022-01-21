@@ -34,4 +34,4 @@ $settings = '[Settings]
 gtk-theme-name=Orchis-light-compact'
 [IO.File]::WriteAllLines("bundle\share\gtk-4.0\settings.ini", $settings)
 
-Compress-Archive -Path .\bundle\* -DestinationPath KTail-x86_x64-win.zip
+Compress-Archive -Path .\bundle\* -DestinationPath KTail-x64-win.zip

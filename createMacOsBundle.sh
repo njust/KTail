@@ -92,4 +92,4 @@ tar --xz -xvf Orchis.tar.xz Orchis-light-compact/gtk-4.0 Orchis-light-compact/CO
 mv Orchis-light-compact "$BUNDLE_RES_DIR/themes"
 
 cd ./target/release/bundle/osx/
-hdiutil create "$BIN_NAME".dmg -volname "$BIN_NAME Installer" -fs HFS+ -srcfolder $APP_NAME
+hdiutil create "KTail-x64.dmg" -volname "KTail Installer" -fs HFS+ -srcfolder $APP_NAME
