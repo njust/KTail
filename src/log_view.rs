@@ -324,7 +324,11 @@ impl Component for LogView {
                 match data {
                     WorkerData::ProcessLogData(data) => {
                         let timestamp = data.timestamp.timestamp_nanos();
-                        let offset = search_offset(&log_entry_times, timestamp);
+                        let mut offset = search_offset(&log_entry_times, timestamp);
+                        let len = log_entry_times.len();
+                        while offset < len && log_entry_times[offset] == timestamp {
+                            offset += 1;
+                        }
                         log_entry_times.insert(offset, timestamp);
                         // We need to insert a extra entry for lines starting with a linefeed or a new line
                         if data.text.starts_with("\r") || data.text.starts_with("\n") {
