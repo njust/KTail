@@ -1079,7 +1079,7 @@ dependencies = [
 
 [[package]]
 name = "ktail"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "argh",

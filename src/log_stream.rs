@@ -10,7 +10,7 @@ use crate::tokio;
 
 
 static LOG_LINE_PATTERN: Lazy<Regex> = Lazy::new(||{
-    Regex::new(r"(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{9}Z)\s(?P<data>.*\n?)").expect("Invalid regex")
+    Regex::new(r"(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{9}Z)\s(?P<data>.*\n)").expect("Invalid regex")
 });
 
 #[derive(Clone)]
@@ -40,9 +40,10 @@ pub async fn log_stream(k8s_client: &KubeClient, namespace: &str, pods: Vec<PodV
                 })).await.unwrap();
 
                 let mut res = res.take_until_if(tripwire);
+                let mut buffer = Vec::new();
                 while let Some(Ok(bytes)) = res.next().await {
-                    let data = bytes.to_vec();
-                    let data = String::from_utf8_lossy(&data).to_string();
+                    buffer.append(&mut bytes.to_vec());
+                    let data = String::from_utf8_lossy(&buffer).to_string();
                     if let Some(ma) = LOG_LINE_PATTERN.captures(&data) {
                         if let Some(timestamp) = ma.name("timestamp")
                             .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts.as_str()).ok()
@@ -56,8 +57,7 @@ pub async fn log_stream(k8s_client: &KubeClient, namespace: &str, pods: Vec<PodV
                         else {
                             eprintln!("Invalid log data data without timestamp")
                         }
-                    } else {
-                        eprintln!("Log data does not match pattern: {}", data);
+                        buffer.clear();
                     }
                 }
                 println!("Stopped tail for: {} ({})", pod.name, container);
