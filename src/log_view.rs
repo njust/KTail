@@ -16,6 +16,7 @@ use gtk4_helper::glib::SourceId;
 use regex::Regex;
 use sourceview5::Buffer;
 use stream_cancel::Trigger;
+use tokio_stream::wrappers::IntervalStream;
 use crate::cluster_list_view::NamespaceViewData;
 use crate::config::{CONFIG};
 use crate::gtk::{TextIter, ToggleButton};
@@ -84,8 +85,8 @@ pub enum LogViewMsg {
     PodSelected(Vec<PodViewData>),
     ContextSelected(NamespaceViewData),
     Loaded(Arc<Trigger>),
-    LogDataLoaded(LogData),
-    LogDataProcessed(i64, LogData),
+    LogDataLoaded(Vec<LogData>),
+    LogDataProcessed(Vec<(i64, LogData)>),
     EnableScroll(bool),
     WrapText(bool),
     AppendContainerNames(bool),
@@ -212,7 +213,7 @@ impl LogView {
 }
 
 enum WorkerData {
-    ProcessLogData(LogData),
+    ProcessLogData(Vec<LogData>),
     ProcessHighlighters(Vec<SearchData>, LogData, String),
     Clear,
 }
@@ -323,21 +324,26 @@ impl Component for LogView {
             while let Ok(data) = w_rx.recv() {
                 match data {
                     WorkerData::ProcessLogData(data) => {
-                        let timestamp = data.timestamp.timestamp_nanos();
-                        let mut offset = search_offset(&log_entry_times, timestamp);
-                        let len = log_entry_times.len();
-                        while offset < len && log_entry_times[offset] == timestamp {
-                            offset += 1;
-                        }
-                        log_entry_times.insert(offset, timestamp);
-                        // We need to insert a extra entry for lines starting with a linefeed or a new line
-                        if data.text.starts_with("\r") || data.text.starts_with("\n") {
-                            // Sourceview seems to ignore those
-                            if data.text != "\r\n" && data.text != "\n" {
-                                log_entry_times.insert(offset, timestamp);
+                        let mut res = vec![];
+                        for datum in data {
+                            let timestamp = datum.timestamp.timestamp_nanos();
+                            let mut offset = search_offset(&log_entry_times, timestamp);
+                            let len = log_entry_times.len();
+                            while offset < len && log_entry_times[offset] == timestamp {
+                                offset += 1;
                             }
+                            log_entry_times.insert(offset, timestamp);
+                            // We need to insert a extra entry for lines starting with a linefeed or a new line
+                            if datum.text.starts_with("\r") || datum.text.starts_with("\n") {
+                                // Sourceview seems to ignore those
+                                if datum.text != "\r\n" && datum.text != "\n" {
+                                    log_entry_times.insert(offset, timestamp);
+                                }
+                            }
+                            res.push((offset as i64, datum));
                         }
-                        tx(LogViewMsg::LogDataProcessed(offset as i64, data))
+
+                        tx(LogViewMsg::LogDataProcessed(res))
                     }
                     WorkerData::Clear => {
                         log_entry_times.clear();
@@ -395,37 +401,40 @@ impl Component for LogView {
                 self.exit_trigger = Some(exit_tx);
             }
             LogViewMsg::LogDataLoaded(data) => {
-                self.overview.update(LogOverviewMsg::LogData(data.timestamp.clone()));
+                let timestamps: Vec<DateTime<Utc>> = data.iter().map(|d| d.timestamp.clone()).collect();
+                self.overview.update(LogOverviewMsg::LogData(timestamps));
                 if let Err(e) = self.worker_action.send(WorkerData::ProcessLogData(data)) {
                     eprint!("Could not send msg to worker: {}", e);
                 }
             }
-            LogViewMsg::LogDataProcessed(idx, data) => {
-                if let Some(mut insert_at) = self.text_buffer.iter_at_line(idx as i32) {
-                    if !self.append_container_names {
-                        self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
+            LogViewMsg::LogDataProcessed(res) => {
+                for (idx, data) in res {
+                    if let Some(mut insert_at) = self.text_buffer.iter_at_line(idx as i32) {
+                        if !self.append_container_names {
+                            self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
+                        } else {
+                            self.text_buffer.insert(&mut insert_at, &format!("{}-{} {}", data.pod, data.container, data.text));
+                        }
+
+                        let mut highlighters = self.highlighters.clone();
+                        if let Some(query) = self.active_search.as_ref() {
+                            highlighters.push(SearchData {
+                                search: query.clone(),
+                                name: SEARCH_TAG.to_string(),
+                            });
+                        }
+
+                        let id = Uuid::new_v4().to_string();
+                        if let Some(iter) = self.text_buffer.iter_at_line(insert_at.line() - 1) {
+                            self.text_buffer.add_mark(&gtk::TextMark::new(Some(&id), false), &iter);
+                        }
+
+                        if let Err(e) = self.worker_action.send(WorkerData::ProcessHighlighters(highlighters, data, id)) {
+                            eprintln!("Could not send msg to worker: {}", e);
+                        }
                     } else {
-                        self.text_buffer.insert(&mut insert_at, &format!("{}-{} {}", data.pod, data.container, data.text));
+                        eprintln!("No iter at line: {}", idx);
                     }
-
-                    let mut highlighters = self.highlighters.clone();
-                    if let Some(query) = self.active_search.as_ref() {
-                        highlighters.push(SearchData {
-                            search: query.clone(),
-                            name: SEARCH_TAG.to_string(),
-                        });
-                    }
-
-                    let id = Uuid::new_v4().to_string();
-                    if let Some(iter) = self.text_buffer.iter_at_line(insert_at.line() - 1) {
-                        self.text_buffer.add_mark(&gtk::TextMark::new(Some(&id), false), &iter);
-                    }
-
-                    if let Err(e) = self.worker_action.send(WorkerData::ProcessHighlighters(highlighters, data, id)) {
-                        eprintln!("Could not send msg to worker: {}", e);
-                    }
-                } else {
-                    eprintln!("No iter at line: {}", idx);
                 }
             }
             LogViewMsg::HighlightResult(res) => {
@@ -545,10 +554,15 @@ async fn search(query: Regex, text: String) -> LogViewMsg {
 
 async fn load_log_stream(ctx: NamespaceViewData, pods: Vec<PodViewData>, tx: Arc<dyn MsgHandler<LogViewMsg>>, since_seconds: u32) -> LogViewMsg {
     let client = crate::log_stream::k8s_client(&ctx.config_path, &ctx.context);
-    let (mut log_stream, exit) = crate::log_stream::log_stream(&client, &ctx.name, pods, since_seconds).await;
+    let (log_stream, exit) = crate::log_stream::log_stream(&client, &ctx.name, pods, since_seconds).await;
     let tx = tx.clone();
     tokio::task::spawn(async move {
-        while let Some(data) = log_stream.next().await {
+        // Throttle the stream to keep the ui responsive.
+        let mut throttled_stream = StreamExt::zip(
+            StreamExt::ready_chunks(log_stream, 1000),
+            IntervalStream::new(tokio::time::interval(std::time::Duration::from_millis(50)))
+        );
+        while let Some((data, _)) = throttled_stream.next().await {
             tx(LogViewMsg::LogDataLoaded(data));
         }
     });

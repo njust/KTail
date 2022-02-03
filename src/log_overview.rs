@@ -11,7 +11,7 @@ use gtk4_helper::{
 use itertools::Itertools;
 
 enum WorkerData {
-    Timestamp(DateTime<Utc>),
+    Timestamp(Vec<DateTime<Utc>>),
     Highlight(HighlightResultData)
 }
 
@@ -33,7 +33,7 @@ pub enum LogOverviewMsg {
     Redraw,
     Clear,
     HighlightResults(HighlightResultData),
-    LogData(DateTime<Utc>),
+    LogData(Vec<DateTime<Utc>>),
 }
 
 impl Component for LogOverview {
@@ -67,29 +67,31 @@ impl Component for LogOverview {
         std::thread::spawn(move|| {
             while let Ok(data) = r.recv() {
                 match data {
-                    WorkerData::Timestamp(timestamp) => {
-                        if let Ok(mut chart_data) = cd.lock() {
-                            if let Some(ts) = chart_data.start_date {
-                                if timestamp < ts {
-                                    chart_data.start_date.replace(timestamp);
+                    WorkerData::Timestamp(data) => {
+                        for timestamp in data {
+                            if let Ok(mut chart_data) = cd.lock() {
+                                if let Some(ts) = chart_data.start_date {
+                                    if timestamp < ts {
+                                        chart_data.start_date.replace(timestamp);
+                                    }
+                                } else {
+                                    chart_data.start_date.replace(timestamp.clone());
                                 }
-                            } else {
-                                chart_data.start_date.replace(timestamp.clone());
-                            }
 
-                            if let Some(ts) = chart_data.end_date {
-                                if timestamp > ts {
-                                    chart_data.end_date.replace(timestamp.clone());
+                                if let Some(ts) = chart_data.end_date {
+                                    if timestamp > ts {
+                                        chart_data.end_date.replace(timestamp.clone());
+                                    }
+                                } else {
+                                    chart_data.end_date.replace(timestamp);
                                 }
-                            } else {
-                                chart_data.end_date.replace(timestamp);
-                            }
 
-                            let time = timestamp.time();
-                            let ts = Utc.ymd(timestamp.year(),timestamp.month(),timestamp.day()).and_hms(time.hour(), time.minute(), 0);
-                            for (_, data) in chart_data.data.iter_mut() {
-                                if data.len() > 0 && !data.contains_key(&ts) {
-                                    data.insert(ts.clone(), 0);
+                                let time = timestamp.time();
+                                let ts = Utc.ymd(timestamp.year(),timestamp.month(),timestamp.day()).and_hms(time.hour(), time.minute(), 0);
+                                for (_, data) in chart_data.data.iter_mut() {
+                                    if data.len() > 0 && !data.contains_key(&ts) {
+                                        data.insert(ts.clone(), 0);
+                                    }
                                 }
                             }
                         }
