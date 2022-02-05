@@ -13,6 +13,7 @@ foreach($lib in $libs)
 
 mkdir bundle\lib\gdk-pixbuf-2.0\2.10.0\loaders
 copy $root\lib\gdk-pixbuf-2.0\2.10.0\loaders\libpixbufloader-png.dll .\bundle\lib\gdk-pixbuf-2.0\2.10.0\loaders
+copy $root\lib\gdk-pixbuf-2.0\2.10.0\loaders\libpixbufloader-svg.dll .\bundle\lib\gdk-pixbuf-2.0\2.10.0\loaders
 copy $root\lib\gdk-pixbuf-2.0\2.10.0\loaders.cache .\bundle\lib\gdk-pixbuf-2.0\2.10.0
 
 mkdir bundle\share\glib-2.0\schemas
