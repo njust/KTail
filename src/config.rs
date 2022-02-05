@@ -18,8 +18,18 @@ pub struct Highlighter {
 #[serde(rename_all = "camelCase")]
 pub struct Config {
    pub k8s_configs: Vec<String>,
-   pub log_view_font: String,
    pub highlighters: HashMap<String, Highlighter>,
+   pub log_view_settings: LogViewSettings,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogViewSettings {
+   pub wrap_text: bool,
+   pub show_pod_names: bool,
+   pub show_container_names: bool,
+   pub show_timestamps: bool,
+   pub font: String,
 }
 
 impl Default for Config {
@@ -42,9 +52,15 @@ impl Default for Config {
       });
 
       Config {
-         log_view_font: font.to_string(),
          k8s_configs: vec![],
          highlighters,
+         log_view_settings: LogViewSettings {
+            show_pod_names: false,
+            show_container_names: false,
+            show_timestamps: false,
+            wrap_text: false,
+            font: font.to_string(),
+         }
       }
    }
 }

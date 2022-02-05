@@ -8,6 +8,8 @@ use gtk4_helper::{
 };
 use gtk4_helper::gtk::Orientation;
 use crate::cluster_list_view::{ClusterListInputData, ClusterListView, ClusterListViewMsg};
+use crate::config::{CONFIG};
+use crate::gtk::Inhibit;
 use crate::log_view::{LogView, LogViewMsg};
 
 mod k8s_client;
@@ -31,6 +33,13 @@ pub enum AppMsg {
 
 fn build_ui(application: &gtk::Application) {
     let window = gtk::ApplicationWindow::new(application);
+    window.connect_close_request(|_| {
+        println!("Saving config");
+        if let Err(e) = CONFIG.lock().map(|cfg| cfg.save()) {
+            eprintln!("Could not save config: {}", e);
+        }
+        Inhibit(false)
+    });
     window.set_title(Some("KTail"));
     window.set_default_size(1600, 768);
     let window = Rc::new(window);

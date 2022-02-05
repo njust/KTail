@@ -207,9 +207,6 @@ impl Component for ClusterListView {
                     if let Ok(mut cfg) = CONFIG.lock() {
                         if let Some((pos,_)) = cfg.k8s_configs.iter().find_position(|a| *a == &cfg_item.path) {
                             cfg.k8s_configs.remove(pos);
-                            if let Err(e) = cfg.save() {
-                                eprintln!("Failed to save config: {}", e);
-                            }
                         }
                     }
                 }
@@ -320,9 +317,6 @@ async fn add_config_file(app_wnd: Rc<ApplicationWindow>) -> ClusterListViewMsg {
     if let Some(path) = path.as_ref().and_then(|p| p.to_str()) {
         if let Ok(mut cfg) = CONFIG.lock() {
             cfg.k8s_configs.push(path.to_string());
-            if let Err(e) = cfg.save() {
-                eprintln!("Failed to save config: {}", e);
-            }
         }
     }
 

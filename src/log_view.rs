@@ -5,7 +5,8 @@ use uuid::Uuid;
 use gtk4_helper::{
     prelude::*,
     gtk,
-    glib
+    glib,
+    gio
 };
 use crate::util;
 use gtk4_helper::gtk::{ComboBoxText, TextTag, TextTagTable, WrapMode};
@@ -73,11 +74,12 @@ pub struct LogView {
     highlighters: Vec<SearchData>,
     scroll_handler: Option<SourceId>,
     overview: ComponentContainer<LogOverview>,
-    append_container_names: bool,
+    settings: Settings,
     search_match_markers: Vec<String>,
     search_results_lbl: gtk::Label,
     current_search_match_pos: Option<usize>,
     worker_action: std::sync::mpsc::Sender<WorkerData>,
+    settings_obj: glib::Object,
 }
 
 #[derive(Clone)]
@@ -88,8 +90,10 @@ pub enum LogViewMsg {
     LogDataLoaded(Vec<LogData>),
     LogDataProcessed(Vec<(i64, LogData)>),
     EnableScroll(bool),
-    WrapText(bool),
-    AppendContainerNames(bool),
+    ToggleWrapText,
+    ToggleShowContainerNames,
+    ToggleShowPodNames,
+    ToggleShowTimestamps,
     SinceTimespanChanged(String),
     Search(String),
     SearchResult(SearchResultData),
@@ -218,12 +222,35 @@ enum WorkerData {
     Clear,
 }
 
+use gtk4_helper::model::prelude::*;
+
+// macro attributes in `#[derive]` output are unstable
+// https://github.com/rust-lang/rust/issues/81119
+#[model]
+struct Settings {
+    #[field]
+    wrap_text: bool,
+    #[field]
+    show_pod_names: bool,
+    #[field]
+    show_container_names: bool,
+    #[field]
+    show_timestamps: bool,
+}
+
 impl Component for LogView {
     type Msg = LogViewMsg;
     type View = gtk::Box;
     type Input = ();
 
     fn create<T: MsgHandler<Self::Msg> + Clone>(sender: T, _: Option<Self::Input>) -> Self {
+        let settings = CONFIG.lock().map(|cfg| Settings {
+            show_timestamps: cfg.log_view_settings.show_timestamps,
+            show_container_names: cfg.log_view_settings.show_container_names,
+            show_pod_names: cfg.log_view_settings.show_pod_names,
+            wrap_text: cfg.log_view_settings.wrap_text
+        }).unwrap_or(Settings::default());
+
         let toolbar = gtk::BoxBuilder::new()
             .margin_start(4)
             .margin_end(4)
@@ -233,12 +260,6 @@ impl Component for LogView {
 
         let auto_scroll_btn = toggle_btn(sender.clone(), "Scroll", |active| LogViewMsg::EnableScroll(active));
         toolbar.append(&auto_scroll_btn);
-
-        let wrap_text_btn = toggle_btn(sender.clone(), "Wrap text", |active| LogViewMsg::WrapText(active));
-        toolbar.append(&wrap_text_btn);
-
-        let show_container_btn = toggle_btn(sender.clone(), "Append container names", |show| LogViewMsg::AppendContainerNames(show));
-        toolbar.append(&show_container_btn);
 
         let since_selector = since_duration_selection(sender.clone());
         toolbar.append(&since_selector);
@@ -266,9 +287,19 @@ impl Component for LogView {
             .editable(false)
             .show_line_numbers(true)
             .highlight_current_line(true)
+            .wrap_mode(
+                if settings.wrap_text {
+                    WrapMode::WordChar
+                } else {
+                    WrapMode::None
+                }
+            )
             .hexpand(true)
             .vexpand(true)
             .build();
+
+        let settings_obj = settings.to_object();
+        add_log_view_settings_menu(&toolbar, &settings_obj, sender.clone());
 
         let search: Vec<SearchData> = if let Ok(cfg) = CONFIG.lock() {
             for (name, highlighter)  in &cfg.highlighters {
@@ -281,7 +312,7 @@ impl Component for LogView {
 
             util::add_css_with_name(&log_data_view,
             "textview",
-            &format!("#textview {{ font: {}; }}", cfg.log_view_font)
+            &format!("#textview {{ font: {}; }}", cfg.log_view_settings.font)
             );
 
             let mut search_data = vec![];
@@ -379,11 +410,12 @@ impl Component for LogView {
             highlighters: search,
             scroll_handler: None,
             overview,
-            append_container_names: false,
             search_match_markers: vec![],
             search_results_lbl,
             current_search_match_pos: None,
             worker_action: w_tx,
+            settings,
+            settings_obj,
         }
     }
 
@@ -410,11 +442,19 @@ impl Component for LogView {
             LogViewMsg::LogDataProcessed(res) => {
                 for (idx, data) in res {
                     if let Some(mut insert_at) = self.text_buffer.iter_at_line(idx as i32) {
-                        if !self.append_container_names {
-                            self.text_buffer.insert(&mut insert_at, &format!("{} {}", data.pod, data.text));
-                        } else {
-                            self.text_buffer.insert(&mut insert_at, &format!("{}-{} {}", data.pod, data.container, data.text));
+                        let mut log_line = String::new();
+                        if self.settings.show_pod_names {
+                            log_line.push_str(&data.pod)
                         }
+                        if self.settings.show_container_names {
+                            log_line.push_str(&format!(" {}", data.container))
+                        }
+                        if self.settings.show_timestamps {
+                            log_line.push_str(&format!(" {}", data.timestamp))
+                        }
+
+                        log_line.push_str(&format!(" {}", data.text));
+                        self.text_buffer.insert(&mut insert_at, &log_line);
 
                         let mut highlighters = self.highlighters.clone();
                         if let Some(query) = self.active_search.as_ref() {
@@ -485,13 +525,38 @@ impl Component for LogView {
             LogViewMsg::EnableScroll(enable) => {
                 self.scroll_to_bottom(enable);
             }
-            LogViewMsg::AppendContainerNames(show) => {
-                self.append_container_names = show;
+            LogViewMsg::ToggleShowContainerNames => {
+                let settings: Settings = Settings::from_object(&self.settings_obj);
+                self.settings.show_container_names = settings.show_container_names;
+                if let Ok(mut cfg) = CONFIG.lock() {
+                    cfg.log_view_settings.show_container_names = settings.show_container_names;
+                }
                 return self.reload();
             }
-            LogViewMsg::WrapText(wrap) => {
+            LogViewMsg::ToggleShowPodNames => {
+                let settings: Settings = Settings::from_object(&self.settings_obj);
+                self.settings.show_pod_names = settings.show_pod_names;
+                if let Ok(mut cfg) = CONFIG.lock() {
+                    cfg.log_view_settings.show_pod_names = settings.show_pod_names;
+                }
+                return self.reload();
+            }
+            LogViewMsg::ToggleShowTimestamps => {
+                let settings: Settings = Settings::from_object(&self.settings_obj);
+                self.settings.show_timestamps = settings.show_timestamps;
+                if let Ok(mut cfg) = CONFIG.lock() {
+                    cfg.log_view_settings.show_timestamps = settings.show_timestamps;
+                }
+                return self.reload();
+            }
+            LogViewMsg::ToggleWrapText => {
+                let settings: Settings = Settings::from_object(&self.settings_obj);
+                self.settings.wrap_text = settings.wrap_text;
+                if let Ok(mut cfg) = CONFIG.lock() {
+                    cfg.log_view_settings.wrap_text = settings.wrap_text;
+                }
                 self.text_view.set_wrap_mode(
-                    if wrap {
+                    if settings.wrap_text {
                         WrapMode::WordChar
                     } else {
                         WrapMode::None
@@ -655,6 +720,42 @@ fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
     });
 
     since_selector
+}
+
+fn add_log_view_settings_menu<T: MsgHandler<LogViewMsg> + Clone>(toolbar: &gtk::Box, settings_obj: &glib::Object, sender: T) {
+    let menu = gio::Menu::new();
+    menu.append(Some("Wrap text"), Some("logView.toggleWrapText"));
+    menu.append(Some("Show pod names"), Some("logView.showPodNames"));
+    menu.append(Some("Show container names"), Some("logView.showContainerNames"));
+    menu.append(Some("Show timestamps"), Some("logView.showTimestamps"));
+    let action_group = gio::SimpleActionGroup::new();
+    toolbar.insert_action_group("logView", Some(&action_group));
+
+    let menu_btn =gtk::MenuButtonBuilder::new()
+        .icon_name("emblem-system-symbolic")
+        .menu_model(&menu)
+        .build();
+
+    add_property_action(&action_group, "toggleWrapText", settings_obj, Settings::wrap_text, || LogViewMsg::ToggleWrapText, sender.clone());
+    add_property_action(&action_group, "showContainerNames", settings_obj, Settings::show_container_names, || LogViewMsg::ToggleShowContainerNames, sender.clone());
+    add_property_action(&action_group, "showTimestamps", settings_obj, Settings::show_timestamps, || LogViewMsg::ToggleShowTimestamps, sender.clone());
+    add_property_action(&action_group, "showPodNames", settings_obj, Settings::show_pod_names, || LogViewMsg::ToggleShowPodNames, sender.clone());
+    toolbar.append(&menu_btn);
+}
+
+fn add_property_action<T: MsgHandler<LogViewMsg> + Clone, M: 'static + Fn() -> LogViewMsg>(
+    action_group: &gio::SimpleActionGroup,
+    name: &str,
+    settings_obj: &glib::Object,
+    property_name: &str,
+    msg: M,
+    tx: T
+) {
+    let action = gio::PropertyAction::new(name, settings_obj, property_name);
+    action.connect_state_notify(move |_| {
+        tx(msg());
+    });
+    action_group.add_action(&action);
 }
 
 fn toggle_btn<T: MsgHandler<LogViewMsg>, M: 'static + Fn(bool) -> LogViewMsg>(tx: T, label: &str, msg: M) -> ToggleButton {
