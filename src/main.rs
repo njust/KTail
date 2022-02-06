@@ -4,7 +4,8 @@ use std::rc::Rc;
 use gtk4_helper::{
     prelude::*,
     gtk,
-    glib
+    glib,
+    gio
 };
 use gtk4_helper::gtk::Orientation;
 use crate::cluster_list_view::{ClusterListInputData, ClusterListView, ClusterListViewMsg};
@@ -42,19 +43,20 @@ fn build_ui(application: &gtk::Application) {
     });
     window.set_title(Some("KTail"));
     window.set_default_size(1600, 768);
+    let global_actions = Rc::new(gio::SimpleActionGroup::new());
+    window.insert_action_group("app", Some(&*global_actions));
     let window = Rc::new(window);
 
     let (sender, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
-
     let tx = sender.clone();
     let mut pod_list = PodListView::new(move |m| {
         tx.send(AppMsg::PodListViewMsg(m)).expect("Could not send msg");
     });
 
     let tx = sender.clone();
-    let mut log_view = LogView::new(move |m| {
+    let mut log_view = LogView::new_with_data(move |m| {
         tx.send(AppMsg::LogViewMsg(m)).expect("Could not send log view msg");
-    });
+    }, global_actions.clone());
 
     let horizontal_split = gtk::Paned::new(Orientation::Horizontal);
     horizontal_split.set_position(250);
@@ -95,6 +97,14 @@ fn build_ui(application: &gtk::Application) {
         glib::Continue(true)
     });
 
+    application.set_accels_for_action("app.search", &["<Ctrl>F"]);
+    application.set_accels_for_action("app.scroll", &["<Ctrl>Q"]);
+    application.set_accels_for_action("app.prevMatch", &["<Ctrl>P"]);
+    application.set_accels_for_action("app.nextMatch", &["<Ctrl>N"]);
+    application.set_accels_for_action("app.toggleWrapText", &["<Ctrl>W"]);
+    application.set_accels_for_action("app.showPodNames", &["<Alt>P"]);
+    application.set_accels_for_action("app.showContainerNames", &["<Alt>C"]);
+    application.set_accels_for_action("app.showTimestamps", &["<Alt>T"]);
     window.set_child(Some(&horizontal_split));
     window.show();
 }

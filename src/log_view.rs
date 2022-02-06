@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
@@ -13,6 +14,7 @@ use gtk4_helper::gtk::{ComboBoxText, TextTag, TextTagTable, WrapMode};
 
 use gtk4_helper::prelude::{Command, MsgHandler};
 use gtk4_helper::component::Component;
+use gtk4_helper::gio::SimpleActionGroup;
 use gtk4_helper::glib::SourceId;
 use regex::Regex;
 use sourceview5::Buffer;
@@ -79,7 +81,7 @@ pub struct LogView {
     search_results_lbl: gtk::Label,
     current_search_match_pos: Option<usize>,
     worker_action: std::sync::mpsc::Sender<WorkerData>,
-    settings_obj: glib::Object,
+    settings_obj: glib::Object
 }
 
 #[derive(Clone)]
@@ -241,9 +243,10 @@ struct Settings {
 impl Component for LogView {
     type Msg = LogViewMsg;
     type View = gtk::Box;
-    type Input = ();
+    type Input = Rc<SimpleActionGroup>;
 
-    fn create<T: MsgHandler<Self::Msg> + Clone>(sender: T, _: Option<Self::Input>) -> Self {
+    fn create<T: MsgHandler<Self::Msg> + Clone>(sender: T, input: Option<Self::Input>) -> Self {
+        let global_actions = input.expect("Should input global actions");
         let settings = CONFIG.lock().map(|cfg| Settings {
             show_timestamps: cfg.log_view_settings.show_timestamps,
             show_container_names: cfg.log_view_settings.show_container_names,
@@ -258,13 +261,17 @@ impl Component for LogView {
             .margin_bottom(4)
             .build();
 
+        let settings_obj = settings.to_object();
+        add_log_view_settings_menu(global_actions.clone(), &toolbar, &settings_obj, sender.clone());
+
         let auto_scroll_btn = toggle_btn(sender.clone(), "Scroll", |active| LogViewMsg::EnableScroll(active));
+        global_actions.add_action(&gio::PropertyAction::new("scroll", &auto_scroll_btn, "active"));
         toolbar.append(&auto_scroll_btn);
 
         let since_selector = since_duration_selection(sender.clone());
         toolbar.append(&since_selector);
 
-        let search_results_lbl = add_search_toolbar(&toolbar, sender.clone());
+        let search_results_lbl = add_search_toolbar(global_actions.clone(), &toolbar, sender.clone());
 
         let search_tag = TextTag::new(Some(SEARCH_TAG));
         search_tag.set_background(Some(SEARCH_COLOR));
@@ -297,9 +304,6 @@ impl Component for LogView {
             .hexpand(true)
             .vexpand(true)
             .build();
-
-        let settings_obj = settings.to_object();
-        add_log_view_settings_menu(&toolbar, &settings_obj, sender.clone());
 
         let search: Vec<SearchData> = if let Ok(cfg) = CONFIG.lock() {
             for (name, highlighter)  in &cfg.highlighters {
@@ -415,7 +419,7 @@ impl Component for LogView {
             current_search_match_pos: None,
             worker_action: w_tx,
             settings,
-            settings_obj,
+            settings_obj
         }
     }
 
@@ -580,7 +584,14 @@ impl Component for LogView {
                     } else {
                         current -1
                     }
-                }).unwrap_or(self.search_match_markers.len() - 1);
+                }).unwrap_or_else(||{
+                    let len = self.search_match_markers.len();
+                    if len > 0 {
+                        self.search_match_markers.len() -1
+                    } else {
+                        0
+                    }
+                });
                 self.highlight_search_at_pos(next_pos);
             }
             LogViewMsg::SinceTimespanChanged(id) => {
@@ -634,7 +645,7 @@ async fn load_log_stream(ctx: NamespaceViewData, pods: Vec<PodViewData>, tx: Arc
     LogViewMsg::Loaded(Arc::new(exit))
 }
 
-fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(toolbar: &gtk::Box, sender: T) -> gtk::Label {
+fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(global_actions: Rc<SimpleActionGroup>,toolbar: &gtk::Box, sender: T) -> gtk::Label {
     let search_entry = gtk::SearchEntryBuilder::new()
         .placeholder_text("Search")
         .margin_end(DEFAULT_MARGIN)
@@ -655,6 +666,12 @@ fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(toolbar: &gtk::Box, sen
         }
     });
 
+    let action = gio::SimpleAction::new("search", None);
+    action.connect_activate(move |_,_|{
+        search_entry.grab_focus();
+    });
+    global_actions.add_action(&action);
+
     let prev_match_btn = gtk::ButtonBuilder::new()
         .label("Previous")
         .margin_end(DEFAULT_MARGIN)
@@ -665,6 +682,11 @@ fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(toolbar: &gtk::Box, sen
         tx(LogViewMsg::SelectPrevSearchMatch);
     });
     toolbar.append(&prev_match_btn);
+    let action = gio::SimpleAction::new("prevMatch", None);
+    action.connect_activate(move |_,_|{
+        prev_match_btn.activate();
+    });
+    global_actions.add_action(&action);
 
     let next_match_btn = gtk::ButtonBuilder::new()
         .label("Next")
@@ -676,6 +698,11 @@ fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(toolbar: &gtk::Box, sen
         tx(LogViewMsg::SelectNextSearchMatch);
     });
     toolbar.append(&next_match_btn);
+    let action = gio::SimpleAction::new("nextMatch", None);
+    action.connect_activate(move |_,_|{
+        next_match_btn.activate();
+    });
+    global_actions.add_action(&action);
 
     let search_results_lbl = gtk::Label::new(None);
     toolbar.append(&search_results_lbl);
@@ -722,18 +749,17 @@ fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
     since_selector
 }
 
-fn add_log_view_settings_menu<T: MsgHandler<LogViewMsg> + Clone>(toolbar: &gtk::Box, settings_obj: &glib::Object, sender: T) {
+fn add_log_view_settings_menu<T: MsgHandler<LogViewMsg> + Clone>(action_group: Rc<SimpleActionGroup>, toolbar: &gtk::Box, settings_obj: &glib::Object, sender: T) {
     let menu = gio::Menu::new();
-    menu.append(Some("Wrap text"), Some("logView.toggleWrapText"));
-    menu.append(Some("Show pod names"), Some("logView.showPodNames"));
-    menu.append(Some("Show container names"), Some("logView.showContainerNames"));
-    menu.append(Some("Show timestamps"), Some("logView.showTimestamps"));
-    let action_group = gio::SimpleActionGroup::new();
-    toolbar.insert_action_group("logView", Some(&action_group));
+    menu.append(Some("Wrap lines"), Some("app.toggleWrapText"));
+    menu.append(Some("Show pod names"), Some("app.showPodNames"));
+    menu.append(Some("Show container names "), Some("app.showContainerNames"));
+    menu.append(Some("Show timestamps"), Some("app.showTimestamps"));
 
     let menu_btn =gtk::MenuButtonBuilder::new()
         .icon_name("emblem-system-symbolic")
         .menu_model(&menu)
+        .margin_end(DEFAULT_MARGIN)
         .build();
 
     add_property_action(&action_group, "toggleWrapText", settings_obj, Settings::wrap_text, || LogViewMsg::ToggleWrapText, sender.clone());
