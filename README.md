@@ -6,11 +6,10 @@
 
 ![](screenshots/ktail.png)
 ## Features
-- Multiple kubernetes configurations can be added
-- Select a single pod via double click or multiple pods via Shift / Ctrl + Enter
+- Timeline view for matching highlighters
 - Log output of multiple pods gets merged and sorted by timestamp
-- Live chart for matching highlighters
-- Highlighters can be configured in the config.json
+- Multiple Kubernetes configurations can be added
+- Multiple pods can be selected via Shift / Ctrl + Enter (select a single pod via double click)
 
 For build instructions please check the linux-build.yml / windows-build.yml / macos-build.yml workflows.
 

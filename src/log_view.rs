@@ -34,6 +34,7 @@ pub const SEARCH_COLOR: &'static str = "rgba(188,150,0,0.7)";
 
 pub const SELECTED_SEARCH_TAG: &'static str = "SELECTED_SEARCH";
 pub const SELECTED_SEARCH_COLOR: &'static str = "rgba(188,150,0,1)";
+const SCROLL_TO_LINE_MARKER: &'static str = "SCROLL_TO_LINE_MARKER";
 
 pub const DEFAULT_MARGIN: i32 = 4;
 
@@ -103,6 +104,7 @@ pub enum LogViewMsg {
     LogOverview(LogOverviewMsg),
     SelectNextSearchMatch,
     SelectPrevSearchMatch,
+    ScrollToLine(i64),
 }
 
 impl LogView {
@@ -222,6 +224,7 @@ enum WorkerData {
     ProcessLogData(Vec<LogData>),
     ProcessHighlighters(Vec<SearchData>, LogData, String),
     Clear,
+    GetOffsetForTimestamp(i64),
 }
 
 use gtk4_helper::model::prelude::*;
@@ -396,6 +399,11 @@ impl Component for LogView {
                             }
                         }
                         tx(LogViewMsg::HighlightResult(res));
+                    }
+                    WorkerData::GetOffsetForTimestamp(timestamp) => {
+                        let ts = timestamp * 1000 * 1000 * 1000; // Seconds to nanoseconds
+                        let offset = search_offset(&log_entry_times, ts);
+                        tx(LogViewMsg::ScrollToLine(offset as i64));
                     }
                 }
             }
@@ -599,7 +607,21 @@ impl Component for LogView {
                 return self.reload();
             }
             LogViewMsg::LogOverview(msg) => {
+                if let LogOverviewMsg::MouseClick((timestamp, _)) = &msg {
+                    if let Err(e) = self.worker_action.send(WorkerData::GetOffsetForTimestamp(*timestamp)) {
+                        eprintln!("Could not send msg: {}", e);
+                    }
+                }
                 self.overview.update(msg);
+            }
+            LogViewMsg::ScrollToLine(idx) => {
+                if let Some(iter) = self.text_buffer.iter_at_line(idx as i32) {
+                    if let Some(m) = self.text_buffer.mark(SCROLL_TO_LINE_MARKER) {
+                        self.text_buffer.delete_mark(&m);
+                    }
+                    self.text_buffer.add_mark(&gtk::TextMark::new(Some(SCROLL_TO_LINE_MARKER), false), &iter);
+                    self.scroll_to_mark(SCROLL_TO_LINE_MARKER);
+                }
             }
         }
         Command::None

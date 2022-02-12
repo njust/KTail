@@ -1,14 +1,12 @@
 use std::collections::{HashMap};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
-use chrono::{Datelike, DateTime, Timelike, TimeZone, Utc};
+use chrono::{Datelike, DateTime, NaiveDateTime, Timelike, TimeZone, Utc};
 use gtk4_helper::component::{Command, MsgHandler};
 use gtk4_helper::prelude::Component;
-use gtk4_helper::{
-    gtk,
-    gtk::prelude::*,
-};
+use gtk4_helper::{gtk, gtk::prelude::*};
 use itertools::Itertools;
+use plotters::coord::ReverseCoordTranslate;
 
 enum WorkerData {
     Timestamp(Vec<DateTime<Utc>>),
@@ -26,6 +24,8 @@ pub struct ChartData {
     start_date: Option<DateTime<Utc>>,
     end_date: Option<DateTime<Utc>>,
     data: HashMap<String, HashMap<DateTime<Utc>, u32>>,
+    click_pos: Option<(f64, f64)>,
+    mouse_pos: Option<(f64, f64)>,
 }
 
 #[derive(Clone)]
@@ -34,6 +34,7 @@ pub enum LogOverviewMsg {
     Clear,
     HighlightResults(HighlightResultData),
     LogData(Vec<DateTime<Utc>>),
+    MouseClick((i64, u32)),
 }
 
 impl Component for LogOverview {
@@ -46,13 +47,50 @@ impl Component for LogOverview {
         let chart_data = Arc::new(Mutex::new(ChartData {
             start_date: None,
             end_date: None,
-            data: HashMap::new()
+            data: HashMap::new(),
+            click_pos: None,
+            mouse_pos: None,
         }));
 
+
+        let mouse_move_events = gtk::EventControllerMotion::new();
         let cd = chart_data.clone();
+        let tx = sender.clone();
+        mouse_move_events.connect_motion(move |_, x, y| {
+            if let Ok(mut cd) = cd.lock() {
+                cd.mouse_pos = Some((x, y));
+                tx(LogOverviewMsg::Redraw);
+            }
+        });
+
+        let cd = chart_data.clone();
+        let tx = sender.clone();
+        mouse_move_events.connect_leave(move |_| {
+            if let Ok(mut cd) = cd.lock() {
+                cd.mouse_pos.take();
+                tx(LogOverviewMsg::Redraw);
+            }
+        });
+        drawing_area.add_controller(&mouse_move_events);
+
+        let click = gtk::GestureClick::new();
+        let cd = chart_data.clone();
+        click.connect_released(move |_gesture, _p,x,y| {
+            if let Ok(mut cd) = cd.lock() {
+                cd.click_pos = Some((x, y));
+            }
+        });
+
+        drawing_area.add_controller(&click);
+        let cd = chart_data.clone();
+        let tx = sender.clone();
         drawing_area.set_draw_func(move |_, ctx, width, height| {
-            if let Ok(cd) = cd.lock().map(|cd| cd.clone()) {
-                draw(cd, &ctx, width, height);
+            if let Ok(mut cd) = cd.lock() {
+                let cdc = cd.clone();
+                cd.click_pos.take();
+                if let Some((dt, val)) = draw(cdc, &ctx, width, height) {
+                    tx(LogOverviewMsg::MouseClick((dt, val)));
+                }
             }
         });
 
@@ -145,6 +183,7 @@ impl Component for LogOverview {
                     eprintln!("Failed to send worker data: {}", e);
                 }
             }
+            LogOverviewMsg::MouseClick(_) => {}
         }
 
         Command::None
@@ -160,11 +199,20 @@ use plotters_cairo::CairoBackend;
 use crate::config::CONFIG;
 use crate::log_view::{HighlightResultData};
 
+
+const Y_LABEL_AREA_SIZE: i32 = 25;
+const X_LABEL_AREA_SIZE: i32 = 25;
+const MARGIN_TOP: i32 = 15;
+const MARGIN_LEFT: i32 = 10;
+const LINE_HEIGHT: i32 = 2;
+const X_START: f64 = (Y_LABEL_AREA_SIZE + MARGIN_LEFT) as f64;
+
 fn draw(
     chart_data: ChartData,
-    ctx: &gtk::cairo::Context, width: i32, height: i32) {
+    ctx: &gtk::cairo::Context, width: i32, height: i32) -> Option<(i64, u32)>
+{
     let root = CairoBackend::new(ctx, (width as u32, height as u32)).unwrap().into_drawing_area();
-
+    let mut resolved = None;
     if let (Some(start), Some(end)) = (chart_data.start_date, chart_data.end_date) {
         let max = CONFIG.lock().ok()
             .and_then(|cfg| chart_data.data.iter()
@@ -172,32 +220,57 @@ fn draw(
             .flat_map(| l| l.1)
             .map(|i|*i.1).max()).unwrap_or(0);
         let mut chart = match ChartBuilder::on(&root)
-            .x_label_area_size(25)
-            .y_label_area_size(25)
-            .margin_top(5)
+            .x_label_area_size(X_LABEL_AREA_SIZE)
+            .y_label_area_size(Y_LABEL_AREA_SIZE)
+            .margin_top(MARGIN_TOP)
             .margin_bottom(2)
-            .margin_left(10)
+            .margin_left(MARGIN_LEFT)
             .margin_right(10)
-            .build_cartesian_2d(start..end, 0u32..max + 1)
+            .build_cartesian_2d(start.timestamp()..end.timestamp(), 0u32..max + 1)
         {
             Ok(chart) => chart,
             Err(e) => {
                 eprintln!("Could not build chart: {}", e);
-                return;
+                return None;
             }
         };
+
+        if let Some((x,y )) = chart_data.mouse_pos {
+            if x > X_START as f64 {
+                if let Some((dt, _)) = chart.as_coord_spec().reverse_translate((x as i32, y as i32)) {
+                    for y in (MARGIN_TOP - LINE_HEIGHT)..(height - (Y_LABEL_AREA_SIZE + LINE_HEIGHT)) {
+                        if let Err(e) = root.draw_pixel((x as i32, y), &BLACK.mix(0.3)) {
+                            eprintln!("Could not draw pixel: {}", e);
+                        }
+                    }
+
+                    let ts = TextStyle::from("13 px Monospace");
+                    let time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(dt, 0), Utc);
+                    if let Err(e) = root.draw_text(&format!("{:02}:{:02}:{:02}", time.hour(), time.minute(), time.second()), &ts, (x as i32 - 25, 1)) {
+                        eprintln!("Could not draw text: {}", e);
+                    }
+                }
+            }
+        }
+
+        if let Some((x, y)) = chart_data.click_pos {
+            if let Some((dt, val)) = chart.as_coord_spec().reverse_translate((x as i32, y as i32)) {
+                resolved = Some((dt, val));
+            }
+        }
 
         if let Err(e) = chart
             .configure_mesh()
             .disable_x_mesh()
             .bold_line_style(&WHITE.mix(0.3))
             .x_label_formatter(&|dt| {
+                let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(*dt, 0), Utc);
                 let time = dt.time();
-                format!("{:02}:{:02}", time.hour(), time.minute())
+                format!("{:02}:{:02}:{:02}", time.hour(), time.minute(), time.second())
             })
             .draw() {
             eprintln!("Could not draw chart: {}", e);
-            return;
+            return None;
         }
 
         if let Ok(cfg) = CONFIG.lock() {
@@ -210,7 +283,7 @@ fn draw(
                     if let (Some(r), Some(g), Some(b)) = (r,g,b)  {
                         let color = plotters::style::RGBColor(r,g,b);
                         if let Err(e) = chart.draw_series(
-                        LineSeries::new(data.iter().sorted_by_key(|(i, _)| **i).map(|(k, v)| (k.clone(), *v)),
+                        LineSeries::new(data.iter().sorted_by_key(|(i, _)| **i).map(|(k, v)| (k.timestamp(), *v)),
                         color.stroke_width(2))
                         ) {
                             eprintln!("Could not draw line series: {}", e);
@@ -221,5 +294,7 @@ fn draw(
                 }
             }
         }
+
     }
+    resolved
 }
