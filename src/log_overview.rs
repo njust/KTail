@@ -174,6 +174,7 @@ impl Component for LogOverview {
                     cd.start_date.take();
                     cd.end_date.take();
                     cd.data.clear();
+                    self.drawing_area.queue_draw();
                 }
             }
             LogOverviewMsg::LogData(timestamp) => {
