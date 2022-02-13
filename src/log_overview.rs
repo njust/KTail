@@ -52,6 +52,10 @@ impl Component for LogOverview {
             mouse_pos: None,
         }));
 
+        let tx = sender.clone();
+        drawing_area.connect_resize(move |_,_,_|{
+            tx(LogOverviewMsg::Redraw);
+        });
 
         let mouse_move_events = gtk::EventControllerMotion::new();
         let cd = chart_data.clone();
@@ -75,9 +79,11 @@ impl Component for LogOverview {
 
         let click = gtk::GestureClick::new();
         let cd = chart_data.clone();
+        let tx = sender.clone();
         click.connect_released(move |_gesture, _p,x,y| {
             if let Ok(mut cd) = cd.lock() {
                 cd.click_pos = Some((x, y));
+                tx(LogOverviewMsg::Redraw);
             }
         });
 
@@ -94,14 +100,9 @@ impl Component for LogOverview {
             }
         });
 
-        let tx = sender.clone();
-        gtk::glib::timeout_add_local(std::time::Duration::from_millis(500), move || {
-            tx(LogOverviewMsg::Redraw);
-            gtk::glib::Continue(true)
-        });
-
         let (s, r) = std::sync::mpsc::channel::<WorkerData>();
         let cd = chart_data.clone();
+        let tx = sender.clone();
         std::thread::spawn(move|| {
             while let Ok(data) = r.recv() {
                 match data {
@@ -133,6 +134,7 @@ impl Component for LogOverview {
                                 }
                             }
                         }
+                        tx(LogOverviewMsg::Redraw);
                     }
                     WorkerData::Highlight(results) => {
                         let ts = results.timestamp;
@@ -148,6 +150,7 @@ impl Component for LogOverview {
                                     series_data.insert(timestamp, 1);
                                 }
                             }
+                            tx(LogOverviewMsg::Redraw);
                         }
                     }
                 }
@@ -216,9 +219,9 @@ fn draw(
     if let (Some(start), Some(end)) = (chart_data.start_date, chart_data.end_date) {
         let max = CONFIG.lock().ok()
             .and_then(|cfg| chart_data.data.iter()
-            .filter(|i| cfg.highlighters.contains_key(i.0))
-            .flat_map(| l| l.1)
-            .map(|i|*i.1).max()).unwrap_or(0);
+                .filter(|i| cfg.highlighters.contains_key(i.0))
+                .flat_map(| l| l.1)
+                .map(|i|*i.1).max()).unwrap_or(0);
         let mut chart = match ChartBuilder::on(&root)
             .x_label_area_size(X_LABEL_AREA_SIZE)
             .y_label_area_size(Y_LABEL_AREA_SIZE)
@@ -283,13 +286,13 @@ fn draw(
                     if let (Some(r), Some(g), Some(b)) = (r,g,b)  {
                         let color = plotters::style::RGBColor(r,g,b);
                         if let Err(e) = chart.draw_series(
-                        LineSeries::new(data.iter().sorted_by_key(|(i, _)| **i).map(|(k, v)| (k.timestamp(), *v)),
-                        color.stroke_width(2))
+                            LineSeries::new(data.iter().sorted_by_key(|(i, _)| **i).map(|(k, v)| (k.timestamp(), *v)),
+                                            color.stroke_width(2))
                         ) {
                             eprintln!("Could not draw line series: {}", e);
                         }
                     } else {
-                      eprintln!("Could not parse highlighter color: {}", highlighter.color);
+                        eprintln!("Could not parse highlighter color: {}", highlighter.color);
                     }
                 }
             }

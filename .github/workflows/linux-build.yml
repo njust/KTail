@@ -20,31 +20,91 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y python3-pip libxkbcommon-dev libcairo2-dev libwayland-dev libxrandr-dev libxi-dev libxcursor-dev libxdamage-dev libxinerama-dev libgstreamer1.0-dev libgstreamer-plugins-bad1.0-dev ninja-build
       - name: Install python modules
         run: sudo python3 -m pip install meson==0.57.1
-      - name: Clone gtk repo
-        run: git clone https://gitlab.gnome.org/GNOME/gtksourceview.git
+
+      - name: Clone pango repo
+        run: git clone https://gitlab.gnome.org/GNOME/pango.git
       - name: Checkout tag
-        working-directory: gtksourceview
-        run: git checkout tags/5.2.0
+        working-directory: pango
+        run: git checkout tags/1.49.4
+      - name: Cache pango build
+        uses: actions/cache@v2
+        id: pango-build-cache
+        with:
+          path: |
+            /tmp/pangoBuild
+            /opt/pango
+          key: ${{ runner.os }}-${{ hashFiles('pango/.git/HEAD') }}
+      - name: Create pango build dir
+        if: steps.pango-build-cache.outputs.cache-hit != 'true'
+        run: mkdir -p pangoBuild
+        working-directory: /tmp
+      - name: Configure pango
+        if: steps.pango-build-cache.outputs.cache-hit != 'true'
+        run: meson --prefix=/opt/pango /tmp/pangoBuild
+        working-directory: pango
+      - name: Build pango
+        if: steps.pango-build-cache.outputs.cache-hit != 'true'
+        run: ninja && ninja install
+        working-directory: /tmp/pangoBuild
+
+      - name: Clone gtk repo
+        run: git clone https://gitlab.gnome.org/GNOME/gtk.git
+      - name: Checkout tag
+        working-directory: gtk
+        run: git checkout tags/4.5.0
       - name: Cache gtk build
         uses: actions/cache@v2
         id: gtk-build-cache
         with:
           path: |
-            /tmp/gtkbuild
+            /tmp/gtkBuild
             /opt/gtk
-          key: ${{ runner.os }}-${{ hashFiles('gtksourceview/.git/HEAD') }}
-      - name: Create build dir
+          key: ${{ runner.os }}-${{ hashFiles('gtk/.git/HEAD') }}
+      - name: Create gtk build dir
         if: steps.gtk-build-cache.outputs.cache-hit != 'true'
-        run: mkdir -p gtkbuild
+        run: mkdir -p gtkBuild
         working-directory: /tmp
-      - name: Configure
+      - name: Configure gtk
         if: steps.gtk-build-cache.outputs.cache-hit != 'true'
-        run: meson --prefix=/opt/gtk /tmp/gtkbuild
-        working-directory: gtksourceview
+        run: meson --prefix=/opt/gtk /tmp/gtkBuild
+        working-directory: gtk
       - name: Build gtk
         if: steps.gtk-build-cache.outputs.cache-hit != 'true'
         run: ninja && ninja install
-        working-directory: /tmp/gtkbuild
+        working-directory: /tmp/gtkBuild
+        env:
+          PKG_CONFIG_PATH: /opt/pango/lib/x86_64-linux-gnu/pkgconfig
+
+      - name: Clone gtk sourceview repo
+        run: git clone https://gitlab.gnome.org/GNOME/gtksourceview.git
+      - name: Checkout tag
+        working-directory: gtksourceview
+        run: git checkout tags/5.2.0
+      - name: Cache gtk sourceview build
+        uses: actions/cache@v2
+        id: gtk-sourceview-build-cache
+        with:
+          path: |
+            /tmp/gtkSourceviewBuild
+            /opt/gtkSourceView
+          key: ${{ runner.os }}-${{ hashFiles('gtksourceview/.git/HEAD') }}
+      - name: Create sourceview build dir
+        if: steps.gtk-sourceview-build-cache.outputs.cache-hit != 'true'
+        run: mkdir -p gtkSourceviewBuild
+        working-directory: /tmp
+      - name: Configure sourceview
+        if: steps.gtk-sourceview-build-cache.outputs.cache-hit != 'true'
+        run: meson --prefix=/opt/gtkSourceView /tmp/gtkSourceviewBuild
+        env:
+          PKG_CONFIG_PATH: /opt/gtk/lib/x86_64-linux-gnu/pkgconfig
+        working-directory: gtksourceview
+      - name: Build gtk sourceview
+        if: steps.gtk-sourceview-build-cache.outputs.cache-hit != 'true'
+        run: ninja && ninja install
+        working-directory: /tmp/gtkSourceviewBuild
+        env:
+          PKG_CONFIG_PATH: /opt/pango/lib/x86_64-linux-gnu/pkgconfig:/opt/gtk/lib/x86_64-linux-gnu/pkgconfig
+
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
         with:
@@ -56,12 +116,13 @@ jobs:
       - name: Cargo build
         run: cargo build --release
         env:
-          PKG_CONFIG_PATH: /opt/gtk/lib/x86_64-linux-gnu/pkgconfig
+          PKG_CONFIG_PATH: /opt/pango/lib/x86_64-linux-gnu/pkgconfig:/opt/gtk/lib/x86_64-linux-gnu/pkgconfig:/opt/gtkSourceView/lib/x86_64-linux-gnu/pkgconfig
           LD_LIBRARY_PATH: /opt/gtk/lib/x86_64-linux-gnu
       - name: Install AppImageTool
         run: wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage && sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool && chmod +x /usr/local/bin/appimagetool
       - name: Create AppImage
         run: ./createAppImage.sh
+
       - uses: actions/upload-artifact@v2
         with:
           name: KTail-x64.AppImage
