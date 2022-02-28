@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use gtk4_helper::{
     prelude::*,
     gtk,
@@ -26,11 +27,12 @@ use gtk4_helper::{
 
 use crate::column_view_helper;
 use crate::cluster_list_view::NamespaceViewData;
-use crate::util::WidgetLoadingWrapper;
+use crate::result::AppResult;
+use crate::util::{show_and_log_error, WidgetLoadingWrapper};
 
 #[derive(Clone, Debug)]
 pub enum PodListViewMsg {
-    Loaded(Vec<PodViewData>),
+    Loaded(AppResult<Vec<PodViewData>>),
     PodSelected(Vec<PodViewData>),
     ClusterSelected(NamespaceViewData)
 }
@@ -38,14 +40,15 @@ pub enum PodListViewMsg {
 pub struct PodListView {
     pod_list_data: gio::ListStore,
     pod_list_view: WidgetLoadingWrapper<gtk::ScrolledWindow>,
+    app_wnd: Rc<ApplicationWindow>,
 }
 
 impl Component for PodListView {
     type Msg = PodListViewMsg;
     type View = gtk::Box;
-    type Input = ();
+    type Input = Rc<ApplicationWindow>;
 
-    fn create<T: MsgHandler<Self::Msg> + Clone>(sender: T, _: Option<Self::Input>) -> Self {
+    fn create<T: MsgHandler<Self::Msg> + Clone>(sender: T, input: Option<Self::Input>) -> Self {
         let (column_view, list_store) =
             column_view_helper::create_column_view(PodViewData::static_type(), column_view_helper::multi_selection_model);
 
@@ -72,19 +75,28 @@ impl Component for PodListView {
             .child(&column_view)
             .build());
 
+        let app_wnd = input.expect("Input is required!");
         Self {
             pod_list_view,
-            pod_list_data: list_store
+            pod_list_data: list_store,
+            app_wnd
         }
     }
 
     fn update(&mut self, msg: Self::Msg) -> Command<Self::Msg> {
         match msg {
-            PodListViewMsg::Loaded(pvd) => {
+            PodListViewMsg::Loaded(res) => {
                 self.pod_list_view.set_is_loading(false);
-                for pod_data in pvd {
-                    let obj = pod_data.to_object();
-                    self.pod_list_data.append(&obj);
+                match res {
+                    Ok(pvd) => {
+                        for pod_data in pvd {
+                            let obj = pod_data.to_object();
+                            self.pod_list_data.append(&obj);
+                        }
+                    }
+                    Err(e) => {
+                        show_and_log_error("Failed to load pods", &e.to_string(), Some(&*self.app_wnd.clone()));
+                    }
                 }
             }
             PodListViewMsg::ClusterSelected(cluster) => {
@@ -104,8 +116,8 @@ impl Component for PodListView {
 
 async fn load_data(cluster: NamespaceViewData) -> PodListViewMsg {
     let client = crate::log_stream::k8s_client_with_timeout(&cluster.config_path, &cluster.context);
-    let pods = if let Ok(pods) = client.pods(&cluster.name).await {
-        pods.into_iter().map(|p| {
+    let res = client.pods(&cluster.name).await.and_then(|pods| {
+        Ok(pods.into_iter().map(|p| {
             //TODO: Currently gtk helper model does not support Vec<String>
             let container_names = p.spec.containers.iter().map(|c| c.name.as_str()).collect::<Vec<&str>>().join(";");
             let pod_name = p.metadata.name.unwrap_or("failed".to_string());
@@ -113,9 +125,7 @@ async fn load_data(cluster: NamespaceViewData) -> PodListViewMsg {
                 container_names,
                 name: pod_name,
             }
-        }).collect()
-    } else {
-        vec![]
-    };
-    PodListViewMsg::Loaded(pods)
+        }).collect())
+    }).map_err(|e| e.into());
+    PodListViewMsg::Loaded(res)
 }

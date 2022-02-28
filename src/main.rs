@@ -12,6 +12,7 @@ use crate::cluster_list_view::{ClusterListInputData, ClusterListView, ClusterLis
 use crate::config::{CONFIG};
 use crate::gtk::Inhibit;
 use crate::log_view::{LogView, LogViewMsg};
+use flexi_logger::{Duplicate, FileSpec, Logger, WriteMode, detailed_format};
 
 mod k8s_client;
 mod log_stream;
@@ -23,6 +24,8 @@ mod util;
 mod config;
 mod log_text_contrast;
 mod log_overview;
+mod result;
+mod dirs;
 
 use crate::pod_list_view::{PodListView, PodListViewMsg};
 
@@ -35,9 +38,9 @@ pub enum AppMsg {
 fn build_ui(application: &gtk::Application) {
     let window = gtk::ApplicationWindow::new(application);
     window.connect_close_request(|_| {
-        println!("Saving config");
+        log::info!("Stopping");
         if let Err(e) = CONFIG.lock().map(|cfg| cfg.save()) {
-            eprintln!("Could not save config: {}", e);
+            log::error!("Could not save config: {}", e);
         }
         Inhibit(false)
     });
@@ -49,9 +52,9 @@ fn build_ui(application: &gtk::Application) {
 
     let (sender, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
     let tx = sender.clone();
-    let mut pod_list = PodListView::new(move |m| {
+    let mut pod_list = PodListView::new_with_data(move |m| {
         tx.send(AppMsg::PodListViewMsg(m)).expect("Could not send msg");
-    });
+    }, window.clone());
 
     let tx = sender.clone();
     let mut log_view = LogView::new_with_data(move |m| {
@@ -110,6 +113,23 @@ fn build_ui(application: &gtk::Application) {
 }
 
 fn main() {
+
+    if let Err(e) = Logger::try_with_str("info")
+        .and_then(|l| l
+            .format_for_files(detailed_format)
+            .log_to_file(FileSpec::default()
+                .directory(dirs::log_dir())
+            )
+            .duplicate_to_stderr(Duplicate::Error)
+            .create_symlink(dirs::log_dir().join("ktail.log"))
+            .print_message()
+            .write_mode(WriteMode::Direct)
+            .start()) {
+        log::error!("Could not initialize logger: {}", e);
+    }
+
+    log::info!("Starting");
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

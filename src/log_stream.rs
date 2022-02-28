@@ -33,7 +33,7 @@ pub async fn log_stream(k8s_client: &KubeClient, namespace: &str, pods: Vec<PodV
             let pod = pod.clone();
 
             tokio::task::spawn(async move {
-                println!("Start tail for {} ({})", pod.name, container);
+                log::info!("Start tail for {} ({})", pod.name, container);
                 let res = k8s_client.logs(&namespace, &pod.name, Some(&container), Some(LogOptions {
                     since_seconds: Some(since_seconds),
                     follow: Some(true),
@@ -51,16 +51,16 @@ pub async fn log_stream(k8s_client: &KubeClient, namespace: &str, pods: Vec<PodV
                         {
                             let log_data = ma.name("data").unwrap().as_str().to_string();
                             if let Err(e ) = tx.send(LogData { pod: pod.name.clone(), container: container.clone(), text: log_data, timestamp }).await {
-                                eprintln!("Failed to send data: {}", e);
+                                log::error!("Failed to send data: {}", e);
                             }
                         }
                         else {
-                            eprintln!("Invalid log data data without timestamp")
+                            log::error!("Invalid log data data without timestamp")
                         }
                         buffer.clear();
                     }
                 }
-                println!("Stopped tail for: {} ({})", pod.name, container);
+                log::info!("Stopped tail for: {} ({})", pod.name, container);
             });
         }
     }

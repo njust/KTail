@@ -112,7 +112,7 @@ impl LogView {
         self.overview.update(LogOverviewMsg::Clear);
         self.clear_search_markers();
         if let Err(e) = self.worker_action.send(WorkerData::Clear) {
-            eprintln!("Could not send msg to worker: {}", e);
+            log::error!("Could not send msg to worker: {}", e);
         }
 
         let (start, end) = self.text_buffer.bounds();
@@ -482,10 +482,10 @@ impl Component for LogView {
                         }
 
                         if let Err(e) = self.worker_action.send(WorkerData::ProcessHighlighters(highlighters, data, id)) {
-                            eprintln!("Could not send msg to worker: {}", e);
+                            log::error!("Could not send msg to worker: {}", e);
                         }
                     } else {
-                        eprintln!("No iter at line: {}", idx);
+                        log::error!("No iter at line: {}", idx);
                     }
                 }
             }
@@ -609,7 +609,7 @@ impl Component for LogView {
             LogViewMsg::LogOverview(msg) => {
                 if let LogOverviewMsg::MouseClick((timestamp, _)) = &msg {
                     if let Err(e) = self.worker_action.send(WorkerData::GetOffsetForTimestamp(*timestamp)) {
-                        eprintln!("Could not send msg: {}", e);
+                        log::error!("Could not send msg: {}", e);
                     }
                 }
                 self.overview.update(msg);

@@ -3,7 +3,6 @@ use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use anyhow::{Result, anyhow};
 use std::fs;
-use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 
 const CONFIG_NAME: &'static str = "config.json";
@@ -67,16 +66,12 @@ impl Default for Config {
 
 
 impl Config {
-   fn config_path() -> Option<PathBuf> {
-      directories::ProjectDirs::from("de", "", "KTail").as_ref().map(|pd| pd.config_dir().to_path_buf())
-   }
-
    pub fn save(&self) -> Result<()> {
       let json = serde_json::to_string_pretty(self)?;
-      let path = Self::config_path().ok_or(anyhow!("No config path!"))?;
+      let path = crate::dirs::config_dir().ok_or(anyhow!("No config path!"))?;
       if !path.exists() {
          if let Err(e) = fs::create_dir_all(&path) {
-            eprintln!("Could not create config dir: {}", e);
+            log::error!("Could not create config dir: {}", e);
          }
       }
       fs::write(path.join(CONFIG_NAME), &json)?;
@@ -84,7 +79,7 @@ impl Config {
    }
 
    pub fn load() -> Result<Self> {
-      let path = Self::config_path().ok_or(anyhow!("No config path!"))?;
+      let path = crate::dirs::config_dir().ok_or(anyhow!("No config path!"))?;
       let json = fs::read_to_string(path.join(CONFIG_NAME))?;
       Ok(serde_json::from_str(&json)?)
    }

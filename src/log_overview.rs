@@ -179,12 +179,12 @@ impl Component for LogOverview {
             }
             LogOverviewMsg::LogData(timestamp) => {
                 if let Err(e) = self.worker.send(WorkerData::Timestamp(timestamp)) {
-                    eprintln!("Failed to send worker data: {}", e);
+                    log::error!("Failed to send worker data: {}", e);
                 }
             }
             LogOverviewMsg::HighlightResults(results) => {
                 if let Err(e) = self.worker.send(WorkerData::Highlight(results)) {
-                    eprintln!("Failed to send worker data: {}", e);
+                    log::error!("Failed to send worker data: {}", e);
                 }
             }
             LogOverviewMsg::MouseClick(_) => {}
@@ -234,7 +234,7 @@ fn draw(
         {
             Ok(chart) => chart,
             Err(e) => {
-                eprintln!("Could not build chart: {}", e);
+                log::error!("Could not build chart: {}", e);
                 return None;
             }
         };
@@ -244,14 +244,14 @@ fn draw(
                 if let Some((dt, _)) = chart.as_coord_spec().reverse_translate((x as i32, y as i32)) {
                     for y in (MARGIN_TOP - LINE_HEIGHT)..(height - (Y_LABEL_AREA_SIZE + LINE_HEIGHT)) {
                         if let Err(e) = root.draw_pixel((x as i32, y), &BLACK.mix(0.3)) {
-                            eprintln!("Could not draw pixel: {}", e);
+                            log::error!("Could not draw pixel: {}", e);
                         }
                     }
 
                     let ts = TextStyle::from("13 px Monospace");
                     let time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(dt, 0), Utc);
                     if let Err(e) = root.draw_text(&format!("{:02}:{:02}:{:02}", time.hour(), time.minute(), time.second()), &ts, (x as i32 - 25, 1)) {
-                        eprintln!("Could not draw text: {}", e);
+                        log::error!("Could not draw text: {}", e);
                     }
                 }
             }
@@ -273,7 +273,7 @@ fn draw(
                 format!("{:02}:{:02}:{:02}", time.hour(), time.minute(), time.second())
             })
             .draw() {
-            eprintln!("Could not draw chart: {}", e);
+            log::error!("Could not draw chart: {}", e);
             return None;
         }
 
@@ -290,10 +290,10 @@ fn draw(
                             LineSeries::new(data.iter().sorted_by_key(|(i, _)| **i).map(|(k, v)| (k.timestamp(), *v)),
                                             color.stroke_width(2))
                         ) {
-                            eprintln!("Could not draw line series: {}", e);
+                            log::error!("Could not draw line series: {}", e);
                         }
                     } else {
-                        eprintln!("Could not parse highlighter color: {}", highlighter.color);
+                        log::error!("Could not parse highlighter color: {}", highlighter.color);
                     }
                 }
             }

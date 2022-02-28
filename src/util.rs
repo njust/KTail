@@ -4,7 +4,8 @@ use gtk4_helper::{
     gtk::Widget,
     gtk::prelude::*,
 };
-use gtk4_helper::gtk::Orientation;
+use gtk4_helper::gtk::{ApplicationWindow, ButtonsType, MessageType, Orientation};
+use crate::gtk::DialogFlags;
 
 pub struct WidgetLoadingWrapper<T: IsA<Widget>> {
     widget: T,
@@ -149,4 +150,20 @@ pub fn search_offset<T: PartialOrd>(arr: &Vec<T>, search: T) -> usize {
     }
 
     return mid;
+}
+
+
+
+pub fn show_and_log_error(title: &str, msg: &str, wnd: Option<&ApplicationWindow>) {
+    log::error!("{}: {}", title, msg);
+    let dlg = gtk::MessageDialog::new::<ApplicationWindow>(
+        wnd,
+        DialogFlags::MODAL,
+        MessageType::Error,
+        ButtonsType::Ok,
+        msg );
+    dlg.set_title(Some(title));
+    dlg.run_async(|dlg, _| {
+        dlg.close();
+    });
 }

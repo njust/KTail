@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::rc::Rc;
 use gtk4_helper::prelude::{Command, MsgHandler};
+
 use gtk4_helper::{
     gtk,
     gio,
@@ -15,7 +16,10 @@ use crate::{ApplicationWindow, column_view_helper};
 use crate::column_view_helper::ButtonOptions;
 use crate::config::{CONFIG};
 use crate::k8s_client::KubeConfig;
-use crate::util::WidgetLoadingWrapper;
+use crate::result::AppResult;
+use crate::util::{WidgetLoadingWrapper, show_and_log_error};
+
+
 
 pub struct ClusterListView {
     container: gtk::Box,
@@ -36,7 +40,7 @@ pub enum ClusterListViewMsg {
     AddConfig,
     RemoveConfig(u32),
     ConfigAdded(Option<PathBuf>),
-    NamespacesLoaded(Vec<NamespaceViewData>),
+    NamespacesLoaded(AppResult<Vec<NamespaceViewData>>),
 }
 
 #[model]
@@ -195,10 +199,17 @@ impl Component for ClusterListView {
             }
             ClusterListViewMsg::NamespacesLoaded(data) => {
                 self.namespace_list_view.set_is_loading(false);
-                self.namespace_list_data.remove_all();
-                for namespace in data {
-                    let obj = NamespaceViewData::to_object(&namespace);
-                    self.namespace_list_data.append(&obj);
+                match data {
+                    Ok(data) => {
+                        self.namespace_list_data.remove_all();
+                        for namespace in data {
+                            let obj = NamespaceViewData::to_object(&namespace);
+                            self.namespace_list_data.append(&obj);
+                        }
+                    }
+                    Err(e) => {
+                        show_and_log_error("Failed to load namespaces", &e.to_string(), Some(&*self.app_wnd.clone()));
+                    }
                 }
             }
             ClusterListViewMsg::RemoveConfig(pos) => {
@@ -224,17 +235,14 @@ impl Component for ClusterListView {
 
 async fn load_namespaces(config_path: String, context: String) -> ClusterListViewMsg {
     let client = crate::log_stream::k8s_client_with_timeout(&config_path, &context);
-    if let Ok(namespaces) = client.namespaces().await {
-        let data = namespaces.iter().map(|data| NamespaceViewData {
+    let res = client.namespaces().await.and_then(|data| {
+        Ok(data.iter().map(|data| NamespaceViewData {
             name: data.metadata.name.as_ref().unwrap().clone(),
             config_path: config_path.clone(),
             context: context.clone()
-        });
-        ClusterListViewMsg::NamespacesLoaded(data.collect())
-    } else {
-        ClusterListViewMsg::NamespacesLoaded(vec![])
-    }
-
+        }).collect())
+    }).map_err(|e| e.into());
+    ClusterListViewMsg::NamespacesLoaded(res)
 }
 
 fn kube_config_list<T: MsgHandler<ClusterListViewMsg> + Clone>(sender: T) -> (ColumnView, ListStore) {
