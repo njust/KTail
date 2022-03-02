@@ -19,13 +19,13 @@ pub struct LogOverview {
     worker: Sender<WorkerData>,
 }
 
-#[derive(Clone)]
 pub struct ChartData {
     start_date: Option<DateTime<Utc>>,
     end_date: Option<DateTime<Utc>>,
     data: HashMap<String, HashMap<DateTime<Utc>, u32>>,
     click_pos: Option<(f64, f64)>,
     mouse_pos: Option<(f64, f64)>,
+    series_styles: HashMap<String, SeriesStyle>,
 }
 
 #[derive(Clone)]
@@ -37,6 +37,10 @@ pub enum LogOverviewMsg {
     MouseClick((i64, u32)),
 }
 
+struct SeriesStyle {
+    pub color: plotters::style::RGBColor,
+}
+
 impl Component for LogOverview {
     type Msg = LogOverviewMsg;
     type View = gtk::DrawingArea;
@@ -44,12 +48,30 @@ impl Component for LogOverview {
 
     fn create<T: MsgHandler<Self::Msg> + Clone>(sender: T, _input: Option<Self::Input>) -> Self {
         let drawing_area = gtk::DrawingArea::new();
+        let series_styles: HashMap<String, SeriesStyle> = if let Ok(cfg) = CONFIG.lock() {
+            cfg.highlighters.iter().map(|h| {
+                let parts = &mut h.color[4..h.color.len() - 1].split(",");
+                let r = parts.next().and_then(|p| p.trim().parse::<u8>().ok()).unwrap_or_default();
+                let g = parts.next().and_then(|p| p.trim().parse::<u8>().ok()).unwrap_or_default();
+                let b = parts.next().and_then(|p| p.trim().parse::<u8>().ok()).unwrap_or_default();
+                let color = plotters::style::RGBColor(r, g, b);
+
+                (h.name.clone(), SeriesStyle {
+                    color
+                })
+            }).collect()
+        } else {
+            log::warn!("Could not get config lock");
+            HashMap::new()
+        };
+
         let chart_data = Arc::new(Mutex::new(ChartData {
             start_date: None,
             end_date: None,
             data: HashMap::new(),
             click_pos: None,
             mouse_pos: None,
+            series_styles
         }));
 
         let tx = sender.clone();
@@ -92,11 +114,10 @@ impl Component for LogOverview {
         let tx = sender.clone();
         drawing_area.set_draw_func(move |_, ctx, width, height| {
             if let Ok(mut cd) = cd.lock() {
-                let cdc = cd.clone();
-                cd.click_pos.take();
-                if let Some((dt, val)) = draw(cdc, &ctx, width, height) {
+                if let Some((dt, val)) = draw(&*cd, &ctx, width, height) {
                     tx(LogOverviewMsg::MouseClick((dt, val)));
                 }
+                cd.click_pos.take();
             }
         });
 
@@ -139,8 +160,8 @@ impl Component for LogOverview {
                     WorkerData::Highlight(results) => {
                         let ts = results.timestamp;
                         if let Ok(mut chart_data) = cd.lock() {
-                            for tag in results.tags {
-                                let series_data = chart_data.data.entry(tag).or_insert(HashMap::new());
+                            for highlighter_name in results.matching_highlighters {
+                                let series_data = chart_data.data.entry(highlighter_name).or_insert(HashMap::new());
                                 let time = ts.time();
 
                                 let timestamp = Utc.ymd(ts.year(), ts.month(), ts.day()).and_hms(time.hour(), time.minute(), 0);
@@ -200,7 +221,7 @@ impl Component for LogOverview {
 
 use plotters::prelude::*;
 use plotters_cairo::CairoBackend;
-use crate::config::CONFIG;
+use crate::config::{CONFIG};
 use crate::log_view::{HighlightResultData};
 
 
@@ -212,17 +233,17 @@ const LINE_HEIGHT: i32 = 2;
 const X_START: f64 = (Y_LABEL_AREA_SIZE + MARGIN_LEFT) as f64;
 
 fn draw(
-    chart_data: ChartData,
+    chart_data: &ChartData,
     ctx: &gtk::cairo::Context, width: i32, height: i32) -> Option<(i64, u32)>
 {
     let root = CairoBackend::new(ctx, (width as u32, height as u32)).unwrap().into_drawing_area();
     let mut resolved = None;
     if let (Some(start), Some(end)) = (chart_data.start_date, chart_data.end_date) {
-        let max = CONFIG.lock().ok()
-            .and_then(|cfg| chart_data.data.iter()
-                .filter(|i| cfg.highlighters.contains_key(i.0))
-                .flat_map(| l| l.1)
-                .map(|i|*i.1).max()).unwrap_or(0);
+        let max = chart_data.data.iter()
+            .filter(|i| chart_data.series_styles.contains_key(i.0.as_str()))
+            .flat_map(| l| l.1)
+            .map(|i|*i.1).max().unwrap_or(0);
+
         let mut chart = match ChartBuilder::on(&root)
             .x_label_area_size(X_LABEL_AREA_SIZE)
             .y_label_area_size(Y_LABEL_AREA_SIZE)
@@ -277,24 +298,13 @@ fn draw(
             return None;
         }
 
-        if let Ok(cfg) = CONFIG.lock() {
-            for (name, data) in &chart_data.data {
-                if let Some(highlighter) = cfg.highlighters.get(name) {
-                    let parts = &mut highlighter.color[4..highlighter.color.len() -1].split(",");
-                    let r = parts.next().and_then(|p| p.parse::<u8>().ok());
-                    let g = parts.next().and_then(|p| p.parse::<u8>().ok());
-                    let b = parts.next().and_then(|p| p.parse::<u8>().ok());
-                    if let (Some(r), Some(g), Some(b)) = (r,g,b)  {
-                        let color = plotters::style::RGBColor(r,g,b);
-                        if let Err(e) = chart.draw_series(
-                            LineSeries::new(data.iter().sorted_by_key(|(i, _)| **i).map(|(k, v)| (k.timestamp(), *v)),
-                                            color.stroke_width(2))
-                        ) {
-                            log::error!("Could not draw line series: {}", e);
-                        }
-                    } else {
-                        log::error!("Could not parse highlighter color: {}", highlighter.color);
-                    }
+        for (name, data) in &chart_data.data {
+            if let Some(series_style) = chart_data.series_styles.get(name.as_str()) {
+                if let Err(e) = chart.draw_series(
+                    LineSeries::new(data.iter().sorted_by_key(|(i, _)| **i).map(|(k, v)| (k.timestamp(), *v)),
+                                    series_style.color.stroke_width(2))
+                ) {
+                    log::error!("Could not draw line series: {}", e);
                 }
             }
         }

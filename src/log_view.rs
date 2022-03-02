@@ -59,9 +59,9 @@ impl SearchResultData {
 
 #[derive(Clone)]
 pub struct HighlightResultData {
-    pub marker: String,
+    pub text_marker_id: String,
     pub timestamp: DateTime<Utc>,
-    pub tags: Vec<String>,
+    pub matching_highlighters: Vec<String>,
 }
 
 pub struct LogView {
@@ -309,8 +309,8 @@ impl Component for LogView {
             .build();
 
         let search: Vec<SearchData> = if let Ok(cfg) = CONFIG.lock() {
-            for (name, highlighter)  in &cfg.highlighters {
-                let tag = TextTag::new(Some(name));
+            for highlighter  in &cfg.highlighters {
+                let tag = TextTag::new(Some(&highlighter.name));
                 tag.set_background(Some(&highlighter.color));
                 let background = tag.background_rgba();
                 tag.set_foreground_rgba(matching_foreground_color_for_background(&background).as_ref());
@@ -323,11 +323,11 @@ impl Component for LogView {
             );
 
             let mut search_data = vec![];
-            for (name, highlighter) in &cfg.highlighters {
+            for highlighter in &cfg.highlighters {
                 if let Ok(regex) = Regex::new(&highlighter.search) {
                     search_data.push(SearchData {
                         search: regex,
-                        name: name.clone(),
+                        name: highlighter.name.clone(),
                     });
                 }
             }
@@ -386,16 +386,16 @@ impl Component for LogView {
                     WorkerData::Clear => {
                         log_entry_times.clear();
                     }
-                    WorkerData::ProcessHighlighters(highlighters, data, marker) => {
+                    WorkerData::ProcessHighlighters(highlighters, data, text_marker_id) => {
                         let mut res = HighlightResultData {
-                            marker,
+                            text_marker_id,
                             timestamp: data.timestamp,
-                            tags: vec![]
+                            matching_highlighters: vec![]
                         };
 
                         for highlighter in highlighters {
                             if highlighter.search.is_match(&data.text) {
-                                res.tags.push(highlighter.name)
+                                res.matching_highlighters.push(highlighter.name)
                             }
                         }
                         tx(LogViewMsg::HighlightResult(res));
@@ -476,12 +476,12 @@ impl Component for LogView {
                             });
                         }
 
-                        let id = Uuid::new_v4().to_string();
+                        let text_marker_id = Uuid::new_v4().to_string();
                         if let Some(iter) = self.text_buffer.iter_at_line(insert_at.line() - 1) {
-                            self.text_buffer.add_mark(&gtk::TextMark::new(Some(&id), false), &iter);
+                            self.text_buffer.add_mark(&gtk::TextMark::new(Some(&text_marker_id), false), &iter);
                         }
 
-                        if let Err(e) = self.worker_action.send(WorkerData::ProcessHighlighters(highlighters, data, id)) {
+                        if let Err(e) = self.worker_action.send(WorkerData::ProcessHighlighters(highlighters, data, text_marker_id)) {
                             log::error!("Could not send msg to worker: {}", e);
                         }
                     } else {
@@ -491,18 +491,19 @@ impl Component for LogView {
             }
             LogViewMsg::HighlightResult(res) => {
                 self.overview.update(LogOverviewMsg::HighlightResults(res.clone()));
-                for search in res.tags {
-                    if let Some(start) = self.text_buffer.mark(&res.marker).map(|m| self.text_buffer.iter_at_mark(&m)) {
+                for highlighter_name in res.matching_highlighters {
+                    if let Some(start) = self.text_buffer.mark(&res.text_marker_id).map(|m| self.text_buffer.iter_at_mark(&m)) {
                         let mut end = start.clone();
                         end.forward_to_line_end();
-                        self.text_buffer.apply_tag_by_name(&search, &start, &end);
-                        if &search == SEARCH_TAG {
+                        self.text_buffer.apply_tag_by_name(&highlighter_name, &start, &end);
+
+                        if &highlighter_name == SEARCH_TAG {
                             self.add_search_marker(&start);
                         }
                     }
                 }
                 self.update_search_label();
-                self.text_buffer.delete_mark_by_name(&res.marker);
+                self.text_buffer.delete_mark_by_name(&res.text_marker_id);
             }
             LogViewMsg::Search(query) => {
                 let (start, end) = self.text_buffer.bounds();
