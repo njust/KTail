@@ -110,6 +110,7 @@ impl KubeClient {
 
     pub async fn pods(&self, namespace: &str) -> Result<Vec<Pod>> {
         let url = format!("{}api/v1/namespaces/{}/pods", self.base_url, namespace);
+        log::info!("Loading pods");
         self.load_data::<Pod>(&url).await.map(|r| r.items)
     }
 
@@ -161,6 +162,7 @@ impl KubeClient {
     #[allow(dead_code)]
     pub async fn namespaces(&self) -> Result<Vec<Namespace>> {
         let url = format!("{}api/v1/namespaces", self.base_url);
+        log::info!("Loading namespaces");
         self.load_data::<Namespace>(&url).await.map(|r| r.items)
     }
 }
