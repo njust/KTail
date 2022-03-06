@@ -1,5 +1,6 @@
 #![windows_subsystem = "windows"]
 
+use std::env;
 use std::rc::Rc;
 use gtk4_helper::{
     prelude::*,
@@ -113,8 +114,8 @@ fn build_ui(application: &gtk::Application) {
 }
 
 fn main() {
-
-    if let Err(e) = Logger::try_with_str("info")
+    let log_level = env::var("LOG_LEVEL").unwrap_or("info".to_string());
+    if let Err(e) = Logger::try_with_str(&log_level)
         .and_then(|l| l
             .format_for_files(detailed_format)
             .log_to_file(FileSpec::default()

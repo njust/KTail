@@ -2,13 +2,15 @@ use std::time::Duration;
 use reqwest::{self, header, ClientBuilder};
 use openssl::pkcs12::Pkcs12;
 use url::Url;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use crate::k8s_client::{ClusterContext};
 use serde::{Deserialize, Serialize};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus, NamespaceSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use log::LevelFilter;
+use serde::de::DeserializeOwned;
 
-use tokio_stream::Stream;
+use tokio_stream::{Stream};
 
 // Problems with empty password on MacOs
 const PKCS12_PWD: &'static str = "a8c51701-bc96-44a4-a3bc-9b6034d1f8bd";
@@ -108,9 +110,7 @@ impl KubeClient {
 
     pub async fn pods(&self, namespace: &str) -> Result<Vec<Pod>> {
         let url = format!("{}api/v1/namespaces/{}/pods", self.base_url, namespace);
-        let response = self.client.get(&url)
-            .send().await?;
-        Ok(response.json::<ListResult<Pod>>().await.map(|r| r.items)?)
+        self.load_data::<Pod>(&url).await.map(|r| r.items)
     }
 
     pub async fn logs(&self, namespace: &str, pod: &str, container: Option<&str>, options: Option<LogOptions>) -> Result<impl Stream<Item=reqwest::Result<bytes::Bytes>>> {
@@ -135,11 +135,33 @@ impl KubeClient {
         Ok(response)
     }
 
+    async fn load_data<T: DeserializeOwned>(&self, url: &str) -> Result<ListResult<T>> {
+        let response = self.client.get(url).send().await?;
+        if !response.status().is_success() {
+            let msg = format!("Loading data failed with response code: {}", response.status());
+            log::error!("{}", msg);
+            if let Some(body) = response.text().await.ok() {
+                log::error!("Response body: {}", body);
+            }
+            bail!(msg)
+        } else {
+            if log::max_level() >= LevelFilter::Trace {
+                log::trace!("Request url: {}", url);
+                log::trace!("Response code: {}", response.status());
+
+                let data = response.text().await?;
+                log::trace!("Response body: {}", data);
+                Ok(serde_json::from_str::<ListResult<T>>(&data)?)
+            } else {
+                Ok(response.json::<ListResult<T>>().await?)
+            }
+        }
+    }
+
     #[allow(dead_code)]
     pub async fn namespaces(&self) -> Result<Vec<Namespace>> {
         let url = format!("{}api/v1/namespaces", self.base_url);
-        let response = self.client.get(&url).send().await?;
-        Ok(response.json::<ListResult<Namespace>>().await.map(|r| r.items)?)
+        self.load_data::<Namespace>(&url).await.map(|r| r.items)
     }
 }
 
