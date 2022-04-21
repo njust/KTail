@@ -65,6 +65,7 @@ pub fn create_column<P, T, I>(column_view: &ColumnView, ty: glib::Type, property
     let prop_exp = gtk::PropertyExpression::new(ty, NONE_EXPRESSION, property);
     let mut col_builder = gtk::ColumnViewColumnBuilder::new()
         .title(title)
+        .resizable(true)
         .factory(&column_factory);
 
     let sorter = sorter_factory(&prop_exp);

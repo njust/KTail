@@ -27,7 +27,6 @@ use crate::log_overview::{LogOverview, LogOverviewMsg};
 use crate::log_stream::LogData;
 use crate::log_text_contrast::matching_foreground_color_for_background;
 use crate::pod_list_view::PodViewData;
-use crate::util::search_offset;
 
 pub const SEARCH_TAG: &'static str = "SEARCH";
 pub const SEARCH_COLOR: &'static str = "rgba(188,150,0,0.7)";
@@ -46,7 +45,7 @@ pub struct SearchData {
 
 #[derive(Clone)]
 pub struct SearchResultData {
-    pub lines: Vec<usize>,
+    pub lines: Vec<(usize, LogData)>,
 }
 
 impl SearchResultData {
@@ -77,6 +76,7 @@ pub struct LogView {
     highlighters: Vec<SearchData>,
     scroll_handler: Option<SourceId>,
     overview: ComponentContainer<LogOverview>,
+    search_result_view: ComponentContainer<SearchResultView>,
     settings: Settings,
     search_match_markers: Vec<String>,
     search_results_lbl: gtk::Label,
@@ -220,14 +220,9 @@ impl LogView {
     }
 }
 
-enum WorkerData {
-    ProcessLogData(Vec<LogData>),
-    ProcessHighlighters(Vec<SearchData>, LogData, String),
-    Clear,
-    GetOffsetForTimestamp(i64),
-}
-
 use gtk4_helper::model::prelude::*;
+use crate::log_data_worker::WorkerData;
+use crate::search_result_view::{SearchResultView, SearchResultViewMsg};
 
 // macro attributes in `#[derive]` output are unstable
 // https://github.com/rust-lang/rust/issues/81119
@@ -242,6 +237,7 @@ struct Settings {
     #[field]
     show_timestamps: bool,
 }
+
 
 impl Component for LogView {
     type Msg = LogViewMsg;
@@ -344,10 +340,20 @@ impl Component for LogView {
             tx(LogViewMsg::LogOverview(msg));
         });
 
+        let search_result = SearchResultView::new(move |msg| {
+        });
+
+        let lower_pane = gtk::PanedBuilder::new()
+            .orientation(gtk::Orientation::Vertical)
+            .start_child(&scroll_wnd)
+            .end_child(search_result.view())
+            .position(500)
+            .build();
+
         let pane = gtk::PanedBuilder::new()
             .orientation(gtk::Orientation::Vertical)
             .start_child(overview.view())
-            .end_child(&scroll_wnd)
+            .end_child(&lower_pane)
             .position(110)
             .build();
 
@@ -355,59 +361,7 @@ impl Component for LogView {
         container.append(&toolbar);
         container.append(&pane);
 
-        let (w_tx, w_rx) = std::sync::mpsc::channel::<WorkerData>();
-        let tx = sender.clone();
-        std::thread::spawn(move || {
-            let mut log_entry_times: Vec<i64> = vec![];
-            while let Ok(data) = w_rx.recv() {
-                match data {
-                    WorkerData::ProcessLogData(data) => {
-                        let mut res = vec![];
-                        for datum in data {
-                            let timestamp = datum.timestamp.timestamp_nanos();
-                            let mut offset = search_offset(&log_entry_times, timestamp);
-                            let len = log_entry_times.len();
-                            while offset < len && log_entry_times[offset] == timestamp {
-                                offset += 1;
-                            }
-                            log_entry_times.insert(offset, timestamp);
-                            // We need to insert a extra entry for lines starting with a linefeed or a new line
-                            if datum.text.starts_with("\r") || datum.text.starts_with("\n") {
-                                // Sourceview seems to ignore those
-                                if datum.text != "\r\n" && datum.text != "\n" {
-                                    log_entry_times.insert(offset, timestamp);
-                                }
-                            }
-                            res.push((offset as i64, datum));
-                        }
-
-                        tx(LogViewMsg::LogDataProcessed(res))
-                    }
-                    WorkerData::Clear => {
-                        log_entry_times.clear();
-                    }
-                    WorkerData::ProcessHighlighters(highlighters, data, text_marker_id) => {
-                        let mut res = HighlightResultData {
-                            text_marker_id,
-                            timestamp: data.timestamp,
-                            matching_highlighters: vec![]
-                        };
-
-                        for highlighter in highlighters {
-                            if highlighter.search.is_match(&data.text) {
-                                res.matching_highlighters.push(highlighter.name)
-                            }
-                        }
-                        tx(LogViewMsg::HighlightResult(res));
-                    }
-                    WorkerData::GetOffsetForTimestamp(timestamp) => {
-                        let ts = timestamp * 1000 * 1000 * 1000; // Seconds to nanoseconds
-                        let offset = search_offset(&log_entry_times, ts);
-                        tx(LogViewMsg::ScrollToLine(offset as i64));
-                    }
-                }
-            }
-        });
+        let worker_action = crate::log_data_worker::start_worker(sender.clone());
 
         Self {
             container,
@@ -425,9 +379,10 @@ impl Component for LogView {
             search_match_markers: vec![],
             search_results_lbl,
             current_search_match_pos: None,
-            worker_action: w_tx,
+            worker_action,
             settings,
-            settings_obj
+            settings_obj,
+            search_result_view: search_result
         }
     }
 
@@ -448,7 +403,7 @@ impl Component for LogView {
                 let timestamps: Vec<DateTime<Utc>> = data.iter().map(|d| d.timestamp.clone()).collect();
                 self.overview.update(LogOverviewMsg::LogData(timestamps));
                 if let Err(e) = self.worker_action.send(WorkerData::ProcessLogData(data)) {
-                    eprint!("Could not send msg to worker: {}", e);
+                    log::error!("Could not send msg to worker: {}", e);
                 }
             }
             LogViewMsg::LogDataProcessed(res) => {
@@ -514,15 +469,14 @@ impl Component for LogView {
                     self.active_search.take();
                 } else {
                     self.active_search = Regex::new(&format!("(?i){}", query)).ok();
-                    let text = self.text_buffer.text(&start, &end, false).to_string();
                     if let Some(query) = &self.active_search {
-                        return self.run_async(search( query.clone(), text));
+                        self.worker_action.send(WorkerData::Search(query.clone()));
                     }
                 }
             }
             LogViewMsg::SearchResult(res) => {
-                for idx in res.lines {
-                    if let Some(start) = self.text_buffer.iter_at_line(idx as i32) {
+                for (idx, data) in &res.lines {
+                    if let Some(start) = self.text_buffer.iter_at_line(*idx as i32) {
                         self.add_search_marker(&start);
                         let mut end = start.clone();
                         end.forward_to_line_end();
@@ -530,7 +484,7 @@ impl Component for LogView {
                     }
                 }
                 self.update_search_label();
-
+                self.search_result_view.update(SearchResultViewMsg::SearchResults(res));
             }
             LogViewMsg::ContextSelected(ctx) => {
                 self.selected_context = Some(ctx);
@@ -633,24 +587,6 @@ impl Component for LogView {
     }
 }
 
-async fn search(query: Regex, text: String) -> LogViewMsg {
-    let mut lines = text.lines();
-    let mut search_results = SearchResultData::new();
-    let mut idx = 0;
-    while let Some(line) = lines.next() {
-        // Some log data contained \r without \n as new line
-        // Sourceview handles it as a new line anyway
-        let sub_lines = line.split("\r");
-        for sub_line in sub_lines {
-            if query.is_match(sub_line) {
-                search_results.lines.push(idx);
-            }
-            idx += 1;
-        }
-    }
-    LogViewMsg::SearchResult(search_results)
-}
-
 async fn load_log_stream(ctx: NamespaceViewData, pods: Vec<PodViewData>, tx: Arc<dyn MsgHandler<LogViewMsg>>, since_seconds: u32) -> LogViewMsg {
     let client = crate::log_stream::k8s_client(&ctx.config_path, &ctx.context);
     let (log_stream, exit) = crate::log_stream::log_stream(&client, &ctx.name, pods, since_seconds).await;
@@ -743,6 +679,8 @@ const SINCE_8H: u32 = 60*60*8;
 const SINCE_10H: u32 = 60*60*10;
 const SINCE_12H: u32 = 60*60*12;
 const SINCE_24H: u32 = 60*60*24;
+const SINCE_36H: u32 = 60*60*36;
+const SINCE_48H: u32 = 60*60*48;
 
 fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
     let since_selector = gtk::ComboBoxTextBuilder::new()
@@ -760,6 +698,8 @@ fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
     since_selector.append(Some(&SINCE_10H.to_string()), "10 hours");
     since_selector.append(Some(&SINCE_12H.to_string()), "12 hours");
     since_selector.append(Some(&SINCE_24H.to_string()), "24 hours");
+    since_selector.append(Some(&SINCE_36H.to_string()), "36 hours");
+    since_selector.append(Some(&SINCE_48H.to_string()), "48 hours");
     since_selector.set_active_id(Some(&SINCE_10M.to_string()));
 
     since_selector.connect_changed(move |a| {

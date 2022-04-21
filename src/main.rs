@@ -27,6 +27,8 @@ mod log_text_contrast;
 mod log_overview;
 mod result;
 mod dirs;
+mod search_result_view;
+mod log_data_worker;
 
 use crate::pod_list_view::{PodListView, PodListViewMsg};
 
