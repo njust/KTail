@@ -40,7 +40,7 @@ jobs:
       - name: Cargo build
         run: msys2 -c 'cargo build --release'
       - name: Download theme
-        run: msys2 -c 'wget https://github.com/vinceliuice/Orchis-theme/raw/master/release/Orchis.tar.xz && tar --xz -xvf Orchis.tar.xz Orchis-light-compact/gtk-4.0 Orchis-light-compact/COPYING Orchis-light-compact/index.theme'
+        run: msys2 -c 'wget https://github.com/vinceliuice/Orchis-theme/raw/master/release/Orchis.tar.xz && tar --xz -xvf Orchis.tar.xz Orchis-Light-Compact/gtk-4.0 Orchis-Light-Compact/COPYING Orchis-Light-Compact/index.theme'
       - name: Create Bundle
         run: .\createWindowsBundle.ps1
         shell: powershell
