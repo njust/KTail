@@ -31,45 +31,31 @@ fn minf(a: f32, b: f32) -> f32 {
     return b;
 }
 
+
 fn contrast(col1: &gdk::RGBA, col2: &gdk::RGBA) -> f32 {
-    let lum1 = luminance(col1.red, col1.green, col1.blue);
-    let lum2 = luminance(col2.red, col2.green, col2.blue);
+    let lum1 = luminance(col1.red(), col1.green(), col1.blue());
+    let lum2 = luminance(col2.red(), col2.green(), col2.blue());
     let brightest = maxf(lum1, lum2);
     let darkest = minf(lum1, lum2);
     return (brightest + 0.05) / (darkest + 0.05);
 }
 
-const RGBA_WHITE: gdk::RGBA = gdk::RGBA {
-    red: 1.0,
-    blue: 1.0,
-    green: 1.0,
-    alpha: 1.0
-};
 
-const RGBA_GREYISH: gdk::RGBA = gdk::RGBA {
-    red: 0.4,
-    blue: 0.4,
-    green: 0.4,
-    alpha: 1.0
-};
-
-const RGBA_BLACK: gdk::RGBA = gdk::RGBA {
-    red: 0.0,
-    blue: 0.0,
-    green: 0.0,
-    alpha: 1.0
-};
 
 pub fn matching_foreground_color_for_background(color: &Option<gdk::RGBA>) -> Option<gdk::RGBA> {
+    let white: gdk::RGBA = gdk::RGBA::new(1.0, 1.0, 1.0, 1.0);
+    let grey: gdk::RGBA = gdk::RGBA::new(0.4, 0.4, 0.4, 1.0);
+    let black: gdk::RGBA = gdk::RGBA::new(0.0, 0.0, 0.0, 1.0);
+
     match color {
-        None => Some(RGBA_BLACK),
+        None => Some(black),
         Some(color) => {
-            let c1 = contrast(color, &RGBA_WHITE);
-            let c2 = contrast(color, &RGBA_GREYISH); // Add a bias toward white
+            let c1 = contrast(color, &white);
+            let c2 = contrast(color, &grey); // Add a bias toward white
             if c1 > c2 {
-                return Some(RGBA_WHITE);
+                return Some(white);
             }
-            return Some(RGBA_BLACK);
+            return Some(black);
         }
     }
 }

@@ -11,7 +11,7 @@ license = "Copyright © 2022 Nico Just"
 [dependencies]
 #gtk4-helper = {path = "./gtk4-helper/gtk4-helper"}
 gtk4-helper = {git = "https://github.com/njust/gtk4-helper.git"}
-sourceview5 = "0.3.0"
+sourceview5 = "0.4.0"
 reqwest = { version = "0.11.4", features = ["json", "native-tls", "stream"] }
 stream-cancel = "0.6.1"
 openssl = "0.10.30"
@@ -39,7 +39,8 @@ flexi_logger = {version = "0.22.3", features = ["use_chrono_for_offset"]}
 
 chrono = "0.4.19"
 plotters = "0.3.1"
-plotters-cairo = {git = "https://github.com/njust/plotters-cairo.git"}
+#plotters-cairo = {git = "https://github.com/njust/plotters-cairo.git"}
+plotters-cairo = {path = "./plotters-cairo"}
 
 # MacOS metadata
 [package.metadata.bundle]

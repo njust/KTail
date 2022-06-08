@@ -104,17 +104,17 @@ impl Component for ClusterListView {
         toolbar.append(&add_btn);
 
         let (config_list_view, config_list_data) = kube_config_list(sender.clone());
-        let config_scroll_wnd = gtk::ScrolledWindowBuilder::new()
+        let config_scroll_wnd = gtk::builders::ScrolledWindowBuilder::new()
             .child(&config_list_view)
             .build();
 
         let (context_list_view, context_list_data) = cluster_context_list(sender.clone());
-        let ctx_scroll_wnd = gtk::ScrolledWindowBuilder::new()
+        let ctx_scroll_wnd = gtk::builders::ScrolledWindowBuilder::new()
             .vexpand(true)
             .child(&context_list_view)
             .build();
 
-        let pane1 = gtk::PanedBuilder::new()
+        let pane1 = gtk::builders::PanedBuilder::new()
             .orientation(Orientation::Vertical)
             .position(110)
             .vexpand(true)
@@ -123,12 +123,12 @@ impl Component for ClusterListView {
             .build();
 
         let (namespace_list_view, namespace_list_data) = namespace_list(sender.clone());
-        let namespace_wnd = WidgetLoadingWrapper::new(gtk::ScrolledWindowBuilder::new()
+        let namespace_wnd = WidgetLoadingWrapper::new(gtk::builders::ScrolledWindowBuilder::new()
             .vexpand(true)
             .child(&namespace_list_view)
             .build());
 
-        let pane2 = gtk::PanedBuilder::new()
+        let pane2 = gtk::builders::PanedBuilder::new()
             .orientation(Orientation::Vertical)
             .position(230)
             .vexpand(true)

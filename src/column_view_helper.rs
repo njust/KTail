@@ -6,7 +6,7 @@ use gtk4_helper::{
 };
 use gtk4_helper::gio::ListStore;
 
-use gtk4_helper::gtk::{NONE_EXPRESSION, NONE_SORTER, ColumnView, Align, Sorter, SelectionModel, SortListModel};
+use gtk4_helper::gtk::{ColumnView, Align, Sorter, SelectionModel, SortListModel, Expression};
 use crate::gtk::PropertyExpression;
 
 pub fn string_sorter(pe: &PropertyExpression) -> gtk::StringSorter {
@@ -26,10 +26,9 @@ pub fn create_column_view<P, T>(item_type: glib::types::Type, sel_model_factory:
           T: Fn(&SortListModel) -> P
 {
     let list_store = gio::ListStore::new(item_type);
-    let sort_view = gtk::SortListModel::new(Some(&list_store), NONE_SORTER);
-
+    let sort_view = gtk::SortListModel::new(Some(&list_store), Option::<&Sorter>::None);
     let sel_model = sel_model_factory(&sort_view);
-    let column_view = gtk::ColumnViewBuilder::new()
+    let column_view = gtk::builders::ColumnViewBuilder::new()
         .model(&sel_model)
         .build();
 
@@ -42,7 +41,7 @@ pub fn create_column_view<P, T>(item_type: glib::types::Type, sel_model_factory:
 
 fn create_item_label(item: &gtk::ListItem, property: &str) {
     if let Some(obj) = item.item() {
-        let lbl = gtk::LabelBuilder::new()
+        let lbl = gtk::builders::LabelBuilder::new()
             .halign(Align::Start)
             .build();
 
@@ -62,8 +61,8 @@ pub fn create_column<P, T, I>(column_view: &ColumnView, ty: glib::Type, property
         item_factory(item, property)
     });
 
-    let prop_exp = gtk::PropertyExpression::new(ty, NONE_EXPRESSION, property);
-    let mut col_builder = gtk::ColumnViewColumnBuilder::new()
+    let prop_exp = gtk::PropertyExpression::new(ty, Option::<&Expression>::None, property);
+    let mut col_builder = gtk::builders::ColumnViewColumnBuilder::new()
         .title(title)
         .factory(&column_factory);
 
@@ -91,7 +90,7 @@ pub fn create_button_column<I>(column_view: &ColumnView, title: &str, click_hand
     column_factory.connect_bind(move |_, item| {
         let click_handler = click_handler.clone();
         let pos = item.position();
-        let mut btn = gtk::ButtonBuilder::new()
+        let mut btn = gtk::builders::ButtonBuilder::new()
             .halign(Align::Center);
 
         if let Some(lbl) = opt.label {
@@ -109,7 +108,7 @@ pub fn create_button_column<I>(column_view: &ColumnView, title: &str, click_hand
         item.set_child(Some(&btn));
     });
 
-    let col_builder = gtk::ColumnViewColumnBuilder::new()
+    let col_builder = gtk::builders::ColumnViewColumnBuilder::new()
         .title(title)
         .factory(&column_factory);
 

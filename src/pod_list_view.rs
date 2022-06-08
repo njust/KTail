@@ -70,7 +70,7 @@ impl Component for PodListView {
 
         column_view_helper::create_label_column(&column_view, PodViewData::static_type(), PodViewData::name, "Pod", column_view_helper::string_sorter);
 
-        let pod_list_view = WidgetLoadingWrapper::new(gtk::ScrolledWindowBuilder::new()
+        let pod_list_view = WidgetLoadingWrapper::new(gtk::builders::ScrolledWindowBuilder::new()
             .vexpand(true)
             .child(&column_view)
             .build());

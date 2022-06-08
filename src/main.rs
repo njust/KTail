@@ -73,11 +73,11 @@ fn build_ui(application: &gtk::Application) {
 
     let vertical_split = gtk::Paned::new(Orientation::Vertical);
     vertical_split.set_position(400);
-    vertical_split.set_start_child(cluster_list.view());
-    vertical_split.set_end_child(pod_list.view());
+    vertical_split.set_start_child(Some(cluster_list.view()));
+    vertical_split.set_end_child(Some(pod_list.view()));
 
-    horizontal_split.set_start_child(&vertical_split);
-    horizontal_split.set_end_child(log_view.view());
+    horizontal_split.set_start_child(Some(&vertical_split));
+    horizontal_split.set_end_child(Some(log_view.view()));
 
     rx.attach(None, move |msg| {
         match msg {
@@ -126,7 +126,7 @@ fn main() {
             .print_message()
             .write_mode(WriteMode::Direct)
             .start()) {
-        log::error!("Could not initialize logger: {}", e);
+        log::error!("Could not initialize logger: {:?}", e);
     }
 
     log::info!("Starting");

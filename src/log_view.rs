@@ -188,12 +188,13 @@ impl LogView {
                 let buffer = text_view.buffer();
                 let (_, mut end) = buffer.bounds();
                 text_view.scroll_to_iter(&mut end, 0.0, true, 0.5, 0.5);
-                glib::Continue(true)
+                Continue(true)
             });
             self.scroll_handler = Some(handle);
         } else {
-            if let Some(sh)  = self.scroll_handler.take() {
-                glib::source::source_remove(sh);
+            if let Some(_sh)  = self.scroll_handler.take() {
+                // TODO: glib::source::source_remove was removed..
+                // glib::source::source_remove(sh);
             }
         }
     }
@@ -209,12 +210,12 @@ impl LogView {
 
                 text_view.scroll_to_iter(&mut iter, 0.0, true, 0.5, 0.5);
                 if visible_rect.intersect(&iter_loc).is_none() {
-                    glib::Continue(true)
+                    Continue(true)
                 } else {
-                    glib::Continue(false)
+                    Continue(false)
                 }
             } else {
-                glib::Continue(false)
+                Continue(false)
             }
         });
     }
@@ -257,7 +258,7 @@ impl Component for LogView {
             wrap_text: cfg.log_view_settings.wrap_text
         }).unwrap_or(Settings::default());
 
-        let toolbar = gtk::BoxBuilder::new()
+        let toolbar = gtk::builders::BoxBuilder::new()
             .margin_start(4)
             .margin_end(4)
             .margin_top(4)
@@ -344,7 +345,7 @@ impl Component for LogView {
             tx(LogViewMsg::LogOverview(msg));
         });
 
-        let pane = gtk::PanedBuilder::new()
+        let pane = gtk::builders::PanedBuilder::new()
             .orientation(gtk::Orientation::Vertical)
             .start_child(overview.view())
             .end_child(&scroll_wnd)
@@ -669,7 +670,7 @@ async fn load_log_stream(ctx: NamespaceViewData, pods: Vec<PodViewData>, tx: Arc
 }
 
 fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(global_actions: Rc<SimpleActionGroup>,toolbar: &gtk::Box, sender: T) -> gtk::Label {
-    let search_entry = gtk::SearchEntryBuilder::new()
+    let search_entry = gtk::builders::SearchEntryBuilder::new()
         .placeholder_text("Search")
         .margin_end(DEFAULT_MARGIN)
         .build();
@@ -695,7 +696,7 @@ fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(global_actions: Rc<Simp
     });
     global_actions.add_action(&action);
 
-    let prev_match_btn = gtk::ButtonBuilder::new()
+    let prev_match_btn = gtk::builders::ButtonBuilder::new()
         .label("Previous")
         .margin_end(DEFAULT_MARGIN)
         .build();
@@ -711,7 +712,7 @@ fn add_search_toolbar<T: MsgHandler<LogViewMsg> + Clone>(global_actions: Rc<Simp
     });
     global_actions.add_action(&action);
 
-    let next_match_btn = gtk::ButtonBuilder::new()
+    let next_match_btn = gtk::builders::ButtonBuilder::new()
         .label("Next")
         .margin_end(DEFAULT_MARGIN)
         .build();
@@ -745,7 +746,7 @@ const SINCE_12H: u32 = 60*60*12;
 const SINCE_24H: u32 = 60*60*24;
 
 fn since_duration_selection<T: MsgHandler<LogViewMsg>>(tx: T) -> ComboBoxText {
-    let since_selector = gtk::ComboBoxTextBuilder::new()
+    let since_selector = gtk::builders::ComboBoxTextBuilder::new()
         .margin_end(DEFAULT_MARGIN)
         .build();
 
@@ -779,7 +780,7 @@ fn add_log_view_settings_menu<T: MsgHandler<LogViewMsg> + Clone>(action_group: R
     menu.append(Some("Show container names "), Some("app.showContainerNames"));
     menu.append(Some("Show timestamps"), Some("app.showTimestamps"));
 
-    let menu_btn =gtk::MenuButtonBuilder::new()
+    let menu_btn =gtk::builders::MenuButtonBuilder::new()
         .icon_name("emblem-system-symbolic")
         .menu_model(&menu)
         .margin_end(DEFAULT_MARGIN)
@@ -808,7 +809,7 @@ fn add_property_action<T: MsgHandler<LogViewMsg> + Clone, M: 'static + Fn() -> L
 }
 
 fn toggle_btn<T: MsgHandler<LogViewMsg>, M: 'static + Fn(bool) -> LogViewMsg>(tx: T, label: &str, msg: M) -> ToggleButton {
-    let toggle_btn = gtk::ToggleButtonBuilder::new()
+    let toggle_btn = gtk::builders::ToggleButtonBuilder::new()
         .label(label)
         .margin_end(DEFAULT_MARGIN)
         .build();

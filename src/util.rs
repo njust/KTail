@@ -22,7 +22,7 @@ impl<T: IsA<Widget>> WidgetLoadingWrapper<T> {
             .width_request(32)
             .build();
 
-        let spinner_wrapper = gtk::BoxBuilder::new()
+        let spinner_wrapper = gtk::builders::BoxBuilder::new()
             .orientation(gtk::Orientation::Vertical)
             .valign(gtk::Align::Center)
             .visible(false)
@@ -31,7 +31,7 @@ impl<T: IsA<Widget>> WidgetLoadingWrapper<T> {
 
         spinner_wrapper.append(&spinner);
 
-        let container = gtk::BoxBuilder::new()
+        let container = gtk::builders::BoxBuilder::new()
             .orientation(Orientation::Vertical)
             .vexpand(true)
             .build();
@@ -67,7 +67,7 @@ pub struct IfElseWidget<A: IsA<Widget>, B: IsA<Widget>> {
 #[allow(dead_code)]
 impl<A: IsA<Widget>, B: IsA<Widget>> IfElseWidget<A, B> {
     pub fn new(widget_a: A, widget_b: B) -> Self {
-        let container = gtk::BoxBuilder::new()
+        let container = gtk::builders::BoxBuilder::new()
             .orientation(Orientation::Vertical)
             .vexpand(true)
             .build();
@@ -156,7 +156,7 @@ pub fn search_offset<T: PartialOrd>(arr: &Vec<T>, search: T) -> usize {
 
 pub fn show_and_log_error(title: &str, msg: &str, wnd: Option<&ApplicationWindow>) {
     log::error!("{}: {}", title, msg);
-    let dlg = gtk::MessageDialog::new::<ApplicationWindow>(
+    let dlg = gtk::MessageDialog::new(
         wnd,
         DialogFlags::MODAL,
         MessageType::Error,
