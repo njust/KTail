@@ -39,8 +39,8 @@ flexi_logger = {version = "0.22.3", features = ["use_chrono_for_offset"]}
 
 chrono = "0.4.19"
 plotters = "0.3.1"
-#plotters-cairo = {git = "https://github.com/njust/plotters-cairo.git"}
-plotters-cairo = {path = "./plotters-cairo"}
+plotters-cairo = {git = "https://github.com/njust/plotters-cairo.git"}
+#plotters-cairo = {path = "./plotters-cairo"}
 
 # MacOS metadata
 [package.metadata.bundle]

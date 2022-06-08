@@ -837,6 +837,7 @@ dependencies = [
 [[package]]
 name = "gtk4-helper"
 version = "0.1.0"
+source = "git+https://github.com/njust/gtk4-helper.git#3bf88cb1d87288f065b509f9270578f69536ad53"
 dependencies = [
  "futures",
  "gtk4",
@@ -849,6 +850,7 @@ dependencies = [
 [[package]]
 name = "gtk4-helper-macros"
 version = "0.1.0"
+source = "git+https://github.com/njust/gtk4-helper.git#3bf88cb1d87288f065b509f9270578f69536ad53"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -1538,6 +1540,7 @@ dependencies = [
 [[package]]
 name = "plotters-cairo"
 version = "0.3.1"
+source = "git+https://github.com/njust/plotters-cairo.git#8b81fedc9f6007c5834a5e73f3735fc3e9c1f367"
 dependencies = [
  "cairo-rs",
  "plotters-backend",
