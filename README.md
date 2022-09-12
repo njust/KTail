@@ -4,7 +4,8 @@
 [![Windows Build](https://github.com/njust/KTail/actions/workflows/windows-build.yml/badge.svg)](https://github.com/njust/KTail/actions/workflows/windows-build.yml)
 [![MacOS Build](https://github.com/njust/KTail/actions/workflows/macos-build.yml/badge.svg)](https://github.com/njust/KTail/actions/workflows/macos-build.yml)
 
-![](screenshots/ktail.gif)
+## This project is no longer actively maintained. If you are looking for a replacement, consider https://kubelog.de/.
+
 ## Features
 - Timeline view for matching highlighters
 - Log output of multiple pods gets merged and sorted by timestamp
